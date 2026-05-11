@@ -1,0 +1,26 @@
+[submodule "SDL"]
+	path = SDL
+	url = git@github.com:x6prl/SDL.git
+	branch = klappt
+[submodule "SDL_ttf"]
+	path = SDL_ttf
+	url = https://github.com/libsdl-org/SDL_ttf
+[submodule "SDL_mixer"]
+	path = SDL_mixer
+	url = https://github.com/libsdl-org/SDL_mixer
+[submodule "SDL_image"]
+	path = SDL_image
+	url = https://github.com/libsdl-org/SDL_image
+[submodule "xxHash"]
+	path = xxHash
+	url = https://github.com/Cyan4973/xxHash.git
+[submodule "lmdb"]
+	path = lmdb
+	url = https://github.com/LMDB/lmdb.git
+[submodule "xapian"]
+	path = xapian
+	url = https://github.com/x6prl/xapian.git
+	branch = android_without_proc_uuid
+[submodule "tracy"]
+	path = tracy
+	url = https://github.com/wolfpld/tracy.git
