@@ -1,0 +1,13 @@
+.DS_Store
+build
+build-prof
+imgui.ini
+.vscode
+.cache
+.codex
+.moved-submodule-content/
+src/ui/translations
+word_data
+__pycache__/
+*.py[cod]
+perf.data*

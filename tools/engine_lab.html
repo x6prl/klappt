@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Engine Lab</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --paper: #fffaf3;
+      --ink: #1f2430;
+      --muted: #6d726f;
+      --accent: #8f4d1f;
+      --accent-soft: #d8b69f;
+      --line: #d7c8b8;
+      --panel: #efe3d4;
+      --good: #1b9e77;
+      --bad: #d95f02;
+      --violet: #6b5b95;
+      --pink: #d45087;
+      --olive: #718c00;
+      --shadow: 0 16px 40px rgba(76, 52, 24, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(214, 174, 138, 0.45), transparent 24rem),
+        linear-gradient(180deg, #f8f0e3 0%, var(--bg) 100%);
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: minmax(19rem, 24rem) minmax(0, 1fr);
+      gap: 1.25rem;
+      padding: 1.25rem;
+      min-height: 100vh;
+    }
+
+    .sidebar,
+    .main {
+      min-width: 0;
+    }
+
+    .card {
+      background: rgba(255, 250, 243, 0.92);
+      border: 1px solid rgba(150, 114, 75, 0.18);
+      border-radius: 1.1rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .sidebar .card {
+      position: sticky;
+      top: 1rem;
+      padding: 1rem;
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      background:
+        linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(247, 238, 227, 0.98));
+    }
+
+    .main {
+      display: grid;
+      gap: 1rem;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    h1 {
+      font-size: clamp(1.9rem, 3.2vw, 3.1rem);
+      line-height: 0.96;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 0.65rem;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .lede {
+      color: var(--muted);
+      margin-top: 0.55rem;
+      max-width: 58rem;
+    }
+
+    .hero {
+      padding: 1.15rem 1.2rem 1.1rem;
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", "Arial Narrow", sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.78rem;
+      color: var(--accent);
+    }
+
+    .hero-tag::before {
+      content: "";
+      width: 0.7rem;
+      height: 0.7rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), #db8c3f);
+      box-shadow: 0 0 0 0.22rem rgba(143, 77, 31, 0.12);
+    }
+
+    .summary {
+      padding: 0.9rem 1rem;
+      background: linear-gradient(135deg, rgba(143, 77, 31, 0.08), rgba(237, 213, 190, 0.45));
+      border: 1px solid rgba(143, 77, 31, 0.16);
+      border-radius: 0.9rem;
+      color: #3b3e3d;
+      font-size: 0.98rem;
+    }
+
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+
+    button,
+    select,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 0.6rem 0.9rem;
+      background: linear-gradient(180deg, #9d5828, #80471d);
+      color: #fff8f0;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", "Arial Narrow", sans-serif;
+      letter-spacing: 0.03em;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, #f2e5d8, #dfcbb7);
+      color: var(--ink);
+    }
+
+    .section {
+      padding-top: 0.9rem;
+      margin-top: 0.9rem;
+      border-top: 1px solid rgba(118, 90, 61, 0.16);
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .section:first-of-type {
+      padding-top: 0;
+      margin-top: 0;
+      border-top: none;
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+
+    .input-grid.triple {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .field {
+      display: grid;
+      gap: 0.34rem;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field label,
+    .field .fake-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 0.4rem;
+    }
+
+    .field input[type="number"],
+    .field input[type="text"],
+    .field select {
+      width: 100%;
+      border: 1px solid rgba(126, 97, 68, 0.22);
+      background: rgba(255, 252, 248, 0.92);
+      border-radius: 0.75rem;
+      padding: 0.56rem 0.65rem;
+      color: var(--ink);
+    }
+
+    .field input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      accent-color: var(--accent);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      padding: 0.66rem 0.72rem;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(126, 97, 68, 0.16);
+      background: rgba(255, 253, 250, 0.85);
+    }
+
+    details {
+      border: 1px solid rgba(126, 97, 68, 0.16);
+      border-radius: 0.85rem;
+      padding: 0.2rem 0.75rem 0.75rem;
+      background: rgba(255, 253, 250, 0.78);
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 0.65rem 0;
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", "Arial Narrow", sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 0.9fr repeat(5, 1fr);
+      gap: 0.35rem;
+      align-items: center;
+    }
+
+    .mode-grid .head,
+    .mode-grid .mode-name {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .mode-grid .mode-name {
+      text-align: left;
+    }
+
+    .mode-grid input {
+      min-width: 0;
+      border: 1px solid rgba(126, 97, 68, 0.18);
+      background: rgba(255, 252, 248, 0.92);
+      border-radius: 0.6rem;
+      padding: 0.46rem 0.5rem;
+    }
+
+    .plot-card,
+    .table-card,
+    .events-card {
+      padding: 0.9rem 1rem 1rem;
+    }
+
+    .plot-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+
+    .plot-title p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    canvas {
+      width: 100%;
+      display: block;
+      border-radius: 0.85rem;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 244, 236, 0.86));
+      border: 1px solid rgba(126, 97, 68, 0.12);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem 1rem;
+      margin-top: 0.7rem;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .swatch {
+      width: 0.95rem;
+      height: 0.95rem;
+      border-radius: 999px;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 0.9fr;
+      gap: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th,
+    td {
+      padding: 0.5rem 0.4rem;
+      border-bottom: 1px solid rgba(126, 97, 68, 0.14);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .mono {
+      font-family: "JetBrains Mono", "SFMono-Regular", "Menlo", "Consolas", monospace;
+    }
+
+    .events {
+      display: grid;
+      gap: 0.75rem;
+      max-height: 31rem;
+      overflow: auto;
+    }
+
+    .event-group {
+      padding: 0.8rem 0.85rem;
+      border-radius: 0.85rem;
+      background: linear-gradient(180deg, rgba(243, 235, 226, 0.75), rgba(255, 251, 246, 0.9));
+      border: 1px solid rgba(126, 97, 68, 0.14);
+    }
+
+    .event-group h3 {
+      font-size: 0.96rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .event-group p + p {
+      margin-top: 0.35rem;
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .inline-note {
+      margin-top: 0.15rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 1100px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar .card {
+        position: static;
+        max-height: none;
+      }
+
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .input-grid,
+      .input-grid.triple,
+      .mode-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .mode-grid .head {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar">
+      <div class="card">
+        <div class="hero-tag">Realtime scheduler playground</div>
+        <h2 style="margin-top:0.35rem;">Controls</h2>
+        <p class="footnote">This page runs entirely in the browser. Edit any field and the plots update immediately.</p>
+
+        <div class="section">
+          <h2>Preset</h2>
+          <div class="preset-row">
+            <button type="button" data-preset="targetish">Reset target-ish</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Simulation</h2>
+          <p class="footnote">These values control only the synthetic review run shown on the plots, not the scheduler math itself.</p>
+          <div class="input-grid">
+            <div class="field">
+              <label for="reviews">Reviews</label>
+              <input id="reviews" type="number" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="reviewSize">Review size</label>
+              <input id="reviewSize" type="number" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="initialMode">Initial mode</label>
+              <select id="initialMode">
+                <option value="entire">Entire</option>
+                <option value="gaps">Gaps</option>
+                <option value="chunks">Chunks</option>
+                <option value="compose">Compose</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="switchReview">Switch review</label>
+              <input id="switchReview" type="number" min="1" step="1">
+            </div>
+            <div class="field full">
+              <label for="keypoints">Keypoints</label>
+              <input id="keypoints" type="text">
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <div>
+              <div class="fake-label">Auto mode switching</div>
+              <div class="footnote">Disable this to freeze the current mode and isolate the formula.</div>
+            </div>
+            <input id="autoModeSwitch" type="checkbox">
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Scenario Inputs</h2>
+          <p class="footnote">`Pretty okay raw` is the observed score before chance correction. The engine turns that into effective quality `q` using the current mode chance baseline.</p>
+          <div class="input-grid">
+            <div class="field">
+              <label for="partialRaw">Pretty okay raw</label>
+              <input id="partialRaw" type="number" min="0" max="1" step="0.01">
+              <div id="partialChanceNote" class="inline-note"></div>
+            </div>
+            <div class="field">
+              <label for="partialLabel">Pretty okay label</label>
+              <input id="partialLabel" type="text">
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Formula Knobs</h2>
+          <p class="footnote">These are the main formula-shape controls. They correspond to the engine’s seed, reward headroom, recovery, and due-mapping stages.</p>
+          <div class="input-grid">
+            <div class="field">
+              <label for="successFormula">Success formula</label>
+              <select id="successFormula">
+                <option value="baseline">baseline</option>
+                <option value="floor">floor</option>
+                <option value="additive">additive</option>
+                <option value="hybrid">hybrid</option>
+              </select>
+              <div class="inline-note">How success headroom is computed from predicted retrievability: baseline uses `1-r`, floor clamps it upward, additive adds a bonus, hybrid does both.</div>
+            </div>
+            <div class="field">
+              <label for="seedFormula">Seed formula</label>
+              <select id="seedFormula">
+                <option value="linear">linear</option>
+                <option value="expo">expo</option>
+              </select>
+              <div class="inline-note">How the first successful review turns quality into initial stability: `linear` interpolates directly, `expo` expands high-quality seeds much more aggressively.</div>
+            </div>
+            <div class="field">
+              <label for="dueFormula">Due formula</label>
+              <select id="dueFormula">
+                <option value="linear">linear</option>
+                <option value="power">power</option>
+              </select>
+              <div class="inline-note">How stability becomes the next due interval: `linear` uses the raw half-life mapping, `power` bends the curve by exponent around the pivot day.</div>
+            </div>
+            <div class="field">
+              <label for="successPower">Success power</label>
+              <input id="successPower" type="number" min="0.05" step="0.05">
+              <div class="inline-note">Exponent applied to success headroom. Lower than `1` makes near-due successes matter more; higher than `1` makes them flatter.</div>
+            </div>
+            <div class="field">
+              <label for="successFloor">Success floor</label>
+              <input id="successFloor" type="number" min="0" step="0.01">
+              <div class="inline-note">Minimum success headroom before exponentiation. This prevents successful reviews from flattening too early when predicted recall is already high.</div>
+            </div>
+            <div class="field">
+              <label for="successBonus">Success bonus</label>
+              <input id="successBonus" type="number" min="0" step="0.01">
+              <div class="inline-note">Extra additive reward headroom on successful reviews. Useful when you want success to keep pushing intervals even at high predicted recall.</div>
+            </div>
+            <div class="field">
+              <label for="recoveryBoost">Recovery boost</label>
+              <input id="recoveryBoost" type="number" min="0" step="0.01">
+              <div class="inline-note">Multiplier bonus on successful reviews after recent failures. This is what makes “wrong several times, then right” recover faster.</div>
+            </div>
+            <div class="field">
+              <label for="recoveryWindow">Recovery window</label>
+              <input id="recoveryWindow" type="number" min="1" step="1">
+              <div class="inline-note">How many recent failures can contribute to the recovery boost. Larger windows remember failure streaks longer.</div>
+            </div>
+            <div class="field">
+              <label for="seedMinScale">Seed min scale</label>
+              <input id="seedMinScale" type="number" min="0.000001" step="0.001">
+              <div class="inline-note">Lower bound of the first-review quality scale. This controls how harsh the very first bad review can be.</div>
+            </div>
+            <div class="field">
+              <label for="seedMaxScale">Seed max scale</label>
+              <input id="seedMaxScale" type="number" min="0.000001" step="0.1">
+              <div class="inline-note">Upper bound of the first-review quality scale. This is the main driver of how big the first perfect interval can get.</div>
+            </div>
+            <div class="field">
+              <label for="seedPower">Seed power</label>
+              <input id="seedPower" type="number" min="0.05" step="0.05">
+              <div class="inline-note">Shape parameter for seed scaling. Higher values make top-end seed growth kick in later; lower values make it kick in earlier.</div>
+            </div>
+            <div class="field">
+              <label for="dueExponent">Due exponent</label>
+              <input id="dueExponent" type="number" min="0.1" step="0.01">
+              <div class="inline-note">Exponent used by the power due mapping. Below `1` compresses very large intervals and fattens early growth; above `1` does the reverse.</div>
+            </div>
+            <div class="field full">
+              <label for="duePivotDays">Due pivot days</label>
+              <input id="duePivotDays" type="number" min="0.001" step="0.05">
+              <div class="inline-note">Reference day for the power due mapping. Around this point the powered curve behaves like the base curve.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Global Constants</h2>
+          <p class="footnote">These are the scheduler-wide defaults: target retention, numerical safety bounds, promotion rules, and decay strengths.</p>
+          <div class="input-grid">
+            <div class="field">
+              <label for="targetRetention">Target retention</label>
+              <input id="targetRetention" type="number" min="0.01" max="0.999" step="0.01">
+              <div class="inline-note">Desired recall probability at due time. Higher values schedule earlier reviews; lower values allow longer intervals.</div>
+            </div>
+            <div class="field">
+              <label for="penaltyLambda">Penalty lambda</label>
+              <input id="penaltyLambda" type="number" min="0" step="0.01">
+              <div class="inline-note">Extra blackout penalty term. It keeps total misses from being treated too softly.</div>
+            </div>
+            <div class="field">
+              <label for="stabilityMinDays">Min stability days</label>
+              <input id="stabilityMinDays" type="number" min="0.000001" step="0.001">
+              <div class="inline-note">Hard lower clamp for stability. This is the shortest possible half-life in the scheduler.</div>
+            </div>
+            <div class="field">
+              <label for="stabilityMaxDays">Max stability days</label>
+              <input id="stabilityMaxDays" type="number" min="0.1" step="1">
+              <div class="inline-note">Hard upper clamp for stability. This caps extreme interval growth.</div>
+            </div>
+            <div class="field">
+              <label for="rewardDecay">Reward decay</label>
+              <input id="rewardDecay" type="number" min="0" step="0.01">
+              <div class="inline-note">Higher stability means smaller gains. Lower values keep successful reviews accelerating for longer.</div>
+            </div>
+            <div class="field">
+              <label for="penaltyDecay">Penalty decay</label>
+              <input id="penaltyDecay" type="number" min="0" step="0.01">
+              <div class="inline-note">Protects high-stability items from collapsing too violently on a miss.</div>
+            </div>
+            <div class="field">
+              <label for="promotionQuality">Promotion quality</label>
+              <input id="promotionQuality" type="number" min="0" max="1" step="0.01">
+              <div class="inline-note">Minimum smoothed quality required before a mode can promote upward.</div>
+            </div>
+            <div class="field">
+              <label for="demotionQuality">Demotion quality</label>
+              <input id="demotionQuality" type="number" min="0" max="1" step="0.01">
+              <div class="inline-note">If smoothed quality falls below this after enough reviews, the mode can demote downward.</div>
+            </div>
+            <div class="field full">
+              <label for="minReviewsBeforeDemotion">Min reviews before demotion</label>
+              <input id="minReviewsBeforeDemotion" type="number" min="1" step="1">
+              <div class="inline-note">Demotion guardrail. Prevents one or two early bad reviews from immediately dropping the mode.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Per Mode</h2>
+          <p class="footnote">Each mode has its own reward, penalty, initial stability, chance baseline, and promotion threshold.</p>
+          <div class="mode-grid">
+            <div></div>
+            <div class="head">eta+</div>
+            <div class="head">eta-</div>
+            <div class="head">seed days</div>
+            <div class="head">chance</div>
+            <div class="head">promote days</div>
+
+            <div class="mode-name">Entire</div>
+            <input id="etaSuccess_entire" type="number" min="0" step="0.01">
+            <input id="etaFailure_entire" type="number" min="0" step="0.01">
+            <input id="initialStability_entire" type="number" min="0.000001" step="0.01">
+            <input id="chance_entire" type="number" min="0" max="1" step="0.01">
+            <input id="promotionStability_entire" type="number" min="0" step="0.1">
+
+            <div class="mode-name">Gaps</div>
+            <input id="etaSuccess_gaps" type="number" min="0" step="0.01">
+            <input id="etaFailure_gaps" type="number" min="0" step="0.01">
+            <input id="initialStability_gaps" type="number" min="0.000001" step="0.01">
+            <input id="chance_gaps" type="number" min="0" max="1" step="0.01">
+            <input id="promotionStability_gaps" type="number" min="0" step="0.1">
+
+            <div class="mode-name">Chunks</div>
+            <input id="etaSuccess_chunks" type="number" min="0" step="0.01">
+            <input id="etaFailure_chunks" type="number" min="0" step="0.01">
+            <input id="initialStability_chunks" type="number" min="0.000001" step="0.01">
+            <input id="chance_chunks" type="number" min="0" max="1" step="0.01">
+            <input id="promotionStability_chunks" type="number" min="0" step="0.1">
+
+            <div class="mode-name">Compose</div>
+            <input id="etaSuccess_compose" type="number" min="0" step="0.01">
+            <input id="etaFailure_compose" type="number" min="0" step="0.01">
+            <input id="initialStability_compose" type="number" min="0.000001" step="0.01">
+            <input id="chance_compose" type="number" min="0" max="1" step="0.01">
+            <input id="promotionStability_compose" type="number" min="0" step="0.1" disabled>
+          </div>
+          <div class="input-grid triple" style="margin-top:0.7rem;">
+            <div class="field">
+              <label for="promotionTransfer_entire">Transfer E->G</label>
+              <input id="promotionTransfer_entire" type="number" min="0" max="1" step="0.01">
+              <div class="inline-note">When a mode promotes, part of its stability transfers upward. Lower values make the new mode harsher and more distinct.</div>
+            </div>
+            <div class="field">
+              <label for="promotionTransfer_gaps">Transfer G->C</label>
+              <input id="promotionTransfer_gaps" type="number" min="0" max="1" step="0.01">
+              <div class="inline-note">Same idea for Gaps -> Chunks.</div>
+            </div>
+            <div class="field">
+              <label for="promotionTransfer_chunks">Transfer C->P</label>
+              <input id="promotionTransfer_chunks" type="number" min="0" max="1" step="0.01">
+              <div class="inline-note">Same idea for Chunks -> Compose.</div>
+            </div>
+          </div>
+        </div>
+
+        <details class="section">
+          <summary>Difficulty Model</summary>
+          <p class="footnote">Difficulty is inferred from surprise: better-than-expected reviews make the item easier, worse-than-expected reviews make it harder.</p>
+          <div class="input-grid">
+            <div class="field">
+              <label for="difficultyInit">Difficulty init</label>
+              <input id="difficultyInit" type="number" min="0.1" step="0.1">
+              <div class="inline-note">Starting difficulty for unseen items.</div>
+            </div>
+            <div class="field">
+              <label for="difficultyLr">Difficulty lr</label>
+              <input id="difficultyLr" type="number" min="0" step="0.01">
+              <div class="inline-note">Learning rate for difficulty updates from surprise.</div>
+            </div>
+            <div class="field">
+              <label for="difficultyMin">Difficulty min</label>
+              <input id="difficultyMin" type="number" min="0.1" step="0.1">
+              <div class="inline-note">Lower clamp for difficulty.</div>
+            </div>
+            <div class="field">
+              <label for="difficultyMax">Difficulty max</label>
+              <input id="difficultyMax" type="number" min="0.1" step="0.1">
+              <div class="inline-note">Upper clamp for difficulty.</div>
+            </div>
+            <div class="field">
+              <label for="easyRewardScale">Easy reward scale</label>
+              <input id="easyRewardScale" type="number" min="0" step="0.01">
+              <div class="inline-note">Reward multiplier for easier items.</div>
+            </div>
+            <div class="field">
+              <label for="hardRewardScale">Hard reward scale</label>
+              <input id="hardRewardScale" type="number" min="0" step="0.01">
+              <div class="inline-note">Reward multiplier for harder items.</div>
+            </div>
+            <div class="field">
+              <label for="easyPenaltyScale">Easy penalty scale</label>
+              <input id="easyPenaltyScale" type="number" min="0" step="0.01">
+              <div class="inline-note">Penalty multiplier for easier items.</div>
+            </div>
+            <div class="field">
+              <label for="hardPenaltyScale">Hard penalty scale</label>
+              <input id="hardPenaltyScale" type="number" min="0" step="0.01">
+              <div class="inline-note">Penalty multiplier for harder items.</div>
+            </div>
+            <div class="field">
+              <label for="qualityEwmaAlpha">Quality EWMA alpha</label>
+              <input id="qualityEwmaAlpha" type="number" min="0" max="1" step="0.01">
+              <div class="inline-note">Smoothing factor for mode quality history. Higher values react faster; lower values are steadier.</div>
+            </div>
+          </div>
+        </details>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero card">
+        <div class="hero-top">
+          <div>
+            <div class="hero-tag">Formula + switching explorer</div>
+            <h1>Engine Lab</h1>
+            <p class="lede">Use this to answer two questions quickly: does the curve flatten because of the formula, and how much of the shape comes from mode switching versus raw growth?</p>
+          </div>
+        </div>
+        <div id="summary" class="summary"></div>
+      </section>
+
+      <section class="plot-card card">
+        <div class="plot-title">
+          <div>
+            <h2>Due Interval</h2>
+            <p>Log scale. Each point is the next due interval after that review.</p>
+          </div>
+        </div>
+        <canvas id="dueCanvas" style="height: 21rem;"></canvas>
+        <div id="legend" class="legend"></div>
+      </section>
+
+      <section class="plot-card card">
+        <div class="plot-title">
+          <div>
+            <h2>Stability</h2>
+            <p>Active-mode half-life, not total historical memory.</p>
+          </div>
+        </div>
+        <canvas id="stabilityCanvas" style="height: 17rem;"></canvas>
+      </section>
+
+      <section class="plot-card card">
+        <div class="plot-title">
+          <div>
+            <h2>Mode Timeline</h2>
+            <p>The step chart shows whether auto mode switching is actually driving the shape.</p>
+          </div>
+        </div>
+        <canvas id="modeCanvas" style="height: 13rem;"></canvas>
+      </section>
+
+      <div class="main-grid">
+        <section class="table-card card">
+          <div class="plot-title">
+            <div>
+              <h2>Keypoints</h2>
+              <p>Selected review checkpoints for every scenario.</p>
+            </div>
+          </div>
+          <div style="overflow:auto;">
+            <table id="keypointsTable"></table>
+          </div>
+        </section>
+
+        <section class="events-card card">
+          <div class="plot-title">
+            <div>
+              <h2>Switch Events</h2>
+              <p>If this stays empty, the flatness is not coming from missing mode switches.</p>
+            </div>
+          </div>
+          <div id="events" class="events"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const A_DAY_SECONDS = 86400.0;
+    const MODES = ["entire", "gaps", "chunks", "compose"];
+    const MODE_LABELS = {
+      entire: "Entire",
+      gaps: "Gaps",
+      chunks: "Chunks",
+      compose: "Compose",
+    };
+    const MODE_INDEX = {
+      entire: 0,
+      gaps: 1,
+      chunks: 2,
+      compose: 3,
+    };
+    const SCENARIO_COLORS = {
+      alwaysRight: "#1b9e77",
+      alwaysWrong: "#d95f02",
+      prettyOkay: "#6b5b95",
+      wrongThenRight: "#d45087",
+      rightThenWrong: "#718c00",
+      typicalUser: "#287271",
+      typicalBumpy: "#b56576",
+    };
+
+    const PRESET = {
+        reviews: 28,
+        reviewSize: 5,
+        initialMode: "entire",
+        autoModeSwitch: true,
+        switchReview: 6,
+        keypoints: "1,2,3,4,5,6,8,12,16,20,24,28",
+        partialRaw: 0.74,
+        partialLabel: "Not very bad",
+        successFormula: "hybrid",
+        seedFormula: "expo",
+        dueFormula: "power",
+        successPower: 0.85,
+        successFloor: 0.55,
+        successBonus: 0.22,
+        recoveryBoost: 1.85,
+        recoveryWindow: 5,
+        seedMinScale: 0.008,
+        seedMaxScale: 24.0,
+        seedPower: 1.0,
+        dueExponent: 0.92,
+        duePivotDays: 1.0,
+        targetRetention: 0.88,
+        penaltyLambda: 0.11,
+        stabilityMinDays: 20 / A_DAY_SECONDS,
+        stabilityMaxDays: 365,
+        rewardDecay: 0.08,
+        penaltyDecay: 0.08,
+        promotionQuality: 0.80,
+        demotionQuality: 0.28,
+        minReviewsBeforeDemotion: 2,
+        difficultyInit: 5.0,
+        difficultyLr: 0.18,
+        difficultyMin: 1.0,
+        difficultyMax: 10.0,
+        easyRewardScale: 1.32,
+        hardRewardScale: 0.82,
+        easyPenaltyScale: 0.92,
+        hardPenaltyScale: 1.08,
+        qualityEwmaAlpha: 0.34,
+        etaSuccess_entire: 0.78,
+        etaSuccess_gaps: 0.82,
+        etaSuccess_chunks: 0.92,
+        etaSuccess_compose: 1.05,
+        etaFailure_entire: 0.09,
+        etaFailure_gaps: 0.11,
+        etaFailure_chunks: 0.15,
+        etaFailure_compose: 0.18,
+        initialStability_entire: 0.18,
+        initialStability_gaps: 0.10,
+        initialStability_chunks: 0.09,
+        initialStability_compose: 0.07,
+        chance_entire: 0.20,
+        chance_gaps: 0.20,
+        chance_chunks: 0.05,
+        chance_compose: 0.00,
+        promotionStability_entire: 6.00,
+        promotionStability_gaps: 10.00,
+        promotionStability_chunks: 18.00,
+        promotionStability_compose: 0.0,
+        promotionTransfer_entire: 0.18,
+        promotionTransfer_gaps: 0.32,
+        promotionTransfer_chunks: 0.42,
+    };
+
+    const FORM_IDS = [
+      "reviews",
+      "reviewSize",
+      "initialMode",
+      "autoModeSwitch",
+      "switchReview",
+      "keypoints",
+      "partialRaw",
+      "partialLabel",
+      "successFormula",
+      "seedFormula",
+      "dueFormula",
+      "successPower",
+      "successFloor",
+      "successBonus",
+      "recoveryBoost",
+      "recoveryWindow",
+      "seedMinScale",
+      "seedMaxScale",
+      "seedPower",
+      "dueExponent",
+      "duePivotDays",
+      "targetRetention",
+      "penaltyLambda",
+      "stabilityMinDays",
+      "stabilityMaxDays",
+      "rewardDecay",
+      "penaltyDecay",
+      "promotionQuality",
+      "demotionQuality",
+      "minReviewsBeforeDemotion",
+      "difficultyInit",
+      "difficultyLr",
+      "difficultyMin",
+      "difficultyMax",
+      "easyRewardScale",
+      "hardRewardScale",
+      "easyPenaltyScale",
+      "hardPenaltyScale",
+      "qualityEwmaAlpha",
+      "etaSuccess_entire",
+      "etaSuccess_gaps",
+      "etaSuccess_chunks",
+      "etaSuccess_compose",
+      "etaFailure_entire",
+      "etaFailure_gaps",
+      "etaFailure_chunks",
+      "etaFailure_compose",
+      "initialStability_entire",
+      "initialStability_gaps",
+      "initialStability_chunks",
+      "initialStability_compose",
+      "chance_entire",
+      "chance_gaps",
+      "chance_chunks",
+      "chance_compose",
+      "promotionStability_entire",
+      "promotionStability_gaps",
+      "promotionStability_chunks",
+      "promotionStability_compose",
+      "promotionTransfer_entire",
+      "promotionTransfer_gaps",
+      "promotionTransfer_chunks",
+    ];
+
+    function clamp01(value) {
+      return Math.min(1, Math.max(0, value));
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function safeExp2Neg(value) {
+      return Math.pow(2, -Math.max(0, value));
+    }
+
+    function intervalDaysFromHalfLife(stabilityDays, targetRetention) {
+      return stabilityDays * Math.log2(1 / targetRetention);
+    }
+
+    function retrievability(elapsedDays, stabilityDays) {
+      if (stabilityDays <= 0) {
+        return 0;
+      }
+      return safeExp2Neg(elapsedDays / stabilityDays);
+    }
+
+    function qualityFromPartial(raw, chance) {
+      raw = clamp01(raw);
+      chance = clamp01(chance);
+      if (chance >= 0.999999) {
+        return raw >= 0.999999 ? 1 : 0;
+      }
+      return clamp01((raw - chance) / (1 - chance));
+    }
+
+    function stabilizationDecay(stabilityDays, decayStrength) {
+      return 1 / (1 + decayStrength * Math.log1p(Math.max(0, stabilityDays)));
+    }
+
+    function dueDaysFromFormula(baseDays, config) {
+      if (config.dueFormula === "power") {
+        const pivot = Math.max(config.duePivotDays, 1e-9);
+        return pivot * Math.pow(Math.max(baseDays / pivot, 1e-9), config.dueExponent);
+      }
+      return baseDays;
+    }
+
+    function seedScale(quality, config) {
+      const minScale = Math.max(config.seedMinScale, 1e-9);
+      const maxScale = Math.max(config.seedMaxScale, minScale);
+      if (config.seedFormula === "expo") {
+        return minScale * Math.pow(maxScale / minScale, Math.pow(clamp01(quality), config.seedPower));
+      }
+      return lerp(minScale, maxScale, clamp01(quality));
+    }
+
+    function successHeadroom(predictedR, config) {
+      const base = Math.max(0, 1 - predictedR);
+      if (config.successFormula === "floor") {
+        return Math.max(base, config.successFloor);
+      }
+      if (config.successFormula === "additive") {
+        return base + config.successBonus;
+      }
+      if (config.successFormula === "hybrid") {
+        return Math.max(base, config.successFloor) + config.successBonus;
+      }
+      return base;
+    }
+
+    function chanceSuccessFor(config, mode) {
+      return clamp01(config.chance[mode]);
+    }
+
+    function difficultyNorm(state, config) {
+      const span = config.difficultyMax - config.difficultyMin;
+      if (span <= 0) {
+        return 0.5;
+      }
+      return clamp01((state.difficulty - config.difficultyMin) / span);
+    }
+
+    function rewardScaleFromDifficulty(state, config) {
+      return lerp(config.easyRewardScale, config.hardRewardScale, difficultyNorm(state, config));
+    }
+
+    function penaltyScaleFromDifficulty(state, config) {
+      return lerp(config.easyPenaltyScale, config.hardPenaltyScale, difficultyNorm(state, config));
+    }
+
+    function createState(config) {
+      const memory = {};
+      for (const mode of MODES) {
+        memory[mode] = {
+          stabilityDays: 0,
+          qualityEwma: 0,
+          reviews: 0,
+        };
+      }
+      return {
+        mode: config.initialMode,
+        difficulty: config.difficultyInit,
+        memory,
+        lastReview: 0,
+        due: 0,
+        totalReviews: 0,
+        lapses: 0,
+        recentFailures: 0,
+      };
+    }
+
+    function updateDifficulty(state, reviewMode, effectiveQuality, predictedR, config) {
+      const signal = {
+        entire: 0.60,
+        gaps: 0.80,
+        chunks: 1.00,
+        compose: 1.10,
+      }[reviewMode];
+      const surprise = effectiveQuality - predictedR;
+      state.difficulty -= config.difficultyLr * signal * surprise;
+      state.difficulty = Math.min(config.difficultyMax, Math.max(config.difficultyMin, state.difficulty));
+    }
+
+    function seedInitialStability(state, mode, quality, config) {
+      const base = config.initialStability[mode];
+      const dNorm = difficultyNorm(state, config);
+      const difficultyScale = lerp(1.10, 0.85, dNorm);
+      return Math.min(
+        config.stabilityMaxDays,
+        Math.max(
+          config.stabilityMinDays,
+          base * difficultyScale * seedScale(quality, config),
+        ),
+      );
+    }
+
+    function maybePromote(state, config) {
+      if (!config.autoModeSwitch || state.mode === "compose") {
+        return null;
+      }
+      const current = state.memory[state.mode];
+      if (current.qualityEwma < config.promotionQuality) {
+        return null;
+      }
+      if (current.stabilityDays < config.promotionStability[state.mode]) {
+        return null;
+      }
+      const nextMode = MODES[Math.min(MODES.length - 1, MODE_INDEX[state.mode] + 1)];
+      const dst = state.memory[nextMode];
+      const from = state.mode;
+      const transfer = config.promotionTransfer[from] ?? 0;
+      dst.stabilityDays = Math.max(dst.stabilityDays, current.stabilityDays * transfer);
+      dst.qualityEwma = Math.max(dst.qualityEwma, current.qualityEwma * 0.80);
+      state.mode = nextMode;
+      return { from, to: nextMode, kind: "promote" };
+    }
+
+    function maybeDemote(state, config) {
+      if (!config.autoModeSwitch || state.mode === "entire") {
+        return null;
+      }
+      const current = state.memory[state.mode];
+      if (current.reviews < config.minReviewsBeforeDemotion) {
+        return null;
+      }
+      if (current.qualityEwma > config.demotionQuality) {
+        return null;
+      }
+      const from = state.mode;
+      state.mode = MODES[Math.max(0, MODE_INDEX[state.mode] - 1)];
+      return { from, to: state.mode, kind: "demote" };
+    }
+
+    function refreshDue(state, config, now) {
+      const active = state.memory[state.mode];
+      const stability = Math.min(config.stabilityMaxDays, Math.max(config.stabilityMinDays, active.stabilityDays));
+      const baseDays = intervalDaysFromHalfLife(stability, config.targetRetention);
+      const dueDays = dueDaysFromFormula(baseDays, config);
+      const dueSeconds = Math.max(0, dueDays * A_DAY_SECONDS);
+      state.due = now + dueSeconds;
+      return dueSeconds;
+    }
+
+    function updateState(state, rawScore, atSeconds, config) {
+      const modeBefore = state.mode;
+      const memoryBefore = state.memory[modeBefore];
+      const chance = chanceSuccessFor(config, modeBefore);
+      const quality = qualityFromPartial(rawScore, chance);
+      let predictedR = 0;
+
+      if (state.lastReview !== 0 && atSeconds > state.lastReview && memoryBefore.stabilityDays > 0) {
+        const elapsedDays = (atSeconds - state.lastReview) / A_DAY_SECONDS;
+        predictedR = retrievability(elapsedDays, memoryBefore.stabilityDays);
+      }
+
+      updateDifficulty(state, modeBefore, quality, predictedR, config);
+
+      if (memoryBefore.stabilityDays <= 0) {
+        memoryBefore.stabilityDays = seedInitialStability(state, modeBefore, quality, config);
+      } else {
+        const recoveryMultiplier = quality >= 0.5
+          ? 1 + (config.recoveryBoost * Math.min(1, state.recentFailures / Math.max(1, config.recoveryWindow)))
+          : 1;
+        const reward = (
+          config.etaSuccess[modeBefore] *
+          quality *
+          Math.pow(Math.max(1e-9, successHeadroom(predictedR, config)), config.successPower) *
+          recoveryMultiplier *
+          rewardScaleFromDifficulty(state, config) *
+          stabilizationDecay(memoryBefore.stabilityDays, config.rewardDecay)
+        );
+        const penalty = (
+          config.etaFailure[modeBefore] *
+          (1 - quality) *
+          (predictedR + config.penaltyLambda) *
+          penaltyScaleFromDifficulty(state, config) *
+          stabilizationDecay(memoryBefore.stabilityDays, config.penaltyDecay)
+        );
+        const nextLog = Math.log(memoryBefore.stabilityDays) + (reward - penalty);
+        memoryBefore.stabilityDays = Math.min(
+          config.stabilityMaxDays,
+          Math.max(config.stabilityMinDays, Math.exp(nextLog)),
+        );
+      }
+
+      memoryBefore.qualityEwma = ((1 - config.qualityEwmaAlpha) * memoryBefore.qualityEwma) + (config.qualityEwmaAlpha * quality);
+      memoryBefore.reviews += 1;
+
+      state.totalReviews += 1;
+      if (quality < 0.5) {
+        state.lapses += 1;
+        state.recentFailures += 1;
+      } else {
+        state.recentFailures = Math.max(0, state.recentFailures - 1);
+      }
+
+      state.lastReview = atSeconds;
+
+      let transition = null;
+      if (quality >= 0.5) {
+        transition = maybePromote(state, config);
+      } else {
+        transition = maybeDemote(state, config);
+      }
+
+      const intervalSeconds = refreshDue(state, config, atSeconds);
+      return {
+        review: state.totalReviews,
+        rawScore,
+        quality,
+        predictedR,
+        atSeconds,
+        dueSeconds: state.due,
+        intervalSeconds,
+        stabilityDays: state.memory[state.mode].stabilityDays,
+        difficulty: state.difficulty,
+        mode: state.mode,
+        modeBefore,
+        transition,
+        lapses: state.lapses,
+      };
+    }
+
+    function parseKeypoints(text, reviews) {
+      return text
+        .split(",")
+        .map((item) => Number(item.trim()))
+        .filter((value) => Number.isFinite(value) && value >= 1 && value <= reviews);
+    }
+
+    function formatDuration(seconds) {
+      const value = Math.max(0, seconds);
+      if (value < 60) {
+        return `${value.toFixed(0)}s`;
+      }
+      const minutes = value / 60;
+      if (minutes < 60) {
+        return minutes < 10 ? `${minutes.toFixed(1)}m` : `${minutes.toFixed(0)}m`;
+      }
+      const hours = minutes / 60;
+      if (hours < 24) {
+        return hours < 10 ? `${hours.toFixed(1)}h` : `${hours.toFixed(0)}h`;
+      }
+      const days = hours / 24;
+      if (days < 7) {
+        return days < 10 ? `${days.toFixed(1)}d` : `${days.toFixed(0)}d`;
+      }
+      const weeks = days / 7;
+      if (weeks < 52) {
+        return weeks < 10 ? `${weeks.toFixed(1)}w` : `${weeks.toFixed(0)}w`;
+      }
+      return `${(days / 365).toFixed(1)}y`;
+    }
+
+    function compactRatio(value) {
+      return Number(value).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+    }
+
+    function buildConfig() {
+      const readNumber = (id) => Number(document.getElementById(id).value);
+      const config = {
+        reviews: Math.max(1, Math.round(readNumber("reviews"))),
+        reviewSize: Math.max(1, Math.round(readNumber("reviewSize"))),
+        initialMode: document.getElementById("initialMode").value,
+        autoModeSwitch: document.getElementById("autoModeSwitch").checked,
+        switchReview: Math.max(1, Math.round(readNumber("switchReview"))),
+        keypoints: document.getElementById("keypoints").value,
+        partialRaw: clamp01(readNumber("partialRaw")),
+        partialLabel: document.getElementById("partialLabel").value.trim() || "Pretty okay",
+        successFormula: document.getElementById("successFormula").value,
+        seedFormula: document.getElementById("seedFormula").value,
+        dueFormula: document.getElementById("dueFormula").value,
+        successPower: Math.max(0.05, readNumber("successPower")),
+        successFloor: Math.max(0, readNumber("successFloor")),
+        successBonus: Math.max(0, readNumber("successBonus")),
+        recoveryBoost: Math.max(0, readNumber("recoveryBoost")),
+        recoveryWindow: Math.max(1, Math.round(readNumber("recoveryWindow"))),
+        seedMinScale: Math.max(1e-9, readNumber("seedMinScale")),
+        seedMaxScale: Math.max(1e-9, readNumber("seedMaxScale")),
+        seedPower: Math.max(0.05, readNumber("seedPower")),
+        dueExponent: Math.max(0.1, readNumber("dueExponent")),
+        duePivotDays: Math.max(0.001, readNumber("duePivotDays")),
+        targetRetention: clamp01(readNumber("targetRetention")),
+        penaltyLambda: Math.max(0, readNumber("penaltyLambda")),
+        stabilityMinDays: Math.max(1e-9, readNumber("stabilityMinDays")),
+        stabilityMaxDays: Math.max(readNumber("stabilityMinDays"), readNumber("stabilityMaxDays")),
+        rewardDecay: Math.max(0, readNumber("rewardDecay")),
+        penaltyDecay: Math.max(0, readNumber("penaltyDecay")),
+        promotionQuality: clamp01(readNumber("promotionQuality")),
+        demotionQuality: clamp01(readNumber("demotionQuality")),
+        minReviewsBeforeDemotion: Math.max(1, Math.round(readNumber("minReviewsBeforeDemotion"))),
+        difficultyInit: readNumber("difficultyInit"),
+        difficultyLr: Math.max(0, readNumber("difficultyLr")),
+        difficultyMin: readNumber("difficultyMin"),
+        difficultyMax: Math.max(readNumber("difficultyMin"), readNumber("difficultyMax")),
+        easyRewardScale: Math.max(0, readNumber("easyRewardScale")),
+        hardRewardScale: Math.max(0, readNumber("hardRewardScale")),
+        easyPenaltyScale: Math.max(0, readNumber("easyPenaltyScale")),
+        hardPenaltyScale: Math.max(0, readNumber("hardPenaltyScale")),
+        qualityEwmaAlpha: clamp01(readNumber("qualityEwmaAlpha")),
+        etaSuccess: {},
+        etaFailure: {},
+        initialStability: {},
+        chance: {},
+        promotionStability: {},
+        promotionTransfer: {},
+      };
+      for (const mode of MODES) {
+        config.etaSuccess[mode] = Math.max(0, readNumber(`etaSuccess_${mode}`));
+        config.etaFailure[mode] = Math.max(0, readNumber(`etaFailure_${mode}`));
+        config.initialStability[mode] = Math.max(1e-9, readNumber(`initialStability_${mode}`));
+        config.chance[mode] = clamp01(readNumber(`chance_${mode}`));
+        config.promotionStability[mode] = Math.max(0, readNumber(`promotionStability_${mode}`));
+      }
+      config.promotionTransfer.entire = clamp01(readNumber("promotionTransfer_entire"));
+      config.promotionTransfer.gaps = clamp01(readNumber("promotionTransfer_gaps"));
+      config.promotionTransfer.chunks = clamp01(readNumber("promotionTransfer_chunks"));
+      return config;
+    }
+
+    function buildScenarios(config) {
+      return [
+        {
+          key: "alwaysRight",
+          label: "Always right",
+          raw(review) {
+            return 1;
+          },
+        },
+        {
+          key: "alwaysWrong",
+          label: "Always wrong",
+          raw(review) {
+            return 0;
+          },
+        },
+        {
+          key: "prettyOkay",
+          label: `${config.partialLabel} (${compactRatio(config.partialRaw)} raw)`,
+          raw(review) {
+            return config.partialRaw;
+          },
+        },
+        {
+          key: "wrongThenRight",
+          label: `Wrong until ${config.switchReview - 1}, then right`,
+          raw(review) {
+            return review < config.switchReview ? 0 : 1;
+          },
+        },
+        {
+          key: "rightThenWrong",
+          label: `Right until ${config.switchReview - 1}, then wrong`,
+          raw(review) {
+            return review < config.switchReview ? 1 : 0;
+          },
+        },
+        {
+          key: "typicalUser",
+          label: "Typical user",
+          raw(review) {
+            const base = 0.48 + Math.min(0.34, review * 0.018);
+            const wobble = review % 6 === 0 ? -0.16 : review % 9 === 0 ? -0.08 : 0.05;
+            return clamp01(base + wobble);
+          },
+        },
+        {
+          key: "typicalBumpy",
+          label: "Typical with lapses",
+          raw(review) {
+            const base = 0.54 + Math.min(0.26, review * 0.014);
+            const majorDip = review % 8 === 0 ? -0.42 : 0;
+            const minorDip = review % 5 === 0 ? -0.14 : 0;
+            return clamp01(base + majorDip + minorDip);
+          },
+        },
+      ];
+    }
+
+    function simulateScenario(config, scenario) {
+      const state = createState(config);
+      const points = [];
+      const switches = [];
+      let now = 0;
+      for (let review = 1; review <= config.reviews; review += 1) {
+        const snapshot = updateState(state, scenario.raw(review), now, config);
+        points.push(snapshot);
+        if (snapshot.transition) {
+          switches.push({
+            review,
+            from: snapshot.transition.from,
+            to: snapshot.transition.to,
+            dueAfter: snapshot.intervalSeconds,
+          });
+        }
+        now = state.due;
+      }
+      return { points, switches };
+    }
+
+    function simulateAll(config) {
+      const scenarios = buildScenarios(config);
+      const results = {};
+      for (const scenario of scenarios) {
+        results[scenario.key] = {
+          label: scenario.label,
+          color: SCENARIO_COLORS[scenario.key],
+          ...simulateScenario(config, scenario),
+        };
+      }
+      return results;
+    }
+
+    function resizeCanvas(canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const width = Math.max(320, Math.round(canvas.clientWidth * ratio));
+      const height = Math.max(180, Math.round(canvas.clientHeight * ratio));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(ratio, ratio);
+      return { ctx, width: canvas.clientWidth, height: canvas.clientHeight };
+    }
+
+    function niceLogTicks(minValue, maxValue) {
+      const ticks = [];
+      const minPower = Math.floor(Math.log10(minValue));
+      const maxPower = Math.ceil(Math.log10(maxValue));
+      for (let power = minPower; power <= maxPower; power += 1) {
+        const base = 10 ** power;
+        for (const mult of [1, 2, 5]) {
+          const tick = mult * base;
+          if (tick >= minValue && tick <= maxValue) {
+            ticks.push(tick);
+          }
+        }
+      }
+      if (!ticks.includes(minValue)) {
+        ticks.unshift(minValue);
+      }
+      if (!ticks.includes(maxValue)) {
+        ticks.push(maxValue);
+      }
+      return [...new Set(ticks)].sort((a, b) => a - b);
+    }
+
+    function drawLogChart(canvas, title, seriesMap, getter) {
+      const { ctx, width, height } = resizeCanvas(canvas);
+      const margin = { left: 72, right: 24, top: 24, bottom: 34 };
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "rgba(255,255,255,0.0)";
+      ctx.fillRect(0, 0, width, height);
+
+      const values = [];
+      const maxReview = Math.max(...Object.values(seriesMap).map((entry) => entry.points.length));
+      for (const entry of Object.values(seriesMap)) {
+        for (const point of entry.points) {
+          values.push(Math.max(1e-9, getter(point)));
+        }
+      }
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const minLog = Math.log10(minValue);
+      const maxLog = Math.log10(maxValue);
+
+      const xFor = (review) => {
+        if (maxReview <= 1) {
+          return margin.left + (width - margin.left - margin.right) / 2;
+        }
+        return margin.left + ((review - 1) / (maxReview - 1)) * (width - margin.left - margin.right);
+      };
+      const yFor = (value) => {
+        const logValue = Math.log10(Math.max(1e-9, value));
+        const ratio = (logValue - minLog) / Math.max(1e-9, (maxLog - minLog));
+        return (height - margin.bottom) - ratio * (height - margin.top - margin.bottom);
+      };
+
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "#6d726f";
+      ctx.strokeStyle = "rgba(120, 98, 69, 0.14)";
+      ctx.lineWidth = 1;
+
+      for (const tick of niceLogTicks(minValue, maxValue)) {
+        const y = yFor(tick);
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(width - margin.right, y);
+        ctx.stroke();
+        ctx.fillText(formatDuration(tick), 8, y + 4);
+      }
+
+      const xTickStep = maxReview > 60 ? 5 : maxReview > 30 ? 2 : 1;
+      for (let review = 1; review <= maxReview; review += xTickStep) {
+        const x = xFor(review);
+        ctx.strokeStyle = "rgba(120, 98, 69, 0.08)";
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, height - margin.bottom);
+        ctx.stroke();
+        ctx.fillStyle = "#6d726f";
+        ctx.fillText(String(review), x - 4, height - 10);
+      }
+
+      ctx.strokeStyle = "rgba(63, 51, 40, 0.45)";
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, width - margin.left - margin.right, height - margin.top - margin.bottom);
+      ctx.stroke();
+
+      ctx.font = "600 14px monospace";
+      ctx.fillStyle = "#1f2430";
+      ctx.fillText(title, margin.left, 14);
+
+      for (const entry of Object.values(seriesMap)) {
+        ctx.strokeStyle = entry.color;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        entry.points.forEach((point, index) => {
+          const x = xFor(point.review);
+          const y = yFor(getter(point));
+          if (index === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+
+        ctx.fillStyle = entry.color;
+        entry.points.forEach((point) => {
+          const x = xFor(point.review);
+          const y = yFor(getter(point));
+          ctx.beginPath();
+          ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        const transitions = entry.points.filter((point) => point.transition);
+        for (const point of transitions) {
+          const x = xFor(point.review);
+          const y = yFor(getter(point));
+          ctx.save();
+          ctx.strokeStyle = entry.color;
+          ctx.fillStyle = "#fffaf3";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, y - 7);
+          ctx.lineTo(x + 7, y);
+          ctx.lineTo(x, y + 7);
+          ctx.lineTo(x - 7, y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#1f2430";
+          ctx.font = "600 11px monospace";
+          ctx.fillText(`${MODE_LABELS[point.transition.to]}`, x + 9, y - 9);
+          ctx.restore();
+        }
+      }
+    }
+
+    function drawModeChart(canvas, seriesMap) {
+      const { ctx, width, height } = resizeCanvas(canvas);
+      const margin = { left: 72, right: 24, top: 24, bottom: 34 };
+      ctx.clearRect(0, 0, width, height);
+
+      const maxReview = Math.max(...Object.values(seriesMap).map((entry) => entry.points.length));
+      const xFor = (review) => {
+        if (maxReview <= 1) {
+          return margin.left + (width - margin.left - margin.right) / 2;
+        }
+        return margin.left + ((review - 1) / (maxReview - 1)) * (width - margin.left - margin.right);
+      };
+      const yFor = (modeIndex) => {
+        return (height - margin.bottom) - ((modeIndex + 0.5) / 4) * (height - margin.top - margin.bottom);
+      };
+
+      ctx.font = "12px monospace";
+      for (let i = 0; i < 4; i += 1) {
+        const y = yFor(i);
+        ctx.strokeStyle = "rgba(120, 98, 69, 0.12)";
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(width - margin.right, y);
+        ctx.stroke();
+        const mode = MODES[3 - i];
+        ctx.fillStyle = "#6d726f";
+        ctx.fillText(MODE_LABELS[mode], 8, y + 4);
+      }
+
+      ctx.strokeStyle = "rgba(63, 51, 40, 0.45)";
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, width - margin.left - margin.right, height - margin.top - margin.bottom);
+      ctx.stroke();
+      ctx.font = "600 14px monospace";
+      ctx.fillStyle = "#1f2430";
+      ctx.fillText("Mode timeline", margin.left, 14);
+
+      for (const entry of Object.values(seriesMap)) {
+        ctx.strokeStyle = entry.color;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        entry.points.forEach((point, index) => {
+          const x = xFor(point.review);
+          const y = yFor(3 - MODE_INDEX[point.mode]);
+          if (index === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+
+        entry.points.forEach((point) => {
+          if (!point.transition) {
+            return;
+          }
+          const x = xFor(point.review);
+          const yPrev = yFor(3 - MODE_INDEX[point.transition.from]);
+          const yNext = yFor(3 - MODE_INDEX[point.transition.to]);
+          ctx.save();
+          ctx.strokeStyle = entry.color;
+          ctx.fillStyle = entry.color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x, yPrev);
+          ctx.lineTo(x, yNext);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x, yNext, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#1f2430";
+          ctx.font = "600 11px monospace";
+          const label = point.transition.kind === "promote" ? "↑" : "↓";
+          ctx.fillText(label, x + 7, yNext - 7);
+          ctx.restore();
+        });
+      }
+    }
+
+    function renderLegend(seriesMap) {
+      const legend = document.getElementById("legend");
+      legend.innerHTML = Object.values(seriesMap)
+        .map((entry) => `
+          <span>
+            <span class="swatch" style="background:${entry.color}"></span>
+            ${entry.label}
+          </span>
+        `)
+        .join("");
+    }
+
+    function renderSummary(config, seriesMap) {
+      const right = seriesMap.alwaysRight.points;
+      const wrong = seriesMap.alwaysWrong.points;
+      const okay = seriesMap.prettyOkay.points;
+      const typical = seriesMap.typicalUser.points;
+      const firstSteps = right.slice(0, 6).map((point) => {
+        const switchSuffix = point.transition ? ` and ${MODE_LABELS[point.transition.to]}` : "";
+        return `${formatDuration(point.intervalSeconds)}${switchSuffix}`;
+      }).join(" -> ");
+      const okaySteps = okay.slice(0, 5).map((point) => formatDuration(point.intervalSeconds)).join(" -> ");
+      const typicalSteps = typical.slice(0, 6).map((point) => formatDuration(point.intervalSeconds)).join(" -> ");
+      const wrongFirst = formatDuration(wrong[0].intervalSeconds);
+      const switchCount = Object.values(seriesMap).reduce((acc, entry) => acc + entry.switches.length, 0);
+      const chance = chanceSuccessFor(config, config.initialMode);
+      const okayQ = qualityFromPartial(config.partialRaw, chance);
+      document.getElementById("partialChanceNote").textContent =
+        `Raw score before chance correction. In ${MODE_LABELS[config.initialMode]}, raw ${compactRatio(config.partialRaw)} with chance ${compactRatio(chance)} becomes q=${compactRatio(okayQ)}.`;
+      document.getElementById("summary").innerHTML = `
+        <strong>Always right:</strong> ${firstSteps}. 
+        <strong>Always wrong first review:</strong> ${wrongFirst}. 
+        <strong>${seriesMap.prettyOkay.label}:</strong> ${okaySteps}. 
+        <strong>Typical user:</strong> ${typicalSteps}. 
+        <strong>Auto mode switching:</strong> ${config.autoModeSwitch ? "on" : "off"}, total switch events across shown scenarios: ${switchCount}.
+      `;
+    }
+
+    function renderKeypoints(config, seriesMap) {
+      const keypoints = parseKeypoints(config.keypoints, config.reviews);
+      const table = document.getElementById("keypointsTable");
+      let html = `
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>Review</th>
+            <th>Mode</th>
+            <th>Due</th>
+            <th>Stability</th>
+            <th>q</th>
+            <th>raw</th>
+            <th>pred-r</th>
+          </tr>
+        </thead>
+        <tbody>
+      `;
+      for (const entry of Object.values(seriesMap)) {
+        let firstRow = true;
+        for (const review of keypoints) {
+          const point = entry.points[review - 1];
+          if (!point) {
+            continue;
+          }
+          html += `
+            <tr>
+              <td>${firstRow ? entry.label : ""}</td>
+              <td class="mono">${point.review}</td>
+              <td>${MODE_LABELS[point.mode]}</td>
+              <td class="mono">${formatDuration(point.intervalSeconds)}</td>
+              <td class="mono">${formatDuration(point.stabilityDays * A_DAY_SECONDS)}</td>
+              <td class="mono">${compactRatio(point.quality)}</td>
+              <td class="mono">${compactRatio(point.rawScore)}</td>
+              <td class="mono">${compactRatio(point.predictedR)}</td>
+            </tr>
+          `;
+          firstRow = false;
+        }
+      }
+      html += "</tbody>";
+      table.innerHTML = html;
+    }
+
+    function renderEvents(seriesMap) {
+      const container = document.getElementById("events");
+      const blocks = [];
+      for (const entry of Object.values(seriesMap)) {
+        if (!entry.switches.length) {
+          blocks.push(`
+            <div class="event-group">
+              <h3>${entry.label}</h3>
+              <p class="footnote">No mode changes.</p>
+            </div>
+          `);
+          continue;
+        }
+        const items = entry.switches.map((event) => `
+          <p><span class="mono">r${event.review}</span> ${MODE_LABELS[event.from]} -> ${MODE_LABELS[event.to]}, next due ${formatDuration(event.dueAfter)}</p>
+        `).join("");
+        blocks.push(`
+          <div class="event-group">
+            <h3>${entry.label}</h3>
+            ${items}
+          </div>
+        `);
+      }
+      container.innerHTML = blocks.join("");
+    }
+
+    function renderAll() {
+      const config = buildConfig();
+      const seriesMap = simulateAll(config);
+      renderLegend(seriesMap);
+      renderSummary(config, seriesMap);
+      renderKeypoints(config, seriesMap);
+      renderEvents(seriesMap);
+      drawLogChart(document.getElementById("dueCanvas"), "Due interval after each review", seriesMap, (point) => Math.max(1e-9, point.intervalSeconds));
+      drawLogChart(document.getElementById("stabilityCanvas"), "Active-mode stability (half-life)", seriesMap, (point) => Math.max(1e-9, point.stabilityDays * A_DAY_SECONDS));
+      drawModeChart(document.getElementById("modeCanvas"), seriesMap);
+    }
+
+    function applyPreset(name) {
+      const preset = PRESET;
+      for (const id of FORM_IDS) {
+        const element = document.getElementById(id);
+        if (!element || !(id in preset)) {
+          continue;
+        }
+        if (element.type === "checkbox") {
+          element.checked = Boolean(preset[id]);
+        } else {
+          element.value = preset[id];
+        }
+      }
+      renderAll();
+    }
+
+    function attachListeners() {
+      for (const id of FORM_IDS) {
+        const element = document.getElementById(id);
+        if (!element) {
+          continue;
+        }
+        const eventName = element.type === "checkbox" || element.tagName === "SELECT" ? "change" : "input";
+        element.addEventListener(eventName, renderAll);
+      }
+      document.querySelectorAll("[data-preset]").forEach((button) => {
+        button.addEventListener("click", () => applyPreset("targetish"));
+      });
+      window.addEventListener("resize", renderAll);
+    }
+
+    attachListeners();
+    applyPreset("targetish");
+  </script>
+</body>
+</html>
