@@ -205,6 +205,8 @@ list(APPEND XAPIAN_QUERYPARSER_SOURCES
     "${XAPIAN_CORE_BINARY_DIR}/queryparser/queryparser_internal.cc"
 )
 
+file(MAKE_DIRECTORY "${XAPIAN_CORE_BINARY_DIR}/weight")
+
 file(MAKE_DIRECTORY "${XAPIAN_CORE_BINARY_DIR}/include/xapian")
 add_custom_command(OUTPUT
     "${XAPIAN_CORE_BINARY_DIR}/include/xapian/error.h"
@@ -342,6 +344,30 @@ add_custom_command(OUTPUT
     COMMENT "Generating Xapian query parser"
 )
 
+add_custom_command(OUTPUT "${XAPIAN_CORE_BINARY_DIR}/weight/idf-norm-dispatch.h"
+    COMMAND perl "-I${XAPIAN_CORE_SOURCE_DIR}/common"
+        "${XAPIAN_CORE_SOURCE_DIR}/weight/collate-idf-norm"
+        "${XAPIAN_CORE_SOURCE_DIR}"
+    WORKING_DIRECTORY "${XAPIAN_CORE_BINARY_DIR}"
+    DEPENDS
+        "${XAPIAN_CORE_SOURCE_DIR}/weight/collate-idf-norm"
+        "${XAPIAN_CORE_SOURCE_DIR}/weight/Makefile.mk"
+        "${XAPIAN_CORE_SOURCE_DIR}/common/Tokeniseise.pm"
+    COMMENT "Generating Xapian idf normalization dispatch header"
+)
+
+add_custom_command(OUTPUT "${XAPIAN_CORE_BINARY_DIR}/weight/wdf-norm-dispatch.h"
+    COMMAND perl "-I${XAPIAN_CORE_SOURCE_DIR}/common"
+        "${XAPIAN_CORE_SOURCE_DIR}/weight/collate-wdf-norm"
+        "${XAPIAN_CORE_SOURCE_DIR}"
+    WORKING_DIRECTORY "${XAPIAN_CORE_BINARY_DIR}"
+    DEPENDS
+        "${XAPIAN_CORE_SOURCE_DIR}/weight/collate-wdf-norm"
+        "${XAPIAN_CORE_SOURCE_DIR}/weight/Makefile.mk"
+        "${XAPIAN_CORE_SOURCE_DIR}/common/Tokeniseise.pm"
+    COMMENT "Generating Xapian wdf normalization dispatch header"
+)
+
 add_library(xapian STATIC
     ${XAPIAN_API_SOURCES}
     ${XAPIAN_BACKEND_SOURCES}
@@ -363,6 +389,8 @@ add_library(xapian STATIC
     "${XAPIAN_CORE_BINARY_DIR}/languages/sbl-dispatch.h"
     "${XAPIAN_CORE_BINARY_DIR}/languages/allsnowballheaders.h"
     "${XAPIAN_CORE_BINARY_DIR}/unicode/c_istab.h"
+    "${XAPIAN_CORE_BINARY_DIR}/weight/idf-norm-dispatch.h"
+    "${XAPIAN_CORE_BINARY_DIR}/weight/wdf-norm-dispatch.h"
 )
 
 add_library(xapian::xapian ALIAS xapian)
