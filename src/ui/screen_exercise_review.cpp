@@ -38,6 +38,29 @@ void screen_exercise_review_draw(AppContext *ctx) {
 		auto label_color = theme()->onSurfaceContainer;
 		label_color.a *= 0.666f;
 
+		CLAY(CLAY_ID("Translation"),
+		     {
+				   .layout =
+						 {
+
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_GROW(0)},
+							   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
+							   .childGap = udpi(child_gap),
+							   .childAlignment = {CLAY_ALIGN_X_CENTER,
+		                                          CLAY_ALIGN_Y_CENTER},
+							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+						 },
+			 }) {
+			auto &diff = ctx->exercises.current_result_review();
+			const auto source_font_id = translation_font_id(ctx);
+			draw_text(diff.source, theme()->onSurface, udpi(20),
+			          source_font_id);
+			draw_text(diff.source_sub0, theme()->onSurface, udpi(20),
+			          source_font_id, CLAY_TEXT_WRAP_NEWLINES);
+			draw_text(diff.source_sub1, theme()->onSurface, udpi(20),
+			          source_font_id);
+		}
 		CLAY(CLAY_ID("DiffBlock"),
 		     {.layout = {
 					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
@@ -163,32 +186,9 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					}
 				};
 
-				draw_wrapped_parts("Your answer"_v, true);
 				draw_wrapped_parts("Correct answer"_v, false);
+				draw_wrapped_parts("Your answer"_v, true);
 			}
-		}
-		CLAY(CLAY_ID("Translation"),
-		     {
-				   .layout =
-						 {
-
-							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_GROW(0)},
-							   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-							   .childGap = udpi(child_gap),
-							   .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                          CLAY_ALIGN_Y_CENTER},
-							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-						 },
-			 }) {
-			auto &diff = ctx->exercises.current_result_review();
-			const auto source_font_id = translation_font_id(ctx);
-			draw_text(diff.source, theme()->onSurface, udpi(20),
-			          source_font_id);
-			draw_text(diff.source_sub0, theme()->onSurface, udpi(20),
-			          source_font_id, CLAY_TEXT_WRAP_NEWLINES);
-			draw_text(diff.source_sub1, theme()->onSurface, udpi(20),
-			          source_font_id);
 		}
 		CLAY(CLAY_ID("Buttons"),
 		     {
