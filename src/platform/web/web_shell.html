@@ -31,14 +31,17 @@
         outline: none;
       }
     </style>
+    <script>
+      var Module = {};
+      Object.defineProperty(Module, "canvas", {
+        get: function() {
+          return document.getElementById("canvas");
+        },
+      });
+    </script>
+    {{{ SCRIPT }}}
   </head>
   <body>
     <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
-    <script>
-      var Module = {
-        canvas: document.getElementById("canvas"),
-      };
-    </script>
-    {{{ SCRIPT }}}
   </body>
 </html>
