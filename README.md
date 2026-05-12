@@ -44,6 +44,13 @@ Build and install on a connected device or emulator:
 
 The APK is produced under `SDL/android-project/app/build/outputs/apk/`.
 
+To build, sign, and install the `arm64-v8a` release APK from the repository
+root:
+
+```sh
+./config/android-build-sign-install-arm64.sh
+```
+
 For Android Debug hot reload, keep the app running and run from the repository
 root:
 

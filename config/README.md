@@ -25,6 +25,8 @@ For the most part, just run the scripts in this directory from this directory.
 		```
   	6. Build and install debug on a connected device/emulator:
 		- `./gradlew assembleDebug installDebug`
+	- For build + sign + install of the arm64 release APK from the repo root:
+		- `./config/android-build-sign-install-arm64.sh`
 	- For hotreload updates without reinstalling APK:
 	1. Keep the app running on device.
 	2. Run `./config/android-push-hotreload.sh --abi arm64-v8a`
