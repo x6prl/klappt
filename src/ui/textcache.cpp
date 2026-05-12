@@ -9,6 +9,7 @@
 
 #include "SDL3/SDL_error.h"
 #include "SDL3/SDL_log.h"
+#include "SDL3/SDL_stdinc.h"
 #include "SDL3_ttf/SDL_ttf.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
@@ -17,20 +18,56 @@
 namespace {
 bool is_arabic_font(uint16_t font_id) { return font_id == FontID::ARABIC_MAIN; }
 
-void configure_arabic_font(TTF_Font *font) {
+bool is_arabic_codepoint(uint32_t cp) {
+	return (cp >= 0x0600u && cp <= 0x06FFu) ||
+	       (cp >= 0x0750u && cp <= 0x077Fu) ||
+	       (cp >= 0x0870u && cp <= 0x089Fu) ||
+	       (cp >= 0x08A0u && cp <= 0x08FFu) ||
+	       (cp >= 0xFB50u && cp <= 0xFDFFu) ||
+	       (cp >= 0xFE70u && cp <= 0xFEFFu) ||
+	       (cp >= 0x10E60u && cp <= 0x10E7Fu) ||
+	       (cp >= 0x1EE00u && cp <= 0x1EEFFu);
+}
+
+bool str_contains_arabic(StrView str) {
+	const char *ptr = str.data;
+	size_t remaining = static_cast<size_t>(str.size);
+	while (remaining > 0) {
+		const auto cp = SDL_StepUTF8(&ptr, &remaining);
+		if (!cp) {
+			break;
+		}
+		if (is_arabic_codepoint(cp)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void configure_font_for_text(TTF_Font *font, bool use_arabic_layout) {
 	if (!font) {
 		return;
 	}
-	TTF_SetFontDirection(font, TTF_DIRECTION_RTL);
-	TTF_SetFontScript(font, TTF_StringToTag("Arab"));
+	if (use_arabic_layout) {
+		TTF_SetFontDirection(font, TTF_DIRECTION_RTL);
+		TTF_SetFontScript(font, TTF_StringToTag("Arab"));
+	} else {
+		TTF_SetFontDirection(font, TTF_DIRECTION_LTR);
+		TTF_SetFontScript(font, TTF_StringToTag("Latn"));
+	}
 }
 
-void configure_arabic_text(TTF_Text *text) {
+void configure_text_for_layout(TTF_Text *text, bool use_arabic_layout) {
 	if (!text) {
 		return;
 	}
-	TTF_SetTextDirection(text, TTF_DIRECTION_RTL);
-	TTF_SetTextScript(text, TTF_StringToTag("Arab"));
+	if (use_arabic_layout) {
+		TTF_SetTextDirection(text, TTF_DIRECTION_RTL);
+		TTF_SetTextScript(text, TTF_StringToTag("Arab"));
+	} else {
+		TTF_SetTextDirection(text, TTF_DIRECTION_LTR);
+		TTF_SetTextScript(text, TTF_StringToTag("Latn"));
+	}
 }
 
 TextCache::Idx lp_home_index(Hash h, TextCache::Idx table_size) {
@@ -164,9 +201,6 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 			             font_id, SDL_GetError());
 		}
 		TTF_SetFontSize(font, font_size);
-		if (is_arabic_font(font_id)) {
-			configure_arabic_font(font);
-		}
 		it->first = {font_id, font_size};
 		it->second = font;
 		return font;
@@ -189,10 +223,11 @@ TTF_Text *TextCache::get(StrView str, uint16_t font_id, uint16_t font_size,
 	if (idx == MAP_SIZE) {
 		// text is not found, create
 		auto font = get_font(font_id, font_size);
+		const bool use_arabic_layout =
+			  is_arabic_font(font_id) && str_contains_arabic(str);
+		configure_font_for_text(font, use_arabic_layout);
 		auto *text = TTF_CreateText(engine, font, str.data, str.size);
-		if (is_arabic_font(font_id)) {
-			configure_arabic_text(text);
-		}
+		configure_text_for_layout(text, use_arabic_layout);
 		auto ncolor = clay_color_normalize(clay_color);
 		TTF_SetTextColorFloat(text, ncolor.r, ncolor.g, ncolor.b, ncolor.a);
 		auto idx = lp_find_free_slot(hash, t);
@@ -214,6 +249,10 @@ Clay_Dimensions TextCache::measure_text(Clay_StringSlice slice,
                                         Clay_TextElementConfig *config) {
 	KLAPPT_PROFILE_SCOPE_N("TextCache::measure_text");
 	auto font = get_font(config->fontId, config->fontSize);
+	const StrView text{slice.chars, static_cast<Size>(slice.length)};
+	const bool use_arabic_layout =
+		  is_arabic_font(config->fontId) && str_contains_arabic(text);
+	configure_font_for_text(font, use_arabic_layout);
 	int width = 0;
 	int height = 0;
 	if (!TTF_GetStringSize(font, slice.chars, slice.length, &width, &height)) {
