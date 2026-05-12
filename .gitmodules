@@ -19,8 +19,7 @@
 	url = https://github.com/LMDB/lmdb.git
 [submodule "xapian"]
 	path = xapian
-	url = https://github.com/x6prl/xapian.git
-	branch = android_without_proc_uuid
+	url = https://github.com/xapian/xapian.git
 [submodule "tracy"]
 	path = tracy
 	url = https://github.com/wolfpld/tracy.git
