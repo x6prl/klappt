@@ -83,7 +83,15 @@ Open `http://localhost:8000/klappt.html` in a browser.
 ## Linux Development
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build \
+                  -DTRACY_ENABLED=OFF \
+                  -DENABLE_HOTRELOAD=ON \
+                  -DCMAKE_BUILD_TYPE=Debug \
+                  -DSDL_X11_XCURSOR=OFF \
+                  -DSDL_X11_XINPUT=OFF \
+                  -DSDL_X11_XFIXES=OFF \
+                  -DSDL_X11_XRANDR=OFF \
+                  -DSDL_X11_XTEST=OFF
 cmake --build build
 ./build/Debug/klappt
 ```
@@ -100,7 +108,12 @@ To enable Tracy profiling on native builds, configure with `TRACY_ENABLED`:
 cmake -S . -B build-prof \                                                                                                           master ✚ ✱
                        -DTRACY_ENABLED=ON \
                        -DENABLE_HOTRELOAD=OFF \
-                       -DCMAKE_BUILD_TYPE=Debug -DSDL_X11_XCURSOR=OFF -DSDL_X11_XINPUT=OFF -DSDL_X11_XFIXES=OFF -DSDL_X11_XRANDR=OFF -DSDL_X11_XTEST=OFF
+                       -DCMAKE_BUILD_TYPE=Debug \
+                       -DSDL_X11_XCURSOR=OFF \
+                       -DSDL_X11_XINPUT=OFF \
+                       -DSDL_X11_XFIXES=OFF \
+                       -DSDL_X11_XRANDR=OFF \
+                       -DSDL_X11_XTEST=OFF
 cmake --build build-prof -j4 --target klappt
 ./build-prof/Debug/klappt
 ```
