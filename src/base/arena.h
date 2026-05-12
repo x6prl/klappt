@@ -1,5 +1,6 @@
 #pragma once
 
+#include <SDL3/SDL_log.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -56,7 +57,7 @@ struct Arena {
 		auto ret = data + offset;
 		offset += size;
 		if (offset > allocated_size) {
-			std::fprintf(stderr,
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Arena: cannot allocate memory"
 			             " (request=%d aligned_used=%td capacity=%d)\n",
 			             size, offset, allocated_size);

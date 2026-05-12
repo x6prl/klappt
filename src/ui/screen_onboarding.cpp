@@ -30,13 +30,13 @@ void screen_onboarding_draw(AppContext *ctx) {
 				std::filesystem::path basePath = "";
 #else
 				auto basePathPtr = SDL_GetBasePath();
-				if (not basePathPtr) {
-					exit(-34);
+				if (!basePathPtr) {
+					ctx->app_status.push_error("Failed to init words"_v);
 				}
 				const std::filesystem::path basePath = basePathPtr;
 #endif
 				if (!init_words(*ctx, basePath)) {
-					exit(-35);
+					ctx->app_status.push_error("Failed to init words"_v);
 				}
 				load_language_data = 0;
 				settings.onboarding_stage += 1;

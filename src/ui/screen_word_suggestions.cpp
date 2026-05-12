@@ -101,7 +101,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 						continue;
 					}
 					add_word_to_learning_list(ctx->tmparena, &word, ctx->words,
-					                          &ctx->word_store, &ctx->states);
+					                          &ctx->word_store, &ctx->states, &ctx->app_status);
 				}
 				m.lap().printus("xapian and states");
 				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
@@ -111,7 +111,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 				Measure m{"adding new words"};
 				for (auto &word : ctx->suggestions_list) {
 					add_word_to_learning_list(ctx->tmparena, &word, ctx->words,
-					                          &ctx->word_store, &ctx->states);
+					                          &ctx->word_store, &ctx->states, &ctx->app_status);
 				}
 				m.lap().printus("xapian and states");
 				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);

@@ -335,7 +335,9 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	FileLoader settingsfl{};
 	if (settingsfl.load("settings.dat"_v)) {
-		Settings::decode(settingsfl.data, settingsfl.size, &state->settings);
+		if (!Settings::decode(settingsfl.data, settingsfl.size, &state->settings)) {
+			state->app_status.set_exit_with_error("cannot decode settings file"_v);
+		}
 	}
 	m.lap().printus("load settings");
 	{
@@ -450,8 +452,6 @@ extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	KLAPPT_PROFILE_SCOPE();
 	auto *app = (AppContext *)appstate;
 	Measure m{__PRETTY_FUNCTION__};
-	save_words_dat(app->tmparena, app->settings, *(app->words));
-	m.lap().printus("save words");
 	(void)result;
 	app->word_store.close();
 	app->states.close();
@@ -474,5 +474,8 @@ extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	// TTF_Quit();
 	// MIX_Quit();
 	//
-	SDL_Log("Application quit successfully!");
+	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled errors: %d", app->app_status.app_quit, app->app_status.error_msgs.size);
+	for (auto &emsg: app->app_status.error_msgs) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, StrView_Fmt, StrView_Arg(emsg));
+	}
 }

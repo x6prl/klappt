@@ -6,6 +6,7 @@
 
 #include <charconv>
 #include <cstddef>
+#include <cstring>
 
 #define StrView_Fmt "%.*s"
 #define StrView_Arg(str_view) (str_view).size, (str_view).data
@@ -15,7 +16,10 @@ struct StrView {
 	Size size{0};
 
 	template <size_t N> consteval static StrView lit(const char (&str)[N]) {
-		return {str, static_cast<int>(N - 1)};
+		return {str, static_cast<Size>(N - 1)};
+	}
+	static StrView lit(const char str[]) {
+		return {str, static_cast<Size>(strlen(str))};
 	}
 
 	operator bool() const;

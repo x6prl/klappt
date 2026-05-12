@@ -134,7 +134,8 @@ void screen_settings_draw(AppContext *ctx) {
 					  if (btn.activated()) {
 						  ctx->settings.tr_language = lang;
 						  ctx->settings.save(ctx->tmparena);
-						  exit(1);
+						  ctx->app_status.push_error("language changed. TODO: notify user about exit"_v);
+						  ctx->app_status.set_exit_normal();
 					  }
 				  });
 		}

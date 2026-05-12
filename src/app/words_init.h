@@ -6,6 +6,7 @@
 
 #include "app/app_context.h"
 #include "base/measure.h"
+#include "domain/word_store.h"
 #include "domain/words_codec.h"
 #include "domain/wparser.h"
 #include "platform/files.h"
@@ -127,20 +128,25 @@ find_learning_list_seed_word(const DynArr<Word> &parsed,
 	return nullptr;
 }
 
-inline void add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
+inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
                                              Words &words,
                                              WordStore &word_store,
                                              Engine::States &states) {
 	constexpr int8_t LEARNING_LIST_ID = 1;
 	word.in_learning_list = LEARNING_LIST_ID;
 	auto word_ref = words.add();
-	words[word_ref] = word;
-	word_store.save(tmparena, word);
-	Engine::State state{};
-	auto [success, was_found] = states.get(word.word_id, state);
-	(void)success;
-	if (!was_found) {
-		states.set(word.word_id, state);
+	if (word_ref != Words::null_index()) {
+		words[word_ref] = word;
+		word_store.save(tmparena, word);
+		Engine::State state{};
+		auto [success, was_found] = states.get(word.word_id, state);
+		(void)success;
+		if (!was_found) {
+			states.set(word.word_id, state);
+		}
+		return true;
+	} else {
+		return false;
 	}
 }
 
@@ -184,8 +190,11 @@ inline bool seed_default_learning_list(const DynArr<Word> &parsed,
 				  StrView_Arg(spec.key));
 			return false;
 		}
-		add_word_to_learning_list_seeded(state.tmparena, word, *state.words,
-		                                 state.word_store, state.states);
+		if (!add_word_to_learning_list_seeded(state.tmparena, word,
+		                                      *state.words, state.word_store,
+		                                      state.states)) {
+			state.app_status.push_error("Failed to seed learning list"_v);
+		}
 		added_any = true;
 	}
 
@@ -272,7 +281,8 @@ inline bool init_words(AppContext &state,
 			  basePath / "word_data" /
 			  std::string(source_leaf.data,
 		                  static_cast<size_t>(source_leaf.size));
-		if (!wparse_file(state.tmparena, source_path.c_str(), parsed_words)) {
+		if (!wparse_file(state.tmparena, source_path.c_str(), parsed_words,
+		                 &state.app_status)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Loading source words from " StrView_Fmt " failed",
 			             StrView_Arg(source_leaf));
@@ -280,8 +290,8 @@ inline bool init_words(AppContext &state,
 		}
 		m.point().printus("file parsed");
 		if (parsed_words.size != state.word_store.word_count()) {
-			SDL_Log("parsed %d, but we have %d. Should import the words", parsed_words.size,
-			        state.word_store.word_count());
+			SDL_Log("parsed %d, but we have %d. Should import the words",
+			        parsed_words.size, state.word_store.word_count());
 
 			Size added_count = 0;
 			if (!import_new_parsed_words(state.tmparena, state.word_store,

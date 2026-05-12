@@ -111,11 +111,12 @@ struct Settings {
 		memcpy(data, &src, size);
 		return {data, size};
 	}
-	static void decode(void *src, Size size, Settings *dst) {
+	static bool decode(void *src, Size size, Settings *dst) {
 		if (sizeof(Settings) != size) {
-			exit(72);
+			return false;
 		}
 		memcpy(dst, src, size);
+		return true;
 	}
 	void save(Arena &a) const {
 		{

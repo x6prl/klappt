@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "app/app_context.h"
+#include "app/app_status.h"
 #include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
@@ -38,18 +39,19 @@ void screen_word_edit_draw(AppContext *ctx);
 void screen_onboarding_go(AppContext *ctx);
 void screen_onboarding_draw(AppContext *ctx);
 
-inline void draw_text(
-	  StrView text, Clay_Color color, uint16_t font_size = 16,
-	  uint16_t font_id = FontID::MAIN,
-	  Clay_TextElementConfigWrapMode wrap_mode = CLAY_TEXT_WRAP_WORDS,
-	  Clay_TextAlignment text_alignment = CLAY_TEXT_ALIGN_CENTER) {
-	CLAY_TEXT(text.to_clay_string(), CLAY_TEXT_CONFIG({
-								 .textColor = color,
-								 .fontId = font_id,
-								 .fontSize = static_cast<uint16_t>(font_size),
-								 .wrapMode = wrap_mode,
-								 .textAlignment = text_alignment,
-						   }));
+inline void
+draw_text(StrView text, Clay_Color color, uint16_t font_size = 16,
+          uint16_t font_id = FontID::MAIN,
+          Clay_TextElementConfigWrapMode wrap_mode = CLAY_TEXT_WRAP_WORDS,
+          Clay_TextAlignment text_alignment = CLAY_TEXT_ALIGN_CENTER) {
+	CLAY_TEXT(text.to_clay_string(),
+	          CLAY_TEXT_CONFIG({
+					.textColor = color,
+					.fontId = font_id,
+					.fontSize = static_cast<uint16_t>(font_size),
+					.wrapMode = wrap_mode,
+					.textAlignment = text_alignment,
+			  }));
 }
 
 inline uint16_t translation_font_id(const AppContext *ctx) {
@@ -58,9 +60,10 @@ inline uint16_t translation_font_id(const AppContext *ctx) {
 	             : FontID::MAIN;
 }
 
-inline float get_font_size_based_on_str_size(
-	  float viewpoint_width, float scale, Size str_size,
-	  float min_font_size = 20.f, float max_font_size = 32.f) {
+inline float get_font_size_based_on_str_size(float viewpoint_width, float scale,
+                                             Size str_size,
+                                             float min_font_size = 20.f,
+                                             float max_font_size = 32.f) {
 	float length_factor = std::clamp(str_size - 15.f, 0.f, 10.f) / 10.f;
 	auto target_text_width = viewpoint_width * (0.8f + 0.15f * length_factor);
 	auto font_size = std::clamp((target_text_width / str_size),
@@ -68,18 +71,23 @@ inline float get_font_size_based_on_str_size(
 	return font_size;
 }
 
-inline void add_word_to_learning_list(Arena &tmparena, Word *word,
-                                      Words *words, WordStore *word_store,
-                                      Engine::States *states) {
+inline void add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,
+                                      WordStore *word_store,
+                                      Engine::States *states, AppStatus *app_status) {
 	uint8_t LEARNING_LIST_ID = 1;
 	word->in_learning_list = LEARNING_LIST_ID;
+
 	auto word_ref = words->add();
-	(*words)[word_ref] = *word;
-	word_store->save(tmparena, *word);
-	Engine::State state{};
-	auto [success, was_found] = states->get(word->word_id, state);
-	if (!was_found) {
-		states->set(word->word_id, state);
+	if (word_ref != Words::null_index()) {
+		(*words)[word_ref] = *word;
+		word_store->save(tmparena, *word);
+		Engine::State state{};
+		auto [success, was_found] = states->get(word->word_id, state);
+		if (!was_found) {
+			states->set(word->word_id, state);
+		}
+	} else {
+		app_status->push_error("Cannot add to the learning list"_v);
 	}
 }
 
@@ -126,8 +134,7 @@ inline Size matching_learning_word_count(const Words &words, StrView query) {
 	query.mut_trim();
 	Size count = 0;
 	for (WordRef ref{0}; ref < Words::MAX_WORDS; ++ref) {
-		if (words.is_used(ref) &&
-		    word_store_matches_query(words[ref], query)) {
+		if (words.is_used(ref) && word_store_matches_query(words[ref], query)) {
 			++count;
 		}
 	}

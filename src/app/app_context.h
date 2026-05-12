@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SDL3/SDL_timer.h"
+#include "app/app_status.h"
 #include "base/dyn_arr.h"
 #include "domain/engine.h"
 #include "domain/exercises.h"
@@ -67,7 +68,7 @@ struct AppContext {
 
 	SDL_Window *window{};
 	SDL_Renderer *renderer{};
-	SDL_AppResult app_quit = SDL_APP_CONTINUE;
+	AppStatus app_status;
 	Clay_Arena clay_arena{};
 	float scale{1.f}, display_width{1000.f};
 	uint64_t ticks{};

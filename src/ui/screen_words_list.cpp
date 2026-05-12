@@ -66,7 +66,7 @@ void screen_words_list_draw(AppContext *ctx) {
 											add_word_to_learning_list(
 												  ctx->tmparena, &word,
 												  ctx->words, &ctx->word_store,
-												  &ctx->states);
+												  &ctx->states, &ctx->app_status);
 										} else {
 											remove_word_from_learning_list(
 												  ctx->tmparena, &word,

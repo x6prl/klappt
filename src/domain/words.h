@@ -21,7 +21,7 @@ struct WordRef {
 };
 
 struct Words {
-	static constexpr Size MAX_WORDS = 2 * 1024;
+	static constexpr Size MAX_WORDS = 1 << 11;
 	bool used[MAX_WORDS]{};
 	Word words[MAX_WORDS]{};
 	Size next_free = 1;
@@ -43,7 +43,6 @@ struct Words {
 			}
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s:\n\tNO SPACE",
 			             __PRETTY_FUNCTION__);
-			exit(666);
 			return null_index();
 		}
 	}

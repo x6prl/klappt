@@ -11,8 +11,8 @@
 #include "SDL3/SDL_timer.h"
 
 #include "app/event_codes.h"
-#include "base/profiler.h"
 #include "base/pair.h"
+#include "base/profiler.h"
 #include "base/str_view.h"
 #include "base/str_view_list.h"
 #include "clay_support.h"
@@ -109,6 +109,15 @@ Clay_Dimensions measure_text_sdl(Clay_StringSlice text,
 static bool dm = false;
 
 void app_bar_layout(AppContext *ctx, StrView title) {
+	if (ctx->app_status.error_msgs.size) {
+		StrViewArray strs{};
+		strs.push(ctx->tmparena, title);
+		strs.push(ctx->tmparena, "e:"_v);
+		strs.push(ctx->tmparena,
+		          StrView::from_integer(ctx->tmparena,
+		                                ctx->app_status.error_msgs.size));
+		title = strs.join(ctx->tmparena, ' ');
+	}
 	const auto app_bar_height = dpi(60.0f);
 	const auto app_bar_button_style = mobile_button_style_app_bar();
 	CLAY(CLAY_ID("AppBar"),
@@ -289,64 +298,65 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.pointer_state");
-	switch (event->type) {
-	case SDL_EVENT_FINGER_UP:
-	case SDL_EVENT_FINGER_CANCELED:
-	case SDL_EVENT_FINGER_DOWN:
-	case SDL_EVENT_FINGER_MOTION: {
-		int width = 0;
-		int height = 0;
-		SDL_GetWindowSizeInPixels(ctx->window, &width, &height);
-		ctx->tslt.handle_touch_event(ticks, event, static_cast<float>(width),
-		                             static_cast<float>(height));
-		break;
-	}
-	default:
-		ctx->tslt.handle_event(ticks, event);
-		break;
-	}
+		switch (event->type) {
+		case SDL_EVENT_FINGER_UP:
+		case SDL_EVENT_FINGER_CANCELED:
+		case SDL_EVENT_FINGER_DOWN:
+		case SDL_EVENT_FINGER_MOTION: {
+			int width = 0;
+			int height = 0;
+			SDL_GetWindowSizeInPixels(ctx->window, &width, &height);
+			ctx->tslt.handle_touch_event(ticks, event,
+			                             static_cast<float>(width),
+			                             static_cast<float>(height));
+			break;
+		}
+		default:
+			ctx->tslt.handle_event(ticks, event);
+			break;
+		}
 	}
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.clay_handle_event");
-	clay_handle_event(event);
+		clay_handle_event(event);
 	}
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.mobile_text_input_handle_event");
-	if (mobile_text_input_handle_event(ctx, event)) {
-		ctx->anim();
-		return SDL_APP_CONTINUE;
-	}
+		if (mobile_text_input_handle_event(ctx, event)) {
+			ctx->anim();
+			return SDL_APP_CONTINUE;
+		}
 	}
 
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.dispatch");
-	switch (event->type) {
-	case SDL_EVENT_QUIT:
-		ctx->app_quit = SDL_APP_SUCCESS;
-		return SDL_APP_CONTINUE;
+		switch (event->type) {
+		case SDL_EVENT_QUIT:
+			ctx->app_status.set_exit_normal();
+			return SDL_APP_CONTINUE;
 
-	case SDL_EVENT_FINGER_DOWN:
-	case SDL_EVENT_FINGER_MOTION:
-	case SDL_EVENT_MOUSE_WHEEL:
-	case SDL_EVENT_FINGER_UP:
-	case SDL_EVENT_FINGER_CANCELED:
-		ctx->anim();
-		break;
+		case SDL_EVENT_FINGER_DOWN:
+		case SDL_EVENT_FINGER_MOTION:
+		case SDL_EVENT_MOUSE_WHEEL:
+		case SDL_EVENT_FINGER_UP:
+		case SDL_EVENT_FINGER_CANCELED:
+			ctx->anim();
+			break;
 
-	case SDL_EVENT_KEY_DOWN:
-		if (event->key.scancode == SDL_SCANCODE_ESCAPE ||
-		    event->key.scancode == SDL_SCANCODE_AC_BACK ||
-		    event->key.key == SDLK_AC_BACK) {
-			if (ctx->screen() == Screen::Exercice &&
-			    ctx->exercises.handler_back_pressed()) {
-				break;
+		case SDL_EVENT_KEY_DOWN:
+			if (event->key.scancode == SDL_SCANCODE_ESCAPE ||
+			    event->key.scancode == SDL_SCANCODE_AC_BACK ||
+			    event->key.key == SDLK_AC_BACK) {
+				if (ctx->screen() == Screen::Exercice &&
+				    ctx->exercises.handler_back_pressed()) {
+					break;
+				}
+				if (!ctx->pop()) {
+					// TODO: ask user whether should exit
+				}
 			}
-			if (!ctx->pop()) {
-				// TODO: ask user whether should exit
-			}
+			break;
 		}
-		break;
-	}
 	}
 
 	return SDL_APP_CONTINUE;
@@ -517,7 +527,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 		frame_end(ctx);
 	}
 
-	return ctx->app_quit;
+	return ctx->app_status.app_quit;
 }
 
 #pragma GCC diagnostic pop

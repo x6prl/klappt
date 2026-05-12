@@ -7,11 +7,11 @@
 // using htable_index_t = Hash;
 // using htable_key_t = FontCache::Data;
 
-#include "base/str_view.h"
-#include "base/profiler.h"
 #include "SDL3/SDL_error.h"
 #include "SDL3/SDL_log.h"
 #include "SDL3_ttf/SDL_ttf.h"
+#include "base/profiler.h"
+#include "base/str_view.h"
 // #include "linear_probing.h"
 
 namespace {
@@ -156,6 +156,7 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 	}
 	if (it != fonts.end()) {
 		// not found, create font
+		KLAPPT_PROFILE_SCOPE_N("Create font");
 		TTF_Font *font = TTF_CopyFont(base_fonts[font_id]);
 		if (!font) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
@@ -170,10 +171,11 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 		it->second = font;
 		return font;
 	} else {
+		// no space
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "cannot create font size %u id %u: no space", font_size,
 		             font_id);
-		exit(8);
+		exit(-6);
 	}
 }
 TTF_Text *TextCache::get(StrView str, uint16_t font_id, uint16_t font_size,
@@ -199,7 +201,7 @@ TTF_Text *TextCache::get(StrView str, uint16_t font_id, uint16_t font_size,
 		} else {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "No space for the text cache!");
-			exit(10);
+			exit(-7);
 		}
 		return text;
 	} else {

@@ -2,14 +2,17 @@
 
 #include <cstddef>
 
+#include "app/app_status.h"
 #include "base/measure.h"
 #include "base/stats.h"
 #include "base/str_view.h"
 #include "domain/word.h"
 
+// TODO: rewrite
+
 template <class AddWord>
-inline void wparse_entries(Arena &a, const char *data, size_t size,
-                           AddWord add_word) {
+inline bool wparse_entries(Arena &a, const char *data, size_t size,
+                           AddWord add_word, AppStatus *app_status) {
 	SDL_Log("%s %ld bytes", __PRETTY_FUNCTION__, size);
 	StrView file{data, static_cast<Size>(size)};
 	Measure perf;
@@ -23,7 +26,7 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 	};
 	auto error = [&](const char msg[]) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "line %d: %s", linecount, msg);
-		exit(6);
+		app_status->set_exit_with_error(StrView::lit(msg));
 	};
 
 	for (; file;) {
@@ -38,6 +41,7 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 		//         StrView_Arg(line));
 		if (line.size < 2) {
 			error("line is too small");
+			return false;
 		}
 		wstats.push(line.size);
 		auto &word = add_word();
@@ -81,16 +85,19 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 			word.n.gender = str_to_gender(line.mut_split().data);
 			if (Gender::unknown == word.n.gender) {
 				error("cannot get gender of that line");
+				return false;
 			}
 			if (line) {
 				word.n.lemma = line.mut_split().copy(a);
 			} else {
 				error("lemma and plural suffix expected");
+				return false;
 			}
 			if (line) {
 				word.n.plural_suffix = line.copy(a);
 			} else {
 				error("plural suffix expected");
+				return false;
 			}
 			break;
 		case WordType::Verb:
@@ -147,6 +154,7 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 			word.translations_raw = line.copy(a);
 		} else {
 			error("translations expected");
+			return false;
 		}
 		line = next_line();
 		if (line) {
@@ -157,6 +165,7 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 			if (line) {
 				error("extra entry line is not allowed; store translatable "
 				      "examples as separate phrase entries");
+				return false;
 			}
 		}
 		// print_word(word);
@@ -164,6 +173,7 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 	perf.lap().print();
 	SDL_Log("words");
 	wstats.print();
+	return true;
 }
 
 // inline void wparse(Arena &a, const char *data, size_t size, Words &words) {
@@ -173,13 +183,13 @@ inline void wparse_entries(Arena &a, const char *data, size_t size,
 // 	});
 // }
 
-inline void wparse(Arena &a, const char *data, size_t size,
-                   DynArr<Word> &words) {
-	wparse_entries(a, data, size, [&]() -> Word & {
+inline bool wparse(Arena &a, const char *data, size_t size,
+                   DynArr<Word> &words, AppStatus *app_status) {
+	return wparse_entries(a, data, size, [&]() -> Word & {
 		words.push(a, Word{});
 		return words.last();
-	});
+	}, app_status);
 }
 
 // bool wparse_file(Arena &a, const char *filename, Words &words);
-bool wparse_file(Arena &a, const char *filename, DynArr<Word> &words);
+bool wparse_file(Arena &a, const char *filename, DynArr<Word> &words, AppStatus *app_status);

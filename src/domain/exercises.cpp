@@ -5,8 +5,8 @@
 #include "base/arena.h"
 #include "base/dyn_arr.h"
 #include "base/measure.h"
-#include "base/profiler.h"
 #include "base/pair.h"
+#include "base/profiler.h"
 #include "base/shuffle.h"
 #include "base/str_view.h"
 #include "base/str_view_list.h"
@@ -481,8 +481,9 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	DynArr<WordRef> due_ref;
 	// collecting due
 	if (!ctx->states.collect_due(ctx->tmparena, now, due_id)) {
-		exit(890);
-		// SDL_LogError(SDL_LOG_CATEGORY_ERROR, "cannot collect due")
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "LMDB error: cannot collect due");
+		ctx->app_status.push_error("Cannot collect due words"_v);
+		return 0;
 	}
 	if (due_id.size == 0) {
 		return 0;
@@ -561,8 +562,8 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 
 	const auto total_exercises = std::min(n, due_ref.size);
 	// the main list to generate exercises
-	auto exercise_words =
-		  DynArr<WordRef>::filled_zero_or_default(ctx->tmparena, total_exercises);
+	auto exercise_words = DynArr<WordRef>::filled_zero_or_default(
+		  ctx->tmparena, total_exercises);
 
 	// we fill it randomly
 	auto rng_state = ctx->ticks;
@@ -580,8 +581,10 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		State state{};
 		auto [success, was_present] = ctx->states.get(word.word_id, state);
 		if (!success) {
-			SDL_Log("failed to get state");
-			exit(34);
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "LMDB error: failed to get state");
+			ctx->app_status.push_error("failed to get state by ID"_v);
+			return 0;
 		}
 		// state.mode = Engine::Mode::Compose; // NOTE: DEBUG
 
