@@ -347,9 +347,15 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			if (event->key.scancode == SDL_SCANCODE_ESCAPE ||
 			    event->key.scancode == SDL_SCANCODE_AC_BACK ||
 			    event->key.key == SDLK_AC_BACK) {
-				if (ctx->screen() == Screen::Exercice &&
-				    ctx->exercises.handler_back_pressed()) {
-					break;
+				if (ctx->screen() == Screen::Exercice) {
+					if (ctx->exercises.handler_back_pressed()) {
+						// NOTE: it wasn't the last substage of the current exercise
+						break;
+					} else {
+						// NOTE: it was, but we ignore it
+						// TODO: think more
+						break;
+					}
 				}
 				if (!ctx->pop()) {
 					// TODO: ask user whether should exit
