@@ -50,6 +50,9 @@ void screen_word_suggestions_draw(AppContext *ctx);
 void screen_settings_push(AppContext *ctx);
 void screen_settings_draw(AppContext *ctx);
 
+void screen_word_push(AppContext *ctx, WordId word_id);
+void screen_word_draw(AppContext *ctx);
+
 void screen_word_edit_push(AppContext *ctx, WordId word_id);
 void screen_word_edit_draw(AppContext *ctx);
 
@@ -459,6 +462,13 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Settings");
 				app_bar_layout(ctx, "Settings"_v);
 				screen_settings_draw(ctx);
+				bottom_bar_layout(ctx);
+				break;
+			}
+			case Screen::Word: {
+				KLAPPT_PROFILE_SCOPE_N("render_screen.Word");
+				app_bar_layout(ctx, "???"_v);
+				screen_word_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
 			}
