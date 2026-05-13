@@ -278,12 +278,13 @@ StrView exercise_x_of_n(AppContext *ctx) {
 }
 
 StrView review_x_of_n(AppContext *ctx) {
-	auto etotal_to_show= ctx->exercises.results.size;
+	auto etotal_to_show = ctx->exercises.results.size;
 	if (!etotal_to_show) {
 		return {};
 	}
 	auto &a = ctx->tmparena;
-	return str_view_x_of_n(a, ctx->exercises.exercise_current_idx, etotal_to_show);
+	return str_view_x_of_n(a, ctx->exercises.exercise_current_idx,
+	                       etotal_to_show);
 }
 
 } // namespace
@@ -358,8 +359,9 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			    event->key.scancode == SDL_SCANCODE_AC_BACK ||
 			    event->key.key == SDLK_AC_BACK) {
 				if (ctx->screen() == Screen::Exercice) {
-					if (ctx->exercises.handler_back_pressed()) {
-						// NOTE: it wasn't the last substage of the current exercise
+					if (ctx->exercises.handler_back_pressed(ctx)) {
+						// NOTE: it wasn't the last substage of the current
+						// exercise
 						break;
 					} else {
 						// NOTE: it was, but we ignore it

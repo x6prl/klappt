@@ -2,9 +2,9 @@
 
 #include "SDL3/SDL_log.h"
 #include "base/dyn_arr.h"
-#include "engine.h"
 #include "base/str_view.h"
 #include "base/str_view_list.h"
+#include "engine.h"
 #include "words.h"
 
 struct AppContext;
@@ -138,11 +138,7 @@ struct Exercises {
 	Size correct_exercise_count{};
 
 	bool is_initialized() const { return exercises.size > 0; }
-	bool handler_back_pressed() {
-		if (!is_initialized())
-			return false;
-		return exercises[exercise_current_idx].undo();
-	}
+	bool handler_back_pressed(AppContext *ctx);
 	// bool is_finished() const {
 	// 	return is_initialized() && exercise_current_idx == exercise_total();
 	// }
@@ -182,7 +178,8 @@ struct Exercises {
 	CommitResult commit(AppContext *ctx);
 
 	void reset() {
-		SDL_Log("=======> %s <========= this=%p arena=%p offset=%td used_words=%d exercises=%d results=%d",
+		SDL_Log("=======> %s <========= this=%p arena=%p offset=%td "
+		        "used_words=%d exercises=%d results=%d",
 		        __PRETTY_FUNCTION__, static_cast<void *>(this),
 		        static_cast<void *>(a.data), a.offset, words.size,
 		        exercises.size, results.size);

@@ -757,6 +757,25 @@ StrView actual_response_from_exercise(Arena &tmpa, Arena &a,
 	return res;
 }
 
+bool Exercises::handler_back_pressed(AppContext *ctx) {
+	if (!is_initialized()) {
+		return false;
+	}
+
+	auto &exercise = exercises[exercise_current_idx];
+	if (!exercise.undo()) {
+		return false;
+	}
+
+	exercise.response =
+		  actual_response_from_exercise(ctx->tmparena, a, exercise);
+	if (exercise.response.size == 0) {
+		exercise.response = ExerciseState::EMPTY_ANSWER;
+	}
+	pending_selection_index = -1;
+	return true;
+}
+
 Triple<DynArr<StrView>, DynArr<StrView>, DynArr<int>>
 find_diff(Arena &arena, const ExerciseState &e) {
 	DynArr<StrView> expected_parts;
