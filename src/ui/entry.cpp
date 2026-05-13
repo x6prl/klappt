@@ -277,7 +277,14 @@ StrView exercise_x_of_n(AppContext *ctx) {
 	return str_view_x_of_n(a, ctx->exercises.exercise_current_idx, etotal);
 }
 
-StrView review_x_of_n(AppContext *ctx) { return exercise_x_of_n(ctx); }
+StrView review_x_of_n(AppContext *ctx) {
+	auto etotal_to_show= ctx->exercises.results.size;
+	if (!etotal_to_show) {
+		return {};
+	}
+	auto &a = ctx->tmparena;
+	return str_view_x_of_n(a, ctx->exercises.exercise_current_idx, etotal_to_show);
+}
 
 } // namespace
 
