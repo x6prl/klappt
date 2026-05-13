@@ -88,8 +88,24 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					  std::max(diff.actual.size, diff.expected.size));
 				auto font_size = get_font_size_based_on_str_size(
 					  ctx->display_width, ctx->scale, response_length);
-				auto max_chars_per_line = static_cast<Size>(std::max(
-					  12.0f, (ctx->display_width * 0.78f) / font_size));
+				auto max_line_width = std::max(
+					  0.0f, ctx->display_width - udpi(64.0f));
+				auto part_width = [&](StrView part) {
+					auto slice = CLAY__INIT(Clay_StringSlice){
+						  .length = static_cast<int32_t>(part.size),
+						  .chars = part.data,
+						  .baseChars = part.data,
+					};
+					return ctx->text
+						  ->measure_text(slice,
+						                 CLAY_TEXT_CONFIG({
+											   .fontId = FontID::MONOSPACE_REGULAR,
+											   .fontSize = static_cast<uint16_t>(
+													 font_size),
+											   .wrapMode = CLAY_TEXT_WRAP_NONE,
+										 }))
+						  .width;
+				};
 
 				auto draw_part_line = [&](Clay_ElementId id, Size start,
 				                          Size end, bool is_actual) {
@@ -151,13 +167,12 @@ void screen_exercise_review_draw(AppContext *ctx) {
 									 },
 						 }) {
 						Size line_start = 0;
-						Size line_len = 0;
+						float line_width = 0.0f;
 						for (Size i = 0; i < diff.actual_parts.size; ++i) {
-							auto part_len =
-								  std::max(diff.actual_parts[i].size,
-							               diff.expected_parts[i].size);
+							auto width = std::max(part_width(diff.actual_parts[i]),
+							                      part_width(diff.expected_parts[i]));
 							if (i > line_start &&
-							    line_len + part_len > max_chars_per_line) {
+							    line_width + width > max_line_width) {
 								auto line_id =
 									  is_actual ? CLAY_IDI("DiffActualLine",
 								                           static_cast<int>(
@@ -168,9 +183,9 @@ void screen_exercise_review_draw(AppContext *ctx) {
 								draw_part_line(line_id, line_start, i,
 								               is_actual);
 								line_start = i;
-								line_len = 0;
+								line_width = 0.0f;
 							}
-							line_len += part_len;
+							line_width += width;
 						}
 						if (line_start < diff.actual_parts.size) {
 							auto line_id =
