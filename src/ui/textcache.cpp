@@ -44,6 +44,14 @@ bool str_contains_arabic(StrView str) {
 	return false;
 }
 
+uint16_t normalize_font_size(uint16_t font_size) {
+	if (font_size < 24) {
+		return font_size;
+	}
+	// round large fonts around 2px
+	return static_cast<uint16_t>(((font_size + 1u) / 2u) * 2u);
+}
+
 void configure_font_for_text(TTF_Font *font, bool use_arabic_layout) {
 	if (!font) {
 		return;
@@ -183,6 +191,7 @@ TextCache::Idx TextCache::lp_find_free_slot(Hash h, TextCache::TimestampSec t) {
 
 TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 	KLAPPT_PROFILE_SCOPE_N("TextCache::get_font");
+	font_size = normalize_font_size(font_size);
 	KLAPPT_PROFILE_NAME_F("TextCache::get_font id=%u size=%u", font_id,
 	                      font_size);
 	auto it = fonts.begin();
@@ -199,6 +208,7 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "cannot create font size %u id %u: %s", font_size,
 			             font_id, SDL_GetError());
+			exit(-6);
 		}
 		TTF_SetFontSize(font, font_size);
 		it->first = {font_id, font_size};
@@ -215,6 +225,7 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 TTF_Text *TextCache::get(StrView str, uint16_t font_id, uint16_t font_size,
                          Clay_Color clay_color, uint64_t ticks) {
 	KLAPPT_PROFILE_SCOPE_N("TextCache::get");
+	font_size = normalize_font_size(font_size);
 	KLAPPT_PROFILE_NAME_F("TextCache::get id=%u size=%u len=%d", font_id,
 	                      font_size, str.size);
 	auto t = TextCache::tss_from_ticks(ticks);
@@ -248,7 +259,8 @@ TTF_Text *TextCache::get(StrView str, uint16_t font_id, uint16_t font_size,
 Clay_Dimensions TextCache::measure_text(Clay_StringSlice slice,
                                         Clay_TextElementConfig *config) {
 	KLAPPT_PROFILE_SCOPE_N("TextCache::measure_text");
-	auto font = get_font(config->fontId, config->fontSize);
+	const auto font_size = normalize_font_size(config->fontSize);
+	auto font = get_font(config->fontId, font_size);
 	const StrView text{slice.chars, static_cast<Size>(slice.length)};
 	const bool use_arabic_layout =
 		  is_arabic_font(config->fontId) && str_contains_arabic(text);
@@ -257,8 +269,8 @@ Clay_Dimensions TextCache::measure_text(Clay_StringSlice slice,
 	int height = 0;
 	if (!TTF_GetStringSize(font, slice.chars, slice.length, &width, &height)) {
 		return {static_cast<float>((float)slice.length *
-		                           ((float)config->fontSize / 2.f)),
-		        static_cast<float>(config->fontSize)};
+		                           ((float)font_size / 2.f)),
+		        static_cast<float>(font_size)};
 	}
 
 	return {static_cast<float>(width), static_cast<float>(height)};

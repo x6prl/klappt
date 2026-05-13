@@ -86,7 +86,7 @@ struct TextCache {
 	};
 	using Font = Pair<FontKey, TTF_Font *>;
 	TTF_Font *base_fonts[FontID::COUNT]{};
-	Arr<Font, 32> fonts{};
+	Arr<Font, 96> fonts{};
 	Data data[MAP_SIZE]{};
 
 	TTF_Font *get_font(uint16_t font_id, uint16_t font_size);
