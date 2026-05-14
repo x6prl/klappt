@@ -321,8 +321,8 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 // 	return strs.join(a, '\n');
 // }
 
-void screen_word_push(AppContext *ctx, WordId word_id) {
-	KLAPPT_PROFILE_SCOPE_N("screen_word_push");
+void screen_word_view_push(AppContext *ctx, WordId word_id) {
+	KLAPPT_PROFILE_SCOPE_N("screen_word_view_push");
 	auto &state = *ctx->word_view_state;
 	state.word_id = word_id;
 	state.has_state = false;
@@ -362,11 +362,11 @@ void screen_word_push(AppContext *ctx, WordId word_id) {
 	}
 	state.title = most_meaningfull_lemma(state.word_copy);
 
-	ctx->push(Screen::Word);
+	ctx->push(Screen::WordView);
 }
 
-void screen_word_draw(AppContext *ctx) {
-	KLAPPT_PROFILE_SCOPE_N("screen_word_draw");
+void screen_word_view_draw(AppContext *ctx) {
+	KLAPPT_PROFILE_SCOPE_N("screen_word_view_draw");
 	const auto padding = udpi(6.f);
 	CLAY(CLAY_ID("WordViewScreenShell"),
 	     {.layout = {

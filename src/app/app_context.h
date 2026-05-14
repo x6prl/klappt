@@ -30,7 +30,7 @@ enum class Screen {
 	LearningList,
 	WordSuggestions,
 	Settings,
-	Word,
+	WordView,
 	WordEdit,
 	Onboarding,
 };
@@ -53,10 +53,10 @@ inline const char *screen_name(Screen s) {
 		return "WordSuggestions";
 	case Screen::Settings:
 		return "Settings";
+	case Screen::WordView:
+		return "WordView";
 	case Screen::WordEdit:
 		return "WordEdit";
-	case Screen::Word:
-		return "Word";
 	case Screen::Onboarding:
 		return "Onboarding";
 	}

@@ -286,7 +286,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			auto view_this_word = mobile_icon_button<false>(
 				  ctx, CLAY_ID("EditButton"), Icons::EDIT);
 			if (view_this_word.activated()) {
-				screen_word_push(
+				screen_word_view_push(
 					  ctx, ctx->exercises.current_result_review().word_id);
 			}
 

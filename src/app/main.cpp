@@ -84,6 +84,7 @@ static const char *FrameName(Screen screen) {
 	case Screen::LearningList: return "Frame/LearningList";
 	case Screen::WordSuggestions: return "Frame/WordSuggestions";
 	case Screen::Settings: return "Frame/Settings";
+	case Screen::WordView: return "Frame/WordView";
 	case Screen::WordEdit: return "Frame/WordEdit";
 	case Screen::Onboarding: return "Frame/Onboarding";
 	}
@@ -280,7 +281,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	m.lap().printus("create text cache");
 
 	// set up the application data
-	auto state = new AppContext{
+	auto ctx = new AppContext{
 		  .window = window,
 		  .renderer = renderer,
 		  .scale = SDL_GetWindowDisplayScale(window),
@@ -294,7 +295,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
 	};
-	*appstate = state;
+	*appstate = ctx;
 	m.lap().printus("create app context");
 
 // load app_hotreload
@@ -323,7 +324,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_clay_init");
-		ui_clay_init(state);
+		ui_clay_init(ctx);
 	}
 	m.lap().printus("ui clay init");
 
@@ -339,25 +340,25 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	FileLoader settingsfl{};
 	if (settingsfl.load("settings.dat"_v)) {
-		if (!Settings::decode(settingsfl.data, settingsfl.size, &state->settings)) {
-			state->app_status.set_exit_with_error("cannot decode settings file"_v);
+		if (!Settings::decode(settingsfl.data, settingsfl.size, &ctx->settings)) {
+			ctx->app_status.set_exit_with_error("cannot decode settings file"_v);
 		}
 	}
 	m.lap().printus("load settings");
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
-		ui_settings_init(state);
+		ui_settings_init(ctx);
 	}
 	m.lap().printus("ui settings init");
-	if (state->settings.onboarding_stage < 0) {
+	if (ctx->settings.onboarding_stage < 0) {
 		{
 			KLAPPT_PROFILE_SCOPE_N("init_words");
-			if (!init_words(*state, basePath)) {
+			if (!init_words(*ctx, basePath)) {
 				return SDL_APP_FAILURE;
 			}
 		}
 		m.lap().printus("init words");
-		state->go(Screen::Start);
+		ctx->go(Screen::Start);
 	}
 	SDL_Log("Application started successfully!");
 	m.lap().printus("total");
@@ -369,8 +370,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppEvent(void *appstate,
                                               SDL_Event *event) {
 	KLAPPT_PROFILE_SCOPE_N("SDL_AppEvent");
 	KLAPPT_PROFILE_NAME_F("SDL_AppEvent:%s", EventTypeName(event->type));
-	auto *app = (AppContext *)appstate;
-	app->ticks = SDL_GetTicks();
+	auto *ctx = (AppContext *)appstate;
+	ctx->ticks = SDL_GetTicks();
 	{
 		char event_type_text[32];
 		auto len = SDL_snprintf(event_type_text, sizeof(event_type_text),
@@ -384,11 +385,11 @@ extern "C" SDL_AppResult SDLCALL SDL_AppEvent(void *appstate,
 	    event->user.code == HOTRELOAD_EVENT_CODE
 
 	) {
-		if (app->animation_timer_id) {
-			SDL_RemoveTimer(app->animation_timer_id);
-			app->animation_timer_id = 0;
+		if (ctx->animation_timer_id) {
+			SDL_RemoveTimer(ctx->animation_timer_id);
+			ctx->animation_timer_id = 0;
 		}
-		app->animate = false;
+		ctx->animate = false;
 		auto [healthy, reloaded] = hotreload(HOTRELOAD_MODULE_PATH);
 		if (!healthy) {
 			SDL_Log("Failed to reload app_hotreload from %s",
@@ -396,14 +397,14 @@ extern "C" SDL_AppResult SDLCALL SDL_AppEvent(void *appstate,
 			// return SDL_APP_CONTINUE;
 		}
 		if (reloaded) {
-			ui_clay_init(app);
-			ui_settings_init(app);
+			ui_clay_init(ctx);
+			ui_settings_init(ctx);
 		}
 	}
 #endif
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event");
-		return ui_event(app, event);
+		return ui_event(ctx, event);
 	}
 }
 
@@ -428,16 +429,16 @@ extern "C" SDL_AppResult SDLCALL SDL_AppIterate(void *appstate) {
 		KLAPPT_PROFILE_NAME_F("SDL_AppIterate:frame delta=%llu ms",
 		                      static_cast<unsigned long long>(delta));
 		last_tick = tick;
-		auto *app = (AppContext *)appstate;
-		app->ticks = tick;
-		KLAPPT_PROFILE_FRAME_N(FrameName(app->screen()));
-		// update_ticks_array(&(app->last_ticks), tick);
+		auto *ctx = (AppContext *)appstate;
+		ctx->ticks = tick;
+		KLAPPT_PROFILE_FRAME_N(FrameName(ctx->screen()));
+		// update_ticks_array(&(ctx->last_ticks), tick);
 		SDL_AppResult ret;
 		{
 			KLAPPT_PROFILE_SCOPE_N("ui_iterate");
-			ret = ui_iterate(app);
+			ret = ui_iterate(ctx);
 		}
-		// update_ticks_array(&(app->last_ticksef), SDL_GetTicks());
+		// update_ticks_array(&(ctx->last_ticksef), SDL_GetTicks());
 		m.lap();
 		if (m.tlap > uint64_t(st.avg()*2)) {
 			m.printms();
@@ -454,32 +455,32 @@ extern "C" SDL_AppResult SDLCALL SDL_AppIterate(void *appstate) {
 
 extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	KLAPPT_PROFILE_SCOPE();
-	auto *app = (AppContext *)appstate;
+	auto *ctx = (AppContext *)appstate;
 	Measure m{__PRETTY_FUNCTION__};
 	(void)result;
-	app->word_store.close();
-	app->states.close();
+	ctx->word_store.close();
+	ctx->states.close();
 	m.lap().printus("save states");
 	// OS will destroy everything itself on exit
 
-	// if (app) {
-	//   SDL_DestroyRenderer(app->renderer);
-	//   SDL_DestroyWindow(app->window);
+	// if (ctx) {
+	//   SDL_DestroyRenderer(ctx->renderer);
+	//   SDL_DestroyWindow(ctx->window);
 	//
 	//   // prevent the music from abruptly ending.
-	// MIX_StopTrack(app->track, MIX_TrackMSToFrames(app->track, 1000));
+	// MIX_StopTrack(ctx->track, MIX_TrackMSToFrames(ctx->track, 1000));
 	// std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	//   // Mix_FreeMusic(app->music); // this call blocks until the music has
 	//   // finished fading
-	//   SDL_CloseAudioDevice(app->audioDevice);
+	//   SDL_CloseAudioDevice(ctx->audioDevice);
 	//
-	//   delete app;
+	//   delete ctx;
 	// }
 	// TTF_Quit();
 	// MIX_Quit();
 	//
-	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled errors: %d", app->app_status.app_quit, app->app_status.error_msgs.size);
-	for (auto &emsg: app->app_status.error_msgs) {
+	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled errors: %d", ctx->app_status.app_quit, ctx->app_status.error_msgs.size);
+	for (auto &emsg: ctx->app_status.error_msgs) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, StrView_Fmt, StrView_Arg(emsg));
 	}
 }

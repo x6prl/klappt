@@ -34,8 +34,8 @@ void screen_word_suggestions_draw(AppContext *ctx);
 void screen_settings_push(AppContext *ctx);
 void screen_settings_draw(AppContext *ctx);
 
-void screen_word_push(AppContext *ctx, WordId word_id);
-void screen_word_draw(AppContext *ctx);
+void screen_word_view_push(AppContext *ctx, WordId word_id);
+void screen_word_view_draw(AppContext *ctx);
 
 void screen_word_edit_push(AppContext *ctx);
 void screen_word_edit_draw(AppContext *ctx);

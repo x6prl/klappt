@@ -181,7 +181,7 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 }
 
 inline bool seed_default_learning_list(const DynArr<Word> &parsed,
-                                       AppContext &state) {
+                                       AppContext &ctx) {
 	static constexpr LearningListSeedSpec DEFAULT_SEEDS[] = {
 		  {WordType::Verb, "sein"_v},
 		  {WordType::Verb, "kommen"_v},
@@ -212,33 +212,33 @@ inline bool seed_default_learning_list(const DynArr<Word> &parsed,
 			continue;
 		}
 
-		auto word = clone_word(state.arena, *parsed_word);
-		if (!state.word_store.ensure_word(state.tmparena, word)) {
+		auto word = clone_word(ctx.arena, *parsed_word);
+		if (!ctx.word_store.ensure_word(ctx.tmparena, word)) {
 			SDL_LogError(
 				  SDL_LOG_CATEGORY_ERROR,
 				  "Ensuring default learning-list seed failed: " StrView_Fmt,
 				  StrView_Arg(spec.key));
 			return false;
 		}
-		if (!add_word_to_learning_list_seeded(state.tmparena, word,
-		                                      *state.words, state.word_store,
-		                                      state.states)) {
-			state.app_status.push_error("Failed to seed learning list"_v);
+		if (!add_word_to_learning_list_seeded(ctx.tmparena, word,
+		                                      *ctx.words, ctx.word_store,
+		                                      ctx.states)) {
+			ctx.app_status.push_error("Failed to seed learning list"_v);
 		}
 		added_any = true;
 	}
 
 	if (added_any) {
-		save_words_dat(state.tmparena, state.settings, *state.words);
+		save_words_dat(ctx.tmparena, ctx.settings, *ctx.words);
 	}
 	return true;
 }
 
-inline bool init_words(AppContext &state,
+inline bool init_words(AppContext &ctx,
                        const std::filesystem::path &basePath) {
 	Measure m{__PRETTY_FUNCTION__};
 	WebPersistBatch persist_batch;
-	const auto lang = state.settings.tr_language;
+	const auto lang = ctx.settings.tr_language;
 	const auto lang_code = Settings::translation_language_code(lang);
 	const auto source_leaf = Settings::translation_source_leaf(lang);
 	const auto words_leaf = Settings::words_snapshot_leaf(lang);
@@ -248,16 +248,16 @@ inline bool init_words(AppContext &state,
 	SDL_Log("Active translation language: " StrView_Fmt,
 	        StrView_Arg(lang_code));
 
-	state.words = new Words;
+	ctx.words = new Words;
 	const auto states_path = FileLoader::path_for(states_leaf);
-	if (states_path.empty() || !state.states.open(str_view(states_path))) {
+	if (states_path.empty() || !ctx.states.open(str_view(states_path))) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening states storage failed");
 		return false;
 	}
 	m.lap().printus("states");
 	const auto word_store_path = FileLoader::path_for(word_store_leaf);
 	if (word_store_path.empty() ||
-	    !state.word_store.open(str_view(word_store_path))) {
+	    !ctx.word_store.open(str_view(word_store_path))) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening Xapian words failed");
 		return false;
 	}
@@ -267,7 +267,7 @@ inline bool init_words(AppContext &state,
 	if (fl.load(words_leaf)) {
 		SDL_Log(StrView_Fmt " loaded: %d bytes", StrView_Arg(words_leaf),
 		        fl.size);
-		if (!WordsCodec::decode(state.arena, fl.data, fl.size, *state.words)) {
+		if (!WordsCodec::decode(ctx.arena, fl.data, fl.size, *ctx.words)) {
 			SDL_Log(StrView_Fmt " exists but is not a valid WordsCodec blob; "
 			                    "resetting learning list snapshot",
 			        StrView_Arg(words_leaf));
@@ -278,29 +278,29 @@ inline bool init_words(AppContext &state,
 				SDL_Log(StrView_Fmt ": failed to remove",
 				        StrView_Arg(words_leaf));
 			}
-			*state.words = {};
+			*ctx.words = {};
 		} else {
 			SDL_Log("main arena usage after decode: %td / %d bytes",
-			        state.arena.offset, state.arena.allocated_size);
+			        ctx.arena.offset, ctx.arena.allocated_size);
 		}
 	} else {
 		SDL_Log(StrView_Fmt " not found; starting with an empty learning list",
 		        StrView_Arg(words_leaf));
 	}
 	SDL_Log(StrView_Fmt " size: %d words", StrView_Arg(words_leaf),
-	        state.words->size);
+	        ctx.words->size);
 	m.lap().printus("load words snapshot");
 
 	bool changed = false;
-	if (!sync_learning_words_to_store(state.tmparena, state.word_store,
-	                                  *state.words, changed)) {
+	if (!sync_learning_words_to_store(ctx.tmparena, ctx.word_store,
+	                                  *ctx.words, changed)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Syncing learning list to Xapian failed");
 		return false;
 	}
 	m.lap().printus("sync words snapshot");
 	Size added_states = 0;
-	if (!sync_learning_words_to_states(state.states, *state.words,
+	if (!sync_learning_words_to_states(ctx.states, *ctx.words,
 	                                   added_states)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Syncing learning list to states failed");
@@ -312,31 +312,31 @@ inline bool init_words(AppContext &state,
 	}
 	m.lap().printus("sync states snapshot");
 	if (changed) {
-		save_words_dat(state.tmparena, state.settings, *state.words);
+		save_words_dat(ctx.tmparena, ctx.settings, *ctx.words);
 		m.lap().printus("save remapped snapshot");
 	}
 
 	{
-		auto guard = state.tmparena.guard();
+		auto guard = ctx.tmparena.guard();
 		DynArr<Word> parsed_words;
 		const auto source_path =
 			  basePath / "word_data" /
 			  std::string(source_leaf.data,
 		                  static_cast<size_t>(source_leaf.size));
-		if (!wparse_file(state.tmparena, source_path.c_str(), parsed_words,
-		                 &state.app_status)) {
+		if (!wparse_file(ctx.tmparena, source_path.c_str(), parsed_words,
+		                 &ctx.app_status)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Loading source words from " StrView_Fmt " failed",
 			             StrView_Arg(source_leaf));
 			return false;
 		}
 		m.point().printus("file parsed");
-		if (parsed_words.size != state.word_store.word_count()) {
+		if (parsed_words.size != ctx.word_store.word_count()) {
 			SDL_Log("parsed %d, but we have %d. Should import the words",
-			        parsed_words.size, state.word_store.word_count());
+			        parsed_words.size, ctx.word_store.word_count());
 
 			Size added_count = 0;
-			if (!import_new_parsed_words(state.tmparena, state.word_store,
+			if (!import_new_parsed_words(ctx.tmparena, ctx.word_store,
 			                             parsed_words, added_count)) {
 				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 				             "Importing parsed words from " StrView_Fmt
@@ -351,8 +351,8 @@ inline bool init_words(AppContext &state,
 				        StrView_Arg(source_leaf));
 			}
 
-			if (state.words->size == 0 &&
-			    !seed_default_learning_list(parsed_words, state)) {
+			if (ctx.words->size == 0 &&
+			    !seed_default_learning_list(parsed_words, ctx)) {
 				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 				             "Seeding default learning list failed");
 				return false;
@@ -360,13 +360,13 @@ inline bool init_words(AppContext &state,
 			m.point().printus("seeded if was needed");
 		} else {
 			SDL_Log("parsed %d and we have %d", parsed_words.size,
-			        state.word_store.word_count());
+			        ctx.word_store.word_count());
 		}
 	}
 	m.lap().printus("import active dictionary");
 
 	SDL_Log("main arena usage after startup load: %td / %d bytes",
-	        state.arena.offset, state.arena.allocated_size);
+	        ctx.arena.offset, ctx.arena.allocated_size);
 	SDL_Log("==================");
 	return true;
 }

@@ -67,7 +67,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 										  due_mark);
 
 									if (is_tapped) {
-										screen_word_push(ctx, w.word_id);
+										screen_word_view_push(ctx, w.word_id);
 									}
 								}
 								return true;

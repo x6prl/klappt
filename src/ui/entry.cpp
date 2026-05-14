@@ -441,10 +441,10 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				bottom_bar_layout(ctx);
 				break;
 			}
-			case Screen::Word: {
-				KLAPPT_PROFILE_SCOPE_N("render_screen.Word");
+			case Screen::WordView: {
+				KLAPPT_PROFILE_SCOPE_N("render_screen.WordView");
 				app_bar_layout(ctx, ctx->word_view_state->title);
-				screen_word_draw(ctx);
+				screen_word_view_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
 			}

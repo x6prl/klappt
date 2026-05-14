@@ -78,7 +78,7 @@ void screen_words_list_draw(AppContext *ctx) {
 							                           *ctx->words);
 									} else if (tap_state ==
 						                       TapSwipeLongTap::Tap) {
-										screen_word_push(ctx, w.word_id);
+										screen_word_view_push(ctx, w.word_id);
 									}
 								}
 								return true;
