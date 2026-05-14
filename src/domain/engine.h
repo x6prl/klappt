@@ -68,7 +68,7 @@ struct Params {
 	double penalty_lambda{0.11};
 
 	// Numerical safety / product constraints.
-	double stability_min_days{20.0 / 86400.0}; // 20 seconds
+	double stability_min_days{40.0 / 86400.0}; // 40 seconds
 	double stability_max_days{365.0};         // 1 year
 
 	// Reward and penalty strengths by mode.
@@ -95,8 +95,8 @@ struct Params {
 	double success_bonus{0.22};
 
 	// Recovery boost after a streak of poor reviews.
-	double recovery_boost{1.85};
-	Size recovery_window{5};
+	double recovery_boost{6.};
+	Size recovery_window{3};
 
 	// Bootstraping same-day learning, we do not have a separate "learning
 	// steps" phase
@@ -127,7 +127,7 @@ struct Params {
 		  0.42, // Chunks -> Compose
 		  0.0};
 
-	double promotion_quality{0.80};
+	double promotion_quality{0.50};
 	double demotion_quality{0.28};
 	Size min_reviews_before_demotion{2};
 
