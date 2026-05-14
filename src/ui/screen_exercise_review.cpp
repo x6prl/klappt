@@ -3,10 +3,61 @@
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/dpi.h"
+#include <algorithm>
+#include <ctime>
 
 void screen_exercise_review_push(AppContext *ctx) {
 	ctx->push(Screen::ExerciseReview);
 }
+
+namespace {
+
+bool promote_current_review_word_mode(AppContext *ctx) {
+	const auto &review = ctx->exercises.current_result_review();
+
+	Engine::State state{};
+	auto [success, found] = ctx->states.get(review.word_id, state);
+	if (!success) {
+		ctx->app_status.push_error("Cannot read word learning state"_v);
+		return false;
+	}
+	if (!found) {
+		ctx->app_status.push_error("Word learning state is missing"_v);
+		return false;
+	}
+	if (state.mode >= Engine::Mode::Compose) {
+		return true;
+	}
+
+	const int current_mode_index = Engine::modei(state.mode);
+	const auto next_mode = Engine::imode(current_mode_index + 1);
+	const auto &current = state.memory[current_mode_index];
+	auto &next = state.memory[Engine::modei(next_mode)];
+
+	const double source_stability = std::max(
+		  current.stability_days,
+		  Engine::State::p.promotion_stability_days[current_mode_index]);
+	const double source_quality =
+		  std::max(current.quality_ewma, Engine::State::p.promotion_quality);
+
+	next.stability_days = std::max(
+		  next.stability_days,
+		  source_stability *
+				Engine::State::p.promotion_transfer[current_mode_index]);
+	next.quality_ewma = std::max(next.quality_ewma, source_quality * 0.80);
+
+	state.mode = next_mode;
+	state.refresh_due(std::time(nullptr));
+
+	if (!ctx->states.set(review.word_id, state)) {
+		ctx->app_status.push_error("Cannot save learning state"_v);
+		return false;
+	}
+
+	return true;
+}
+
+} // namespace
 
 void screen_exercise_review_draw(AppContext *ctx) {
 	if (ctx->exercises.results.empty()) {
@@ -221,12 +272,6 @@ void screen_exercise_review_draw(AppContext *ctx) {
 		                                          CLAY_ALIGN_Y_CENTER},
 						 },
 			 }) {
-			auto edit_this_word = mobile_icon_button<false>(
-				  ctx, CLAY_ID("EditButton"), Icons::EDIT);
-			if (edit_this_word.activated()) {
-				screen_word_push(
-					  ctx, ctx->exercises.current_result_review().word_id);
-			}
 
 			auto remove_this_word_from_learning_list =
 				  mobile_icon_button<false>(ctx, CLAY_ID("RemoveButton"),
@@ -237,6 +282,18 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				remove_word_from_learning_list(ctx->tmparena, &word, ctx->words,
 				                               &ctx->word_store);
 				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
+			}
+			auto view_this_word = mobile_icon_button<false>(
+				  ctx, CLAY_ID("EditButton"), Icons::EDIT);
+			if (view_this_word.activated()) {
+				screen_word_push(
+					  ctx, ctx->exercises.current_result_review().word_id);
+			}
+
+			auto promote_mode = mobile_icon_button<false>(
+				  ctx, CLAY_ID("PromoteModeButton"), Icons::HAMSA);
+			if (promote_mode.activated()) {
+				promote_current_review_word_mode(ctx);
 			}
 
 			auto next =

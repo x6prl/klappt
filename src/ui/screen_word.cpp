@@ -47,6 +47,41 @@ static StrView mode_name(Engine::Mode mode) {
 	return "Unknown"_v;
 }
 
+static StrView successful_reviews_to_next_mode(Arena &a,
+                                               const Engine::State &state) {
+	if (state.mode >= Engine::Mode::Compose) {
+		return "Max level"_v;
+	}
+
+	Engine::State probe = state;
+	const auto start_mode = probe.mode;
+	Engine::Timestamp at = std::time(nullptr);
+	constexpr int max_reviews = 1000;
+
+	for (int reviews = 1; reviews <= max_reviews; ++reviews) {
+		if (probe.due > at) {
+			at = probe.due;
+		}
+		if (probe.last_review >= at) {
+			at = probe.last_review + 1;
+		}
+
+		Engine::Review review{
+			  .right = 1,
+			  .size = 1,
+			  .at = at,
+		};
+		if (!probe.update(review)) {
+			return "Unknown"_v;
+		}
+		if (probe.mode != start_mode) {
+			return StrView::from_number(a, reviews);
+		}
+	}
+
+	return ">1000"_v;
+}
+
 static inline StrView word_to_lexemme_str(Arena &scratch, Arena &a,
                                           const Word &w) {
 	StrViewArray strs{};
@@ -188,6 +223,11 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			draw_text(StrView::concat_with(ctx->tmparena, "Mode"_v,
 			                               mode_name(s.mode), ':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
+			draw_text(
+				  StrView::concat_with(
+						ctx->tmparena, "Successes to next mode"_v,
+						successful_reviews_to_next_mode(ctx->tmparena, s), ':'),
+				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(StrView::concat_with(ctx->tmparena, "Due"_v,
 			                               format_due_delta(ctx->tmparena,
 			                                                std::time(nullptr),
