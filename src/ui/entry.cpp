@@ -26,39 +26,6 @@
 #include "themes.h"
 #include "tslt.h"
 
-void screen_start_go(AppContext *ctx);
-void screen_start_draw(AppContext *ctx);
-
-void screen_exercise_go(AppContext *ctx, bool reset_stack);
-void screen_exercise_draw(AppContext *ctx);
-
-void screen_exercise_summary_go(AppContext *ctx);
-void screen_exercise_summary_draw(AppContext *ctx);
-
-void screen_exercise_review_push(AppContext *ctx);
-void screen_exercise_review_draw(AppContext *ctx);
-
-void screen_words_list_go(AppContext *ctx);
-void screen_words_list_draw(AppContext *ctx);
-
-void screen_learning_list_go(AppContext *ctx);
-void screen_learning_list_draw(AppContext *ctx);
-
-void screen_word_suggestions_go(AppContext *ctx);
-void screen_word_suggestions_draw(AppContext *ctx);
-
-void screen_settings_push(AppContext *ctx);
-void screen_settings_draw(AppContext *ctx);
-
-void screen_word_push(AppContext *ctx, WordId word_id);
-void screen_word_draw(AppContext *ctx);
-
-void screen_word_edit_push(AppContext *ctx, WordId word_id);
-void screen_word_edit_draw(AppContext *ctx);
-
-void screen_onboarding_go(AppContext *ctx);
-void screen_onboarding_draw(AppContext *ctx);
-
 namespace {
 constexpr Uint32 animation_timer_interval_ms = 4;
 constexpr Uint64 interaction_animation_duration_ms = 700;
@@ -117,7 +84,7 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 		strs.push(ctx->tmparena, title);
 		strs.push(ctx->tmparena, "e:"_v);
 		strs.push(ctx->tmparena,
-		          StrView::from_integer(ctx->tmparena,
+		          StrView::from_number(ctx->tmparena,
 		                                ctx->app_status.error_msgs.size));
 		title = strs.join(ctx->tmparena, ' ');
 	}
@@ -263,8 +230,8 @@ StrView str_view_x_of_n(Arena &a, Size x, Size n) {
 	++x;
 	StrViewArray strs{};
 
-	strs.push(a, StrView::from_integer(a, x));
-	strs.push(a, StrView::from_integer(a, n));
+	strs.push(a, StrView::from_number(a, x));
+	strs.push(a, StrView::from_number(a, n));
 	return strs.join(a, '/');
 }
 
@@ -476,7 +443,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::Word: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Word");
-				app_bar_layout(ctx, "???"_v);
+				app_bar_layout(ctx, ctx->word_view_state->title);
 				screen_word_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;

@@ -1,7 +1,8 @@
-#include "screen_helpers.h"
-#include "ui/dpi.h"
-#include "ui/components/button.h"
 #include "app/words_init.h"
+#include "base/str_view.h"
+#include "screen_helpers.h"
+#include "ui/components/button.h"
+#include "ui/dpi.h"
 
 void screen_exercise_review_push(AppContext *ctx) {
 	ctx->push(Screen::ExerciseReview);
@@ -88,8 +89,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					  std::max(diff.actual.size, diff.expected.size));
 				auto font_size = get_font_size_based_on_str_size(
 					  ctx->display_width, ctx->scale, response_length);
-				auto max_line_width = std::max(
-					  0.0f, ctx->display_width - udpi(64.0f));
+				auto max_line_width =
+					  std::max(0.0f, ctx->display_width - udpi(64.0f));
 				auto part_width = [&](StrView part) {
 					auto slice = CLAY__INIT(Clay_StringSlice){
 						  .length = static_cast<int32_t>(part.size),
@@ -97,14 +98,15 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						  .baseChars = part.data,
 					};
 					return ctx->text
-						  ->measure_text(slice,
-						                 CLAY_TEXT_CONFIG({
-											   .fontId = FontID::MONOSPACE_REGULAR,
-											   .fontSize = static_cast<uint16_t>(
-													 font_size),
-											   .wrapMode = CLAY_TEXT_WRAP_NONE,
-										 }))
-						  .width;
+					      ->measure_text(
+								slice,
+								CLAY_TEXT_CONFIG({
+									  .fontId = FontID::MONOSPACE_REGULAR,
+									  .fontSize =
+											static_cast<uint16_t>(font_size),
+									  .wrapMode = CLAY_TEXT_WRAP_NONE,
+								}))
+					      .width;
 				};
 
 				auto draw_part_line = [&](Clay_ElementId id, Size start,
@@ -169,8 +171,9 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						Size line_start = 0;
 						float line_width = 0.0f;
 						for (Size i = 0; i < diff.actual_parts.size; ++i) {
-							auto width = std::max(part_width(diff.actual_parts[i]),
-							                      part_width(diff.expected_parts[i]));
+							auto width =
+								  std::max(part_width(diff.actual_parts[i]),
+							               part_width(diff.expected_parts[i]));
 							if (i > line_start &&
 							    line_width + width > max_line_width) {
 								auto line_id =
@@ -218,18 +221,16 @@ void screen_exercise_review_draw(AppContext *ctx) {
 		                                          CLAY_ALIGN_Y_CENTER},
 						 },
 			 }) {
-			auto surface_style = mobile_button_style_surface_container_high();
-			surface_style.font_id = FontID::ICONS;
-
-			auto edit_this_word = mobile_button(ctx, CLAY_ID("EditButton"),
-			                                    ""_v, surface_style);
+			auto edit_this_word = mobile_icon_button<false>(
+				  ctx, CLAY_ID("EditButton"), Icons::EDIT);
 			if (edit_this_word.activated()) {
-				screen_word_edit_push(
+				screen_word_push(
 					  ctx, ctx->exercises.current_result_review().word_id);
 			}
 
-			auto remove_this_word_from_learning_list = mobile_button(
-				  ctx, CLAY_ID("RemoveButton"), ""_v, surface_style);
+			auto remove_this_word_from_learning_list =
+				  mobile_icon_button<false>(ctx, CLAY_ID("RemoveButton"),
+			                                Icons::REMOVE);
 			if (remove_this_word_from_learning_list.activated()) {
 				auto word_ref = ctx->exercises.current_result_review().word_ref;
 				auto &word = (*ctx->words)[word_ref];
@@ -238,10 +239,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
 			}
 
-			auto next_style = mobile_button_style_primary();
-			next_style.font_id = FontID::ICONS;
-			auto next = mobile_button(ctx, CLAY_ID("NextButton"), ""_v,
-			                          next_style);
+			auto next =
+				  mobile_icon_button(ctx, CLAY_ID("NextButton"), Icons::NEXT);
 			if (next.activated()) {
 				ctx->exercises.next_result();
 			}

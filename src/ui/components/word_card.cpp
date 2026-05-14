@@ -1,8 +1,10 @@
 #include "word_card.h"
 
 #include "../dpi.h"
-#include "base/profiler.h"
 #include "../themes.h"
+#include "base/profiler.h"
+#include "base/str_view.h"
+#include "ui/tslt.h"
 #include <charconv>
 
 namespace {
@@ -81,11 +83,12 @@ void word_second_col(Clay_ElementId id, StrView text, Clay_Color color,
 
 } // namespace
 
-bool word_card_longtap(AppContext *ctx, Clay_ElementId id, const Word &w) {
+TapSwipeLongTap::State word_card_words_list(AppContext *ctx, Clay_ElementId id,
+                                            const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_longtap");
 	const auto padding = udpi(6.f);
 	const auto height = dpi(WORD_CARD_HEIGHT);
-	bool ret{false};
+	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
 	auto is_usual_card = w.in_learning_list == 0;
 
 	CLAY(id,
@@ -137,8 +140,10 @@ bool word_card_longtap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 		word_second_col(CLAY_IDI("SecondCol", id.id), tr, col, udpi(13),
 		                translation_font_id(ctx));
 
-		if (ctx->tslt.is_longtap() && Clay_Hovered()) {
-			ret = true;
+		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
+		                          ctx->tslt.state == TapSwipeLongTap::LongTap);
+		if (Clay_Hovered() && is_tap_or_longtap) {
+			ret = ctx->tslt.state;
 		}
 	}
 	return ret;
@@ -207,11 +212,12 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	return ret;
 }
 
-void word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
+bool word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
                         int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
 	const auto padding = udpi(6.f);
 	const auto height = dpi(WORD_CARD_HEIGHT);
+	bool ret{false};
 
 	CLAY(id,
 	     {
@@ -332,5 +338,10 @@ void word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
 							.wrapMode = CLAY_TEXT_WRAP_NONE,
 					  }));
 		}
+
+		if (Clay_Hovered() && ctx->tslt.state == TapSwipeLongTap::Tap) {
+			ret = true;
+		}
 	}
+	return ret;
 }

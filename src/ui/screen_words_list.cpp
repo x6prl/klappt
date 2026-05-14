@@ -4,6 +4,7 @@
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 #include "ui/dpi.h"
+#include "ui/tslt.h"
 
 void screen_words_list_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
@@ -35,8 +36,7 @@ void screen_words_list_draw(AppContext *ctx) {
 			}
 		}
 		const auto query = ctx->words_search.view();
-		const auto total_words =
-			  ctx->word_store.matching_word_count(query);
+		const auto total_words = ctx->word_store.matching_word_count(query);
 		CLAY(CLAY_ID("WordsListSlot"),
 		     {.layout = {
 					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)}}}) {
@@ -53,9 +53,9 @@ void screen_words_list_draw(AppContext *ctx) {
 												  CLAY_SIZING_GROW(0),
 												  CLAY_SIZING_FIXED(dpi(
 														WORD_CARD_ROW_HEIGHT))}}}) {
-									auto switched = word_card_longtap(
+									auto tap_state = word_card_words_list(
 										  ctx, CLAY_IDI("Word", index), w);
-									if (switched) {
+									if (tap_state == TapSwipeLongTap::LongTap) {
 										SDL_Log(
 											  StrView_Fmt,
 											  StrView_Arg(w.translations_raw));
@@ -66,7 +66,8 @@ void screen_words_list_draw(AppContext *ctx) {
 											add_word_to_learning_list(
 												  ctx->tmparena, &word,
 												  ctx->words, &ctx->word_store,
-												  &ctx->states, &ctx->app_status);
+												  &ctx->states,
+												  &ctx->app_status);
 										} else {
 											remove_word_from_learning_list(
 												  ctx->tmparena, &word,
@@ -75,6 +76,9 @@ void screen_words_list_draw(AppContext *ctx) {
 										save_words_dat(ctx->tmparena,
 							                           ctx->settings,
 							                           *ctx->words);
+									} else if (tap_state ==
+						                       TapSwipeLongTap::Tap) {
+										screen_word_push(ctx, w.word_id);
 									}
 								}
 								return true;

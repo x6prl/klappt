@@ -7,6 +7,8 @@
 #include "base/str_view.h"
 #include "domain/settings.h"
 #include "platform/files.h"
+#include "ui/components/word_edit_state.h"
+#include "ui/components/word_view_state.h"
 #include "ui/textcache.h"
 #define SDL_MAIN_USE_CALLBACKS // This is necessary for the new callbacks API.
                                // To use the legacy API, don't define this.
@@ -289,6 +291,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .current = 0,
 		  .stack = {Screen::Onboarding},
 		  // .track = mixerTrack,
+		  .word_view_state = new WordViewState{},
+		  .word_edit_state = new WordEditState{},
 	};
 	*appstate = state;
 	m.lap().printus("create app context");

@@ -32,16 +32,42 @@ inline void save_words_dat(Arena &tmp, const Settings &settings,
 
 inline bool sync_learning_words_to_store(Arena &scratch, WordStore &store,
                                          Words &words, bool &changed) {
-	for (Size ref = 1; ref < Words::MAX_WORDS; ++ref) {
-		if (!words.is_used({ref})) {
-			continue;
-		}
-		auto &word = words[{ref}];
+	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+		auto &word = words[ref];
 		auto previous_id = word.word_id;
 		if (!store.ensure_word(scratch, word)) {
 			return false;
 		}
 		changed = changed || word.word_id != previous_id;
+	}
+	return true;
+}
+
+inline bool sync_learning_words_to_states(Engine::States &states,
+                                          const Words &words,
+                                          Size &added_count) {
+	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+		const auto &word = words[ref];
+		Engine::State state{};
+		auto [success, was_found] = states.get(word.word_id, state);
+		if (!success) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "Syncing learning state failed for word_id=%llu",
+			             static_cast<unsigned long long>(word.word_id.value));
+			return false;
+		}
+		if (was_found) {
+			continue;
+		}
+		SDL_Log("Creating learning state for word_id=%llu",
+		        static_cast<unsigned long long>(word.word_id.value));
+		if (!states.set(word.word_id, state)) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "Creating learning state failed for word_id=%llu",
+			             static_cast<unsigned long long>(word.word_id.value));
+			return false;
+		}
+		++added_count;
 	}
 	return true;
 }
@@ -140,9 +166,13 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 		word_store.save(tmparena, word);
 		Engine::State state{};
 		auto [success, was_found] = states.get(word.word_id, state);
-		(void)success;
+		if (!success) {
+			return false;
+		}
 		if (!was_found) {
-			states.set(word.word_id, state);
+			if (!states.set(word.word_id, state)) {
+				return false;
+			}
 		}
 		return true;
 	} else {
@@ -269,6 +299,18 @@ inline bool init_words(AppContext &state,
 		return false;
 	}
 	m.lap().printus("sync words snapshot");
+	Size added_states = 0;
+	if (!sync_learning_words_to_states(state.states, *state.words,
+	                                   added_states)) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Syncing learning list to states failed");
+		return false;
+	}
+	if (added_states > 0) {
+		SDL_Log("Created %d missing learning states",
+		        static_cast<int>(added_states));
+	}
+	m.lap().printus("sync states snapshot");
 	if (changed) {
 		save_words_dat(state.tmparena, state.settings, *state.words);
 		m.lap().printus("save remapped snapshot");

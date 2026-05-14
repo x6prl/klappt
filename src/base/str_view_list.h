@@ -54,4 +54,25 @@ struct StrViewArray {
 		}
 		return ret;
 	}
+	StrView join(Arena &a, StrView insert) {
+		auto delim_count = (data.size - 1);
+		auto result_lenght = total_lenght + delim_count*insert.size;
+		auto dst = a.pushN<char>(result_lenght);
+		StrView ret = {dst, result_lenght};
+
+		for (Size i{0}; i < data.size; ++i) {
+			if (i) {
+				memcpy(dst-data.size,insert.data, insert.size);
+			}
+			auto &str = data[i];
+			if (str.size > 0) {
+				memcpy(dst, str.data, str.size);
+				// if (i != data.size - 1) {
+				// 	dst[str.size] = delim;
+				// }
+				dst += str.size + data.size;
+			}
+		}
+		return ret;
+	}
 };

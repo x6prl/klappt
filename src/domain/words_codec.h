@@ -149,24 +149,22 @@ inline Size entry_size(const Word &word) {
 
 inline uint32_t used_count(const Words &words) {
 	uint32_t count = 0;
-	for (Size i = 1; i < Words::MAX_WORDS; ++i) {
-		count += words.used[i] ? 1u : 0u;
+	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+		++count;
 	}
 	return count;
 }
 
 inline Size encoded_size(const Words &words) {
 	uint64_t total = sizeof(Header);
-	for (Size i = 1; i < Words::MAX_WORDS; ++i) {
-		if (words.used[i]) {
-			const auto size = entry_size(words.words[i]);
-			if (size <= 0) {
-				return 0;
-			}
-			total += static_cast<uint64_t>(size);
-			if (total > static_cast<uint64_t>(MAX_ENCODED_BLOB_SIZE)) {
-				return 0;
-			}
+	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+		const auto size = entry_size(words.words[ref.value]);
+		if (size <= 0) {
+			return 0;
+		}
+		total += static_cast<uint64_t>(size);
+		if (total > static_cast<uint64_t>(MAX_ENCODED_BLOB_SIZE)) {
+			return 0;
 		}
 	}
 	return static_cast<Size>(total);
@@ -261,13 +259,10 @@ inline StrView encode(Arena &a, const Words &words) {
 	const auto count = used_count(words);
 	const auto total_size = encoded_size(words);
 	if (total_size <= 0 || total_size > MAX_ENCODED_BLOB_SIZE) {
-		for (Size i = 1; i < Words::MAX_WORDS; ++i) {
-			if (!words.used[i]) {
-				continue;
-			}
-			if (entry_size(words.words[i]) <= 0) {
-				log_invalid_word_for_encode(static_cast<uint16_t>(i),
-				                            words.words[i]);
+		for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+			if (entry_size(words.words[ref.value]) <= 0) {
+				log_invalid_word_for_encode(static_cast<uint16_t>(ref.value),
+				                            words.words[ref.value]);
 			}
 		}
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
@@ -284,12 +279,9 @@ inline StrView encode(Arena &a, const Words &words) {
 
 	auto *cursor = reinterpret_cast<uint8_t *>(header + 1);
 	auto *end = data + total_size;
-	for (Size i = 1; i < Words::MAX_WORDS; ++i) {
-		if (!words.used[i]) {
-			continue;
-		}
-		if (!encode_entry(cursor, end, static_cast<uint16_t>(i),
-		                  words.words[i])) {
+	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+		if (!encode_entry(cursor, end, static_cast<uint16_t>(ref.value),
+		                  words.words[ref.value])) {
 			return {};
 		}
 	}
@@ -448,6 +440,9 @@ inline bool decode(Arena &a, const void *data, Size size, Words &words) {
 			return false;
 		}
 		decoded.used[ref] = true;
+		if (ref >= decoded.next_free) {
+			decoded.next_free = ref + 1;
+		}
 	}
 
 	if (cursor != end) {
@@ -456,13 +451,11 @@ inline bool decode(Arena &a, const void *data, Size size, Words &words) {
 	}
 
 	decoded.size = static_cast<Size>(header.entry_count);
-	decoded.next_free = header.next_free;
 	if (decoded.next_free < 1 || decoded.next_free > Words::MAX_WORDS) {
 		decoded.next_free = 1;
-		while (decoded.next_free < Words::MAX_WORDS &&
-		       decoded.used[decoded.next_free]) {
-			++decoded.next_free;
-		}
+	}
+	for (; decoded.next_free > 1 && !decoded.used[decoded.next_free - 1];
+	     --decoded.next_free) {
 	}
 
 	words = decoded;

@@ -74,7 +74,7 @@ void screen_settings_draw(AppContext *ctx) {
 			auto MINUS = ""_v;
 			auto current_value = ctx->settings.exercise_round_size;
 			auto current_value_str =
-				  StrView::from_integer(ctx->tmparena, current_value);
+				  StrView::from_number(ctx->tmparena, current_value);
 			auto button_minus = mobile_button(ctx, CLAY_ID("MinusButton"),
 			                                  MINUS, button_style);
 			draw_text(current_value_str, theme()->onSurface, text_size);

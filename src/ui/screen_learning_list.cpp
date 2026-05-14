@@ -49,9 +49,10 @@ void screen_learning_list_draw(AppContext *ctx) {
 									Engine::State state{};
 									auto [is_success, is_present] =
 										  ctx->states.get(w.word_id, state);
-									SDL_Log("%s %s",
-						                    is_success ? "SUC" : "FAIL",
-						                    is_present ? "PRES" : "NOTFOUND");
+									// SDL_Log("%s %s",
+						            //                  is_success ? "SUC" :
+						            //                  "FAIL", is_present ?
+						            //                  "PRES" : "NOTFOUND");
 									Engine::Timestamp due = state.due;
 									int due_mark{0};
 									if (due >= 0) {
@@ -61,9 +62,13 @@ void screen_learning_list_draw(AppContext *ctx) {
 														: static_cast<int>(due -
 							                                               now);
 									}
-									word_card_with_due(ctx,
-						                               CLAY_IDI("Word", index),
-						                               w, due_mark);
+									bool is_tapped = word_card_with_due(
+										  ctx, CLAY_IDI("Word", index), w,
+										  due_mark);
+
+									if (is_tapped) {
+										screen_word_push(ctx, w.word_id);
+									}
 								}
 								return true;
 							});

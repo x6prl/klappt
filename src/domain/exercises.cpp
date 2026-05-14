@@ -443,11 +443,20 @@ void submit_finished_exercise(AppContext *ctx, const ExerciseState &e) {
 	};
 	// TODO: cache state; in Words?
 	State state;
-	ctx->states.get(e.word_id, state);
+	{
+		KLAPPT_PROFILE_SCOPE_N("estate: get");
+		ctx->states.get(e.word_id, state);
+	}
 	m.lap().printus("get");
-	state.update(review);
+	{
+		KLAPPT_PROFILE_SCOPE_N("estate: update");
+		state.update(review);
+	}
 	m.lap().printus("update");
-	ctx->states.set(e.word_id, state);
+	{
+		KLAPPT_PROFILE_SCOPE_N("estate: set");
+		ctx->states.set(e.word_id, state);
+	}
 	m.lap().printus("set");
 }
 
@@ -504,46 +513,45 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	// and lists of spare words
 	// NOTE: big lists will contain due-words too
 	// NOTE: the order of due_ref and due_id is not the same!!!
-	for (WordRef i{1}; i < Words::MAX_WORDS; ++i) {
-		if (words.is_used(i)) {
-			auto &word = words[i];
-			if (due_id.is_contains(word.word_id)) {
-				due_ref.push(ctx->tmparena, i);
+	// TODO: fix this shit, cause it iterates over all the list
+	for (auto i = words.begin(); i < words.end(); i.advance(&words)) {
+		auto &word = words[i];
+		if (due_id.is_contains(word.word_id)) {
+			due_ref.push(ctx->tmparena, i);
+		}
+		auto text = word.p.text; // hä...  TODO: be more elegant
+		switch (word.type) {
+		case WordType::Noun:
+			// noun_word_ref_list.push(ctx->tmparena, i);
+			push_if_not_empty(&noun_lemma_list, word.n.lemma);
+			break;
+		case WordType::Verb:
+			// verb_word_ref_list.push(ctx->tmparena, i);
+			push_if_not_empty(&verb_infinitive_list, word.v.infinitive);
+			push_if_not_empty(&verb_third_person_list, word.v.third_person);
+			push_if_not_empty(&verb_praeteritum_list, word.v.praeteritum);
+			// we need to split aux and pII
+			{
+				auto pp = word.v.auxv_and_past_participle.split().second;
+				push_if_not_empty(&verb_past_participle_list, pp);
 			}
-			auto text = word.p.text; // hä...  TODO: be more elegant
-			switch (word.type) {
-			case WordType::Noun:
-				// noun_word_ref_list.push(ctx->tmparena, i);
-				push_if_not_empty(&noun_lemma_list, word.n.lemma);
-				break;
-			case WordType::Verb:
-				// verb_word_ref_list.push(ctx->tmparena, i);
-				push_if_not_empty(&verb_infinitive_list, word.v.infinitive);
-				push_if_not_empty(&verb_third_person_list, word.v.third_person);
-				push_if_not_empty(&verb_praeteritum_list, word.v.praeteritum);
-				// we need to split aux and pII
-				{
-					auto pp = word.v.auxv_and_past_participle.split().second;
-					push_if_not_empty(&verb_past_participle_list, pp);
-				}
-				break;
-			case WordType::Adj:
-				// adjective_word_ref_list.push(ctx->tmparena, i);
-				push_if_not_empty(&adjective_lemma_list, word.a.lemma);
-				push_if_not_empty(&adjective_cmp_list, word.a.comparative);
-				push_if_not_empty(&adjective_sup_list, word.a.superlative);
-				break;
-			case WordType::Phrase:
-				// TODO: fix
-				for (auto w = text.mut_split(); w; w = text.mut_split()) {
-					// phrase_word_ref_list.push(ctx->tmparena,
-					// i * 2 + w.size); // hä???
-					push_if_not_empty(&phrase_words_list, w);
-				}
-				break;
-			default:
-				break;
+			break;
+		case WordType::Adj:
+			// adjective_word_ref_list.push(ctx->tmparena, i);
+			push_if_not_empty(&adjective_lemma_list, word.a.lemma);
+			push_if_not_empty(&adjective_cmp_list, word.a.comparative);
+			push_if_not_empty(&adjective_sup_list, word.a.superlative);
+			break;
+		case WordType::Phrase:
+			// TODO: fix
+			for (auto w = text.mut_split(); w; w = text.mut_split()) {
+				// phrase_word_ref_list.push(ctx->tmparena,
+				// i * 2 + w.size); // hä???
+				push_if_not_empty(&phrase_words_list, w);
 			}
+			break;
+		default:
+			break;
 		}
 	}
 	// extend phrase words list

@@ -8,6 +8,7 @@
 #include "base/dyn_arr.h"
 #include "base/pair.h"
 #include "base/str_view.h"
+#include "base/str_view_list.h"
 #include "word_id.h"
 
 enum class WordType : int32_t { Nil = 0, Noun, Verb, Adj, Phrase };
@@ -403,52 +404,3 @@ inline Word clone_word(Arena &a, const Word &src) {
 	return dst;
 }
 
-/*
-static void print_word(const Word &w) {
-    switch (w.type) {
-    case WordType::Nil:
-        SDL_Log("<empty word>");
-        break;
-    case WordType::Noun:
-        SDL_Log("noun %d " StrView_Fmt " " StrView_Fmt, (int)w.n.gender,
-                StrView_Arg(w.n.lemma), StrView_Arg(w.n.plural_suffix));
-        break;
-    case WordType::Verb:
-        if (w.v.third_person) {
-            SDL_Log("verb " StrView_Fmt " / " StrView_Fmt " / " StrView_Fmt
-                    " / " StrView_Fmt,
-                    StrView_Arg(w.v.infinitive), StrView_Arg(w.v.third_person),
-                    StrView_Arg(w.v.praeteritum),
-                    StrView_Arg(w.v.auxv_and_past_participle));
-        } else if (w.v.praeteritum || w.v.auxv_and_past_participle) {
-            SDL_Log("verb " StrView_Fmt " / " StrView_Fmt " / " StrView_Fmt,
-                    StrView_Arg(w.v.infinitive), StrView_Arg(w.v.praeteritum),
-                    StrView_Arg(w.v.auxv_and_past_participle));
-        } else {
-            SDL_Log("verb " StrView_Fmt, StrView_Arg(w.v.infinitive));
-        }
-        break;
-    case WordType::Adj:
-        if (w.a.is_indeclinable) {
-            SDL_Log("adj " StrView_Fmt " (indecl.)", StrView_Arg(w.a.lemma));
-        } else if (w.a.comparative || w.a.superlative) {
-            SDL_Log("adj " StrView_Fmt " / " StrView_Fmt " / " StrView_Fmt,
-                    StrView_Arg(w.a.lemma), StrView_Arg(w.a.comparative),
-                    StrView_Arg(w.a.superlative));
-        } else {
-            SDL_Log("adj " StrView_Fmt, StrView_Arg(w.a.lemma));
-        }
-        break;
-    case WordType::Phrase:
-        SDL_Log("phrase " StrView_Fmt, StrView_Arg(w.p.text));
-        break;
-    }
-
-    SDL_Log("translations_raw: " StrView_Fmt, StrView_Arg(w.translations_raw));
-    SDL_Log("grammar: " StrView_Fmt, StrView_Arg(w.grammar));
-    SDL_Log("in_learning_list: %d", static_cast<int>(w.in_learning_list));
-    SDL_Log("was_learned: %d", static_cast<int>(w.was_learned));
-    SDL_Log("ID: %llu\n______________________________",
-            static_cast<unsigned long long>(w.word_id.value));
-}
-*/

@@ -15,6 +15,8 @@
 #include "base/arena.h"
 #include "base/profiler.h"
 #include "ui/components/text_input_state.h"
+#include "ui/components/word_edit_state.h"
+#include "ui/components/word_view_state.h"
 #include "ui/textcache.h"
 #include "ui/tslt.h"
 #include <clay/clay.h>
@@ -105,6 +107,8 @@ struct AppContext {
 	MobileTextInputState mobile_text_input{};
 	MobileTextInputBuffer words_search{};
 	MobileTextInputBuffer learning_search{};
+	WordViewState *word_view_state{};
+	WordEditState *word_edit_state{};
 	Settings settings{};
 
 	// uint64_t last_ticks[10]{};

@@ -24,11 +24,11 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 		StrViewArray strs{};
 		{
 			strs.push(ctx->tmparena,
-			          StrView::from_integer(ctx->tmparena,
+			          StrView::from_number(ctx->tmparena,
 			                           ctx->exercises.correct_exercise_count));
 			strs.push(ctx->tmparena, " of "_v);
 			strs.push(ctx->tmparena,
-			          StrView::from_integer(ctx->tmparena,
+			          StrView::from_number(ctx->tmparena,
 			                           ctx->exercises.exercise_total()));
 		}
 		auto result_str = strs.join(ctx->tmparena);

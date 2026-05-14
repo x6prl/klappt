@@ -7,6 +7,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstring>
+#include <type_traits>
 
 #define StrView_Fmt "%.*s"
 #define StrView_Arg(str_view) (str_view).size, (str_view).data
@@ -68,11 +69,17 @@ struct StrView {
 
 	Clay_String to_clay_string() const;
 
-	static StrView from_integer(Arena &a, auto val) {
-		constexpr Size BUF_SIZE = 16;
+	static StrView from_number(Arena &a, auto val) {
+		constexpr Size BUF_SIZE = 32;
 		auto strbuf = a.pushN<char>(BUF_SIZE);
-		auto to_chars_res = std::to_chars(strbuf, strbuf + BUF_SIZE, val);
-		return {strbuf, static_cast<Size>(to_chars_res.ptr - strbuf)};
+		std::to_chars_result res;
+		if constexpr (std::is_integral_v<decltype(val)>) {
+			res = std::to_chars(strbuf, strbuf + BUF_SIZE, val);
+		} else {
+			res = std::to_chars(strbuf, strbuf + BUF_SIZE, val,
+			                    std::chars_format::fixed, 2);
+		}
+		return {strbuf, static_cast<Size>(res.ptr - strbuf)};
 	}
 	static StrView from_chars(Arena &a, const char *data, int size);
 	static StrView from_chars(Arena &a, const char *data);

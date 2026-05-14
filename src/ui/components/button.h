@@ -1,12 +1,19 @@
 #pragma once
 
+#include "../themes.h"
 #include "app/app_context.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "../themes.h"
 #include "ui/dpi.h"
 #include <clay/clay.h>
 #include <cstdint>
+
+namespace Icons {
+constexpr auto EDIT = ""_v;
+constexpr auto REMOVE = ""_v;
+constexpr auto NEXT = ""_v;
+constexpr auto SAVE = ""_v;
+} // namespace Icons
 
 struct MobileButtonStyle {
 	bool fill_width{false};
@@ -66,10 +73,11 @@ inline MobileButtonStyle mobile_button_style_surface_container_high() {
 	const Theme *t = theme();
 	return {
 		  .background = t->surfaceContainerHigh,
-		  .background_pressed =
-				mobile_button_mix(t->surfaceContainerHigh, t->onSurfaceContainerHigh, 0.12f),
+		  .background_pressed = mobile_button_mix(
+				t->surfaceContainerHigh, t->onSurfaceContainerHigh, 0.12f),
 		  .border = t->outline,
-		  .border_pressed = mobile_button_mix(t->outline, t->onSurfaceContainerHigh, 0.24f),
+		  .border_pressed =
+				mobile_button_mix(t->outline, t->onSurfaceContainerHigh, 0.24f),
 		  .text = t->onSurfaceContainerHigh,
 		  .text_pressed = t->onSurfaceContainerHigh,
 	};
@@ -97,7 +105,7 @@ inline MobileButtonStyle mobile_button_style_app_bar() {
 }
 
 inline MobileButtonResult mobile_button_state(const AppContext *ctx,
-                                             Clay_ElementId id) {
+                                              Clay_ElementId id) {
 	const bool hit = Clay_PointerOver(id);
 	const bool held = hit && (ctx->tslt.state == TapSwipeLongTap::KeyDown ||
 	                          ctx->tslt.state == TapSwipeLongTap::LongTap);
@@ -110,7 +118,8 @@ inline MobileButtonResult mobile_button_state(const AppContext *ctx,
 
 inline MobileButtonResult
 mobile_button(AppContext *ctx, Clay_ElementId id, StrView label,
-              const MobileButtonStyle &style = mobile_button_style_surface_container_high()) {
+              const MobileButtonStyle &style =
+                    mobile_button_style_surface_container_high()) {
 	KLAPPT_PROFILE_SCOPE_N("mobile_button");
 	const uint16_t padding_x = udpi(style.padding_x);
 	const uint16_t padding_y = udpi(style.padding_y);
@@ -163,5 +172,18 @@ mobile_button(AppContext *ctx, Clay_ElementId id, StrView label,
 	}
 
 	return state;
+}
+
+template <bool primary = true>
+inline MobileButtonResult mobile_icon_button(AppContext *ctx, Clay_ElementId id,
+                                             StrView icon) {
+	MobileButtonStyle style;
+	if constexpr (primary) {
+		style = mobile_button_style_primary();
+	} else {
+		style = mobile_button_style_surface_container_high();
+	}
+	style.font_id = FontID::ICONS;
+	return mobile_button(ctx, id, icon, style);
 }
 #pragma GCC diagnostic pop
