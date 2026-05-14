@@ -2,6 +2,6 @@
 
 #include "translations/langs.h"
 
-Translation *tr();
+UiTranslation *tr();
 
 void set_language(Lang lang);

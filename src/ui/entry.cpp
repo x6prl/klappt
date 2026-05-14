@@ -24,6 +24,7 @@
 #include "sdlcr.h"
 #include "textcache.h"
 #include "themes.h"
+#include "trs.h"
 #include "tslt.h"
 
 namespace {
@@ -85,7 +86,7 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 		strs.push(ctx->tmparena, "e:"_v);
 		strs.push(ctx->tmparena,
 		          StrView::from_number(ctx->tmparena,
-		                                ctx->app_status.error_msgs.size));
+		                               ctx->app_status.error_msgs.size));
 		title = strs.join(ctx->tmparena, ' ');
 	}
 	const auto app_bar_height = dpi(60.0f);
@@ -266,6 +267,23 @@ extern "C" void ui_settings_init(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
 	SDL_Log("SETTINGS INIT");
 	theme_set(ctx->settings.theme_type);
+	switch (ctx->settings.tr_language) {
+	case Settings::TranslationLanguage::Arabic:
+		set_language(lang_ar);
+		break;
+	case Settings::TranslationLanguage::English:
+		set_language(lang_en);
+		break;
+	case Settings::TranslationLanguage::Russian:
+		set_language(lang_ru);
+		break;
+	case Settings::TranslationLanguage::Turkish:
+		set_language(lang_tr);
+		break;
+	default:
+		set_language(lang_ru);
+		break;
+	}
 }
 
 extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {

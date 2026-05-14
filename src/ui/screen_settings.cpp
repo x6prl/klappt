@@ -1,6 +1,7 @@
 #include "screen_helpers.h"
 #include "ui/components/switch_button.h"
 #include "ui/dpi.h"
+#include "ui/trs.h"
 
 void screen_settings_push(AppContext *ctx) { ctx->push(Screen::Settings); }
 
@@ -33,7 +34,8 @@ void screen_settings_draw(AppContext *ctx) {
 			                                  CLAY_SIZING_FIT(0)},
 							 },
 				 })
-			draw_text("Dark theme"_v, theme()->onSurface, text_size);
+			draw_text(tr()->screen_settings_dark_theme, theme()->onSurface,
+			          text_size, translation_font_id(ctx));
 			if (switch_button(ctx, CLAY_ID("Switch"), is_dark, 30.f)) {
 				auto new_theme = !is_dark ? Theme::Dark : Theme::Light;
 				theme_set(new_theme);
@@ -62,8 +64,9 @@ void screen_settings_draw(AppContext *ctx) {
 			                                  CLAY_SIZING_FIT(0)},
 							 },
 				 }) {
-				draw_text("Exercises per round"_v, theme()->onSurface,
-				          text_size);
+				draw_text(tr()->screen_settings_exercises_per_round,
+				          theme()->onSurface, text_size,
+				          translation_font_id(ctx));
 			}
 
 			auto button_style = mobile_button_style_surface_container_high();
@@ -111,7 +114,8 @@ void screen_settings_draw(AppContext *ctx) {
 			                                  CLAY_SIZING_FIT(0)},
 							 },
 				 }) {
-				draw_text("Language"_v, theme()->onSurface, text_size);
+				draw_text(tr()->screen_settings_language, theme()->onSurface,
+				          text_size, translation_font_id(ctx));
 			}
 			auto button_unchosen_style =
 				  mobile_button_style_surface_container_high();
@@ -134,7 +138,8 @@ void screen_settings_draw(AppContext *ctx) {
 					  if (btn.activated()) {
 						  ctx->settings.tr_language = lang;
 						  ctx->settings.save(ctx->tmparena);
-						  ctx->app_status.push_error("language changed. TODO: notify user about exit"_v);
+						  ctx->app_status.push_error(
+								tr()->screen_settings_language_changed_exit);
 						  ctx->app_status.set_exit_normal();
 					  }
 				  });

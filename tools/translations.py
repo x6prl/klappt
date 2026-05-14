@@ -6,6 +6,7 @@ in_dir = Path("translations")
 out_dir = Path("src/ui/translations")
 
 str_type = "StrView"
+translation_type = "UiTranslation"
 
 
 def escape_cpp_string(value):
@@ -85,7 +86,7 @@ for file in in_dir.glob("*.tr"):
     wl("#pragma once\n")
     wl('#include "langs.h"\n')
 
-    wl(f"static Translation trs[{len(languages)}] = ")
+    wl(f"static {translation_type} trs[{len(languages)}] = ")
     wl("{")
     i = -1
     for lang in languages:
@@ -121,4 +122,4 @@ i = 0
 for key in entries:
     i += 1
     wl(f"\t{str_type} {key};")
-wl("} Translation;\n")
+wl(f"}} {translation_type};\n")

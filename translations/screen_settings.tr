@@ -1,0 +1,20 @@
+@dark_theme
+en: Dark theme
+ar: المظهر الداكن
+ru: Темная тема
+tr: Koyu tema
+@exercises_per_round
+en: Exercises per round
+ar: التمارين في كل جولة
+ru: Упражнений за раунд
+tr: Tur başına alıştırma
+@language
+en: Language
+ar: اللغة
+ru: Язык
+tr: Dil
+@language_changed_exit
+en: Language changed. Restarting app
+ar: تم تغيير اللغة. جار إعادة تشغيل التطبيق
+ru: Язык изменен. Перезапуск приложения
+tr: Dil değiştirildi. Uygulama yeniden başlatılıyor
