@@ -442,20 +442,34 @@ void submit_finished_exercise(AppContext *ctx, const ExerciseState &e) {
 		  time(nullptr),
 	};
 	// TODO: cache state; in Words?
-	State state;
+	State state{};
 	{
 		KLAPPT_PROFILE_SCOPE_N("estate: get");
-		ctx->states.get(e.word_id, state);
+		auto [success, found] = ctx->states.get(e.word_id, state);
+		if (!success) {
+			ctx->app_status.push_error("Cannot read word learning state"_v);
+			return;
+		}
+		if (!found) {
+			ctx->app_status.push_error("Word learning state is missing"_v);
+			return;
+		}
 	}
 	m.lap().printus("get");
 	{
 		KLAPPT_PROFILE_SCOPE_N("estate: update");
-		state.update(review);
+		if (!state.update(review)) {
+			ctx->app_status.push_error("Cannot update word learning state"_v);
+			return;
+		}
 	}
 	m.lap().printus("update");
 	{
 		KLAPPT_PROFILE_SCOPE_N("estate: set");
-		ctx->states.set(e.word_id, state);
+		if (!ctx->states.set(e.word_id, state)) {
+			ctx->app_status.push_error("Cannot save learning state"_v);
+			return;
+		}
 	}
 	m.lap().printus("set");
 }

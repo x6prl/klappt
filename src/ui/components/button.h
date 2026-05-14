@@ -13,7 +13,8 @@ constexpr auto EDIT = ""_v;
 constexpr auto REMOVE = ""_v;
 constexpr auto NEXT = ""_v;
 constexpr auto SAVE = ""_v;
-constexpr auto HAMSA = " "_v;
+constexpr auto CHEVRON_UP = ""_v;
+constexpr auto CHEVRON_DOWN = ""_v;
 } // namespace Icons
 
 struct MobileButtonStyle {

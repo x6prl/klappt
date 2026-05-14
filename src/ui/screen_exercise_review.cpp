@@ -290,10 +290,16 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					  ctx, ctx->exercises.current_result_review().word_id);
 			}
 
-			auto promote_mode = mobile_icon_button<false>(
-				  ctx, CLAY_ID("PromoteModeButton"), Icons::HAMSA);
-			if (promote_mode.activated()) {
-				promote_current_review_word_mode(ctx);
+			bool is_correct = ctx->exercises.current_result_review().actual ==
+			                  ctx->exercises.current_result_review().expected;
+			if (is_correct) {
+				auto promote_mode = mobile_icon_button<false>(
+					  ctx, CLAY_ID("PromoteModeButton"), Icons::CHEVRON_UP);
+				if (promote_mode.activated()) {
+					promote_current_review_word_mode(ctx);
+				}
+			} else {
+				// demote?
 			}
 
 			auto next =
