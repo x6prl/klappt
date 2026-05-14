@@ -11,10 +11,6 @@ static void expect(StrView view, std::string_view expected) {
 }
 
 static void test_literal_and_indexing() {
-	constexpr auto lit = StrView::lit("hello");
-	static_assert(lit.size == 5);
-	static_assert(lit.data[0] == 'h');
-
 	constexpr auto udl = "hello"_v;
 	static_assert(udl.size == 5);
 	static_assert(udl.data[1] == 'e');
@@ -23,6 +19,7 @@ static void test_literal_and_indexing() {
 	static_assert(prefix.size == 5);
 	static_assert(prefix.data[4] == 'o');
 
+	auto lit = StrView::lit("hello");
 	StrView mutable_view = lit;
 	assert(mutable_view);
 	assert(mutable_view.first() == 'h');

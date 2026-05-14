@@ -410,6 +410,7 @@ if(BUILD_TESTING AND NOT ANDROID)
     target_include_directories(str_view_tests SYSTEM PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
     )
+    target_link_libraries(str_view_tests PRIVATE SDL3::SDL3)
     add_test(NAME str_view_tests COMMAND str_view_tests)
 
     add_executable(arr_tests
@@ -419,6 +420,7 @@ if(BUILD_TESTING AND NOT ANDROID)
     target_include_directories(arr_tests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
+    target_link_libraries(arr_tests PRIVATE SDL3::SDL3)
     add_test(NAME arr_tests COMMAND arr_tests)
 
     add_executable(tokenizer_tests
@@ -433,6 +435,7 @@ if(BUILD_TESTING AND NOT ANDROID)
     target_include_directories(tokenizer_tests SYSTEM PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
     )
+    target_link_libraries(tokenizer_tests PRIVATE SDL3::SDL3)
     add_test(NAME tokenizer_tests COMMAND tokenizer_tests)
 
 endif()
