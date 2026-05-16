@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base/arena.h"
+#include "base/profiler.h"
 #include "words.h"
 #include <cstdint>
 #include <cstring>
@@ -296,6 +297,7 @@ inline bool decode_entry(uint8_t type, int8_t aux, uint64_t word_id,
                          int8_t in_learning_list, int8_t was_learned,
                          const uint8_t *&cursor, const uint8_t *end,
                          Word &word) {
+	KLAPPT_PROFILE_SCOPE_N("decode_entry");
 	word = {};
 	word.word_id = WordId{word_id};
 	word.type = static_cast<WordType>(type);
@@ -366,6 +368,7 @@ inline StrView encode_word(Arena &a, const Word &word) {
 }
 
 inline bool decode_word(Arena &a, const void *data, Size size, Word &word) {
+	KLAPPT_PROFILE_SCOPE_N("decode_word");
 	if (!data || size < static_cast<Size>(sizeof(SingleWordHeader)) ||
 	    size > MAX_ENCODED_BLOB_SIZE) {
 		return false;

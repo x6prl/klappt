@@ -6,8 +6,8 @@
 #include <filesystem>
 #include <string>
 
-#include "platform/files.h"
 #include "base/profiler.h"
+#include "platform/files.h"
 #ifdef __EMSCRIPTEN__
 #include "platform/web_persist.h"
 #endif
@@ -205,7 +205,8 @@ void index_translation_fields(Arena &scratch, Xapian::TermGenerator &generator,
 	}
 }
 
-void index_word_fields(Arena &scratch, Xapian::Document &doc, const Word &word) {
+void index_word_fields(Arena &scratch, Xapian::Document &doc,
+                       const Word &word) {
 	Xapian::TermGenerator generator;
 	generator.set_document(doc);
 
@@ -310,11 +311,13 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 		}
 		auto merged = stored;
 		bool changed = false;
-		auto merged_translations = merge_unique_items(
-			  scratch, stored.translations_raw, candidate.translations_raw, ';');
+		auto merged_translations =
+			  merge_unique_items(scratch, stored.translations_raw,
+		                         candidate.translations_raw, ';');
 		if (merged_translations != stored.translations_raw) {
-			SDL_Log("word_store: merging translations for existing word_id=%llu",
-			        static_cast<unsigned long long>(word_id.value));
+			SDL_Log(
+				  "word_store: merging translations for existing word_id=%llu",
+				  static_cast<unsigned long long>(word_id.value));
 			merged.translations_raw = merged_translations;
 			changed = true;
 		}
@@ -465,10 +468,10 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 		Xapian::QueryParser parser;
 		configure_query_parser(parser, *db);
 		const auto parsed = parser.parse_query(
-		      std::string_view{query.data, static_cast<size_t>(query.size)},
-		      Xapian::QueryParser::FLAG_BOOLEAN |
-		            Xapian::QueryParser::FLAG_LOVEHATE |
-		            Xapian::QueryParser::FLAG_PARTIAL);
+			  std::string_view{query.data, static_cast<size_t>(query.size)},
+			  Xapian::QueryParser::FLAG_BOOLEAN |
+					Xapian::QueryParser::FLAG_LOVEHATE |
+					Xapian::QueryParser::FLAG_PARTIAL);
 		Xapian::Enquire enquire(*db);
 		enquire.set_query(parsed);
 		mset = enquire.get_mset(static_cast<Xapian::doccount>(start),
@@ -489,7 +492,8 @@ bool WordStore::ensure_word(Arena &scratch, Word &word, bool *was_new) {
 	if (word.type == WordType::Nil) {
 		return false;
 	}
-	// SDL_Log("word_store.ensure_word begin type=%d id=%llu lemma=" StrView_Fmt,
+	// SDL_Log("word_store.ensure_word begin type=%d id=%llu lemma="
+	// StrView_Fmt,
 	//         static_cast<int>(word.type),
 	//         static_cast<unsigned long long>(word.word_id.value),
 	//         StrView_Arg(most_meaningfull_lemma(word)));
@@ -588,9 +592,18 @@ void WordStore::save(Arena &scratch, Word &word) {
 			return;
 		}
 
-		db->begin_transaction();
-		db->replace_document(word_id_term(word.word_id), doc);
-		db->commit_transaction();
+		{
+			KLAPPT_PROFILE_SCOPE_N("begin_transaction");
+			db->begin_transaction();
+		}
+		{
+			KLAPPT_PROFILE_SCOPE_N("replace_document");
+			db->replace_document(word_id_term(word.word_id), doc);
+		}
+		{
+			KLAPPT_PROFILE_SCOPE_N("commit_transaction");
+			db->commit_transaction();
+		}
 #ifdef __EMSCRIPTEN__
 		web_persist_sync();
 #endif
@@ -614,10 +627,18 @@ void WordStore::set_was_learned(Arena &scratch, Word &word) {
 			             "Serializing word for Xapian failed");
 			return;
 		}
-
-		db->begin_transaction();
-		db->replace_document(word_id_term(word.word_id), doc);
-		db->commit_transaction();
+		{
+			KLAPPT_PROFILE_SCOPE_N("begin_transaction");
+			db->begin_transaction();
+		}
+		{
+			KLAPPT_PROFILE_SCOPE_N("replace_document");
+			db->replace_document(word_id_term(word.word_id), doc);
+		}
+		{
+			KLAPPT_PROFILE_SCOPE_N("commit_transaction");
+			db->commit_transaction();
+		}
 #ifdef __EMSCRIPTEN__
 		web_persist_sync();
 #endif

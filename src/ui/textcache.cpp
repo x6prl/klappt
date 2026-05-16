@@ -53,6 +53,7 @@ uint16_t normalize_font_size(uint16_t font_size) {
 }
 
 void configure_font_for_text(TTF_Font *font, bool use_arabic_layout) {
+	KLAPPT_PROFILE_SCOPE_N("configure_font_for_text");
 	if (!font) {
 		return;
 	}
@@ -267,12 +268,15 @@ Clay_Dimensions TextCache::measure_text(Clay_StringSlice slice,
 	configure_font_for_text(font, use_arabic_layout);
 	int width = 0;
 	int height = 0;
-	if (!TTF_GetStringSize(font, slice.chars, slice.length, &width, &height)) {
-		return {static_cast<float>((float)slice.length *
-		                           ((float)font_size / 2.f)),
-		        static_cast<float>(font_size)};
+	{
+		KLAPPT_PROFILE_SCOPE_N("TTF_GetStringSize");
+		if (!TTF_GetStringSize(font, slice.chars, slice.length, &width,
+		                       &height)) {
+			return {static_cast<float>((float)slice.length *
+			                           ((float)font_size / 2.f)),
+			        static_cast<float>(font_size)};
+		}
 	}
-
 	return {static_cast<float>(width), static_cast<float>(height)};
 }
 // inline void htable_swap(htable_index_t a, htable_index_t b);

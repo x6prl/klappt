@@ -118,8 +118,10 @@ void list_island_commit(AppContext *ctx) {
 	if (!tex || g_list_island.texture_w != tex_w ||
 	    g_list_island.texture_h != tex_h) {
 		if (tex) {
+			KLAPPT_PROFILE_SCOPE_N("SDL_DestroyTexture");
 			SDL_DestroyTexture(tex);
 		}
+		KLAPPT_PROFILE_SCOPE_N("SDL_CreateTexture");
 		tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
 		                        SDL_TEXTUREACCESS_TARGET, tex_w, tex_h);
 		g_list_island.texture_w = tex_w;

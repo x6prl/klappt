@@ -9,10 +9,10 @@
 
 #ifndef __EMSCRIPTEN__
 #include "lmdb.h"
+#include "platform/files.h"
 #include <filesystem>
 #include <string>
 #include <system_error>
-#include "platform/files.h"
 #endif
 
 #include <algorithm>
@@ -130,14 +130,16 @@ double State::recovery_multiplier(double effective_quality) const {
 	if (effective_quality < 0.5) {
 		return 1.0;
 	}
-	const double window = static_cast<double>(std::max<Size>(1, p.recovery_window));
-	return 1.0 + p.recovery_boost *
-	                    std::min(1.0, static_cast<double>(recent_failures) / window);
+	const double window =
+		  static_cast<double>(std::max<Size>(1, p.recovery_window));
+	return 1.0 +
+	       p.recovery_boost *
+	             std::min(1.0, static_cast<double>(recent_failures) / window);
 }
 
 double State::due_days_from_stability(double stability_days) const {
 	const double base_days =
-	      interval_days_from_half_life(stability_days, p.target_retention);
+		  interval_days_from_half_life(stability_days, p.target_retention);
 	const double pivot = std::max(p.due_pivot_days, 1e-9);
 	return pivot * std::pow(std::max(base_days / pivot, 1e-9), p.due_exponent);
 }
@@ -255,9 +257,8 @@ bool State::update(const Review &r) {
 		const double reward =
 			  p.eta_success[i] * q *
 			  std::pow(std::max(success_headroom(predicted_r), 1e-9),
-			           p.success_power) *
-			  recovery_multiplier(q) *
-			  reward_scale_from_difficulty() *
+		               p.success_power) *
+			  recovery_multiplier(q) * reward_scale_from_difficulty() *
 			  stabilization_decay(m.stability_days, p.reward_decay);
 
 		const double penalty =
@@ -346,6 +347,7 @@ uint64_t decode_be64(const unsigned char *data) {
 MDB_val mdb_val_from_bytes(void *data, size_t size) { return {size, data}; }
 
 MDB_val state_key_from_word_id(WordId word_id, unsigned char (&buffer)[8]) {
+	KLAPPT_PROFILE_SCOPE_N("state_key_from_word_id");
 	encode_be64(word_id.value, buffer);
 	return mdb_val_from_bytes(buffer, sizeof(buffer));
 }
@@ -436,28 +438,36 @@ bool States::open(StrView requested_path) {
 		close();
 		return false;
 	}
-
-	rc = mdb_dbi_open(txn, STATE_DB_NAME, MDB_CREATE, &state_dbi);
-	if (rc != 0) {
-		log_lmdb_error("mdb_dbi_open(state)", rc);
-		mdb_txn_abort(txn);
-		close();
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_dbi_open: STATE");
+		rc = mdb_dbi_open(txn, STATE_DB_NAME, MDB_CREATE, &state_dbi);
+		if (rc != 0) {
+			log_lmdb_error("mdb_dbi_open(state)", rc);
+			mdb_txn_abort(txn);
+			close();
+			return false;
+		}
 	}
 
-	rc = mdb_dbi_open(txn, DUE_DB_NAME, MDB_CREATE, &due_dbi);
-	if (rc != 0) {
-		log_lmdb_error("mdb_dbi_open(due)", rc);
-		mdb_txn_abort(txn);
-		close();
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_dbi_open: DUE");
+		rc = mdb_dbi_open(txn, DUE_DB_NAME, MDB_CREATE, &due_dbi);
+		if (rc != 0) {
+			log_lmdb_error("mdb_dbi_open(due)", rc);
+			mdb_txn_abort(txn);
+			close();
+			return false;
+		}
 	}
 
-	rc = mdb_txn_commit(txn);
-	if (rc != 0) {
-		log_lmdb_error("mdb_txn_commit", rc);
-		close();
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_txn_commit");
+		rc = mdb_txn_commit(txn);
+		if (rc != 0) {
+			log_lmdb_error("mdb_txn_commit", rc);
+			close();
+			return false;
+		}
 	}
 
 	return true;
@@ -482,10 +492,14 @@ void States::close() {
 Pair<bool, bool> States::get(WordId word_id, State &dst) const {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::get");
 	MDB_txn *txn;
-	auto rc = mdb_txn_begin(env, nullptr, MDB_RDONLY, &txn);
-	if (rc != 0) {
-		log_lmdb_error("mdb_txn_begin(read)", rc);
-		return {false, false};
+	int rc;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_txn_begin");
+		rc = mdb_txn_begin(env, nullptr, MDB_RDONLY, &txn);
+		if (rc != 0) {
+			log_lmdb_error("mdb_txn_begin(read)", rc);
+			return {false, false};
+		}
 	}
 
 	unsigned char key_bytes[8];
@@ -514,10 +528,15 @@ bool States::set(WordId word_id, const State &new_state) {
 	MDB_txn *txn;
 	// open rw-transaction
 	constexpr auto MDB_READ_WRITE = 0;
-	auto rc = mdb_txn_begin(env, nullptr, MDB_READ_WRITE, &txn);
-	if (rc != 0) {
-		log_lmdb_error("mdb_txn_begin(write)", rc);
-		return false;
+
+	int rc;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_txn_begin");
+		rc = mdb_txn_begin(env, nullptr, MDB_READ_WRITE, &txn);
+		if (rc != 0) {
+			log_lmdb_error("mdb_txn_begin(write)", rc);
+			return false;
+		}
 	}
 
 	unsigned char state_key_bytes[8]{};
@@ -528,11 +547,14 @@ bool States::set(WordId word_id, const State &new_state) {
 	// TODO: optimize this. add another index? store old due in state for
 	// convinience?
 	MDB_val existing;
-	rc = mdb_get(txn, state_dbi, &state_key, &existing);
-	if (rc != 0 && rc != MDB_NOTFOUND) {
-		log_lmdb_error("mdb_get", rc);
-		mdb_txn_abort(txn);
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_get");
+		rc = mdb_get(txn, state_dbi, &state_key, &existing);
+		if (rc != 0 && rc != MDB_NOTFOUND) {
+			log_lmdb_error("mdb_get", rc);
+			mdb_txn_abort(txn);
+			return false;
+		}
 	}
 
 	if (rc == 0) {
@@ -560,11 +582,14 @@ bool States::set(WordId word_id, const State &new_state) {
 	// save new state to state_dbi
 	MDB_val value{sizeof(State),
 	              const_cast<State *>(std::addressof(new_state))};
-	rc = mdb_put(txn, state_dbi, &state_key, &value, 0);
-	if (rc != 0) {
-		log_lmdb_error("mdb_put", rc);
-		mdb_txn_abort(txn);
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_put: STATE");
+		rc = mdb_put(txn, state_dbi, &state_key, &value, 0);
+		if (rc != 0) {
+			log_lmdb_error("mdb_put", rc);
+			mdb_txn_abort(txn);
+			return false;
+		}
 	}
 
 	// save new due timestamp to due_dbi
@@ -572,18 +597,23 @@ bool States::set(WordId word_id, const State &new_state) {
 	unsigned char due_key_bytes[16]{};
 	auto due_key = due_key_from(new_state.due, word_id, due_key_bytes);
 	MDB_val due_value{};
-	rc = mdb_put(txn, due_dbi, &due_key, &due_value, 0);
-	if (rc != 0) {
-		log_lmdb_error("mdb_put(due)", rc);
-		mdb_txn_abort(txn);
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_put: DUE");
+		rc = mdb_put(txn, due_dbi, &due_key, &due_value, 0);
+		if (rc != 0) {
+			log_lmdb_error("mdb_put(due)", rc);
+			mdb_txn_abort(txn);
+			return false;
+		}
 	}
-	// }
 
-	rc = mdb_txn_commit(txn);
-	if (rc != 0) {
-		log_lmdb_error("mdb_txn_commit", rc);
-		return false;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_txn_commit");
+		rc = mdb_txn_commit(txn);
+		if (rc != 0) {
+			log_lmdb_error("mdb_txn_commit", rc);
+			return false;
+		}
 	}
 
 	return true;
@@ -592,10 +622,14 @@ bool States::set(WordId word_id, const State &new_state) {
 bool States::erase(WordId word_id) {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::erase");
 	MDB_txn *txn;
-	auto rc = mdb_txn_begin(env, nullptr, 0, &txn);
-	if (rc != 0) {
-		log_lmdb_error("mdb_txn_begin(write)", rc);
-		return false;
+	int rc;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_txn_begin");
+		rc = mdb_txn_begin(env, nullptr, 0, &txn);
+		if (rc != 0) {
+			log_lmdb_error("mdb_txn_begin(write)", rc);
+			return false;
+		}
 	}
 
 	unsigned char state_key_bytes[8];
@@ -654,10 +688,14 @@ bool States::collect_due(Arena &a, Timestamp now, DynArr<WordId> &dst,
                          Size limit) const {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::collect_due");
 	MDB_txn *txn;
-	auto rc = mdb_txn_begin(env, nullptr, MDB_RDONLY, &txn);
-	if (rc != 0) {
-		log_lmdb_error("mdb_txn_begin(read)", rc);
-		return false;
+	int rc;
+	{
+		KLAPPT_PROFILE_SCOPE_N("mdb_txn_begin");
+		rc = mdb_txn_begin(env, nullptr, MDB_RDONLY, &txn);
+		if (rc != 0) {
+			log_lmdb_error("mdb_txn_begin(read)", rc);
+			return false;
+		}
 	}
 
 	MDB_cursor *cursor;
@@ -745,7 +783,7 @@ EM_JS(int, web_storage_size, (const char *key_ptr), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
-		if (value === null) {
+		if (value == = null) {
 			return -1;
 		}
 		return value.length;
@@ -759,10 +797,10 @@ EM_JS(int, web_storage_load, (const char *key_ptr, uint8_t *dst, int size), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
-		if (value === null) {
+		if (value == = null) {
 			return 0;
 		}
-		if (value.length !== size) {
+		if (value.length != = size) {
 			return -1;
 		}
 		for (let i = 0; i < size; ++i) {
@@ -777,22 +815,22 @@ EM_JS(int, web_storage_load, (const char *key_ptr, uint8_t *dst, int size), {
 
 EM_JS(int, web_storage_save,
       (const char *key_ptr, const uint8_t *src, int size), {
-	const key = UTF8ToString(key_ptr);
-	try {
-		const chunk_size = 0x8000;
-		let value = "";
-		for (let i = 0; i < size; i += chunk_size) {
-			const end = Math.min(i + chunk_size, size);
-			value += String.fromCharCode.apply(
-			      null, HEAPU8.subarray(src + i, src + end));
-		}
-		globalThis.localStorage.setItem(key, value);
-		return 1;
-	} catch (e) {
-		console.error("localStorage setItem failed", e);
-		return 0;
-	}
-});
+		  const key = UTF8ToString(key_ptr);
+		  try {
+			  const chunk_size = 0x8000;
+			  let value = "";
+			  for (let i = 0; i < size; i += chunk_size) {
+				  const end = Math.min(i + chunk_size, size);
+				  value += String.fromCharCode.apply(
+						null, HEAPU8.subarray(src + i, src + end));
+			  }
+			  globalThis.localStorage.setItem(key, value);
+			  return 1;
+		  } catch (e) {
+			  console.error("localStorage setItem failed", e);
+			  return 0;
+		  }
+	  });
 
 std::pair<uint64_t, WordId> due_entry_from(Timestamp due, WordId word_id) {
 	return {static_cast<uint64_t>(std::max<Timestamp>(0, due)), word_id};
@@ -824,15 +862,15 @@ bool persist_web_states(const States &states) {
 	const uint32_t count = static_cast<uint32_t>(states.states.size());
 	const size_t record_size = sizeof(WordId) + sizeof(State);
 	const size_t total_size =
-	      sizeof(WebStatesHeader) + static_cast<size_t>(count) * record_size;
+		  sizeof(WebStatesHeader) + static_cast<size_t>(count) * record_size;
 
 	std::vector<uint8_t> bytes(total_size);
 	auto *cursor = bytes.data();
 
 	const WebStatesHeader header{
-	      .magic = WEB_STATES_MAGIC,
-	      .version = WEB_STATES_VERSION,
-	      .count = count,
+		  .magic = WEB_STATES_MAGIC,
+		  .version = WEB_STATES_VERSION,
+		  .count = count,
 	};
 	memcpy(cursor, &header, sizeof(header));
 	cursor += sizeof(header);
@@ -864,8 +902,8 @@ bool restore_web_states(States &states) {
 	}
 
 	std::vector<uint8_t> bytes(static_cast<size_t>(stored_size));
-	const int load_rc = web_storage_load(storage_key, bytes.data(),
-	                                     stored_size);
+	const int load_rc =
+		  web_storage_load(storage_key, bytes.data(), stored_size);
 	if (load_rc != 1) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Loading web states storage failed");
@@ -882,8 +920,9 @@ bool restore_web_states(States &states) {
 	}
 
 	const size_t record_size = sizeof(WordId) + sizeof(State);
-	const size_t expected_size = sizeof(WebStatesHeader) +
-	                             static_cast<size_t>(header.count) * record_size;
+	const size_t expected_size =
+		  sizeof(WebStatesHeader) +
+		  static_cast<size_t>(header.count) * record_size;
 	if (bytes.size() != expected_size) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Web states storage size mismatch");
@@ -924,9 +963,7 @@ bool States::open(StrView requested_path) {
 	return restore_web_states(*this);
 }
 
-void States::close() {
-	storage_key.clear();
-}
+void States::close() { storage_key.clear(); }
 
 Pair<bool, bool> States::get(WordId word_id, State &dst) const {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::get");
