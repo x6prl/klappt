@@ -214,7 +214,7 @@ void append_common_stage_entire(Arena &a, const StrView correct_str,
                                 ExerciseState *exercise) {
 	constexpr Size OPTIONS_MAX = 5;
 
-	auto points_reward_for_that_stage = correct_str.size;
+	auto points_reward_for_that_stage = utf8_codepoint_count(correct_str);
 
 	Size opts_count =
 		  std::min(all_strs.size /* contains correct ref */, OPTIONS_MAX);

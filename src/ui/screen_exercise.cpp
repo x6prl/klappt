@@ -78,13 +78,7 @@ void screen_exercise_draw(AppContext *ctx) {
 				   .backgroundColor = theme()->surface,
 			 }) {
 
-			Size text_lenght = es.source().size; // TODO: count UTF8 length)))
-			if (ctx->settings.tr_language ==
-			          Settings::TranslationLanguage::Russian ||
-			    ctx->settings.tr_language ==
-			          Settings::TranslationLanguage::Arabic) {
-				text_lenght /= 2;
-			}
+			Size text_lenght = utf8_codepoint_count(es.source());
 			float source_font_size = get_font_size_based_on_str_size(
 				  ctx->display_width, ctx->scale, text_lenght, 20.f, 48.f);
 
