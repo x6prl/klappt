@@ -156,7 +156,12 @@ struct Exercises {
 		return exercises[exercise_current_idx].source_sub1;
 	}
 	const StrView response() const {
-		return exercises[exercise_current_idx].response;
+		const auto &exercise = exercises[exercise_current_idx];
+		if (exercise.mode == Mode::Gaps &&
+		    exercise.response == ExerciseState::EMPTY_ANSWER) {
+			return exercise.s().before_answer;
+		}
+		return exercise.response;
 	}
 
 	const ExerciseResult &current_result_review() const {
