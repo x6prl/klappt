@@ -171,11 +171,12 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 	auto left_part = merge(a, chunks, left_part_idxs);
 	auto gap = merge(a, chunks, gap_idxs);
 	auto right_part = merge(a, chunks, right_part_idxs);
+	const auto gap_len = utf8_codepoint_count(gap);
 
 	DynArr<ExerciseState::SubStage> substages{};
 
 	{
-		const auto points_for_correct_answer = gap.size;
+		const auto points_for_correct_answer = gap_len;
 		auto opts = DynArr<StrView>::with<5>(a, gap);
 		auto distractors = Tokenizer::get_4_distractors_for_a_chunk(
 			  gap, static_cast<uint32_t>(rng_state));
@@ -193,7 +194,7 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 
 	StrViewArray answer_while_prompt_builder{};
 	answer_while_prompt_builder.push(a, left_part);
-	for (auto &_ : gap) {
+	for (Size i{}; i < gap_len; ++i) {
 		answer_while_prompt_builder.push(a, "_"_v);
 	}
 	answer_while_prompt_builder.push(a, right_part);
@@ -205,7 +206,7 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 				   .substages = substages,
 				   .gap = {.left_part = left_part, .right_part = right_part},
 			 });
-	exercise->points_max += gap.size;
+	exercise->points_max += gap_len;
 }
 
 void append_common_stage_entire(Arena &a, const StrView correct_str,

@@ -118,6 +118,14 @@ static void test_slice_and_from_chars() {
 	assert(partial.data[partial.size] == '\0');
 }
 
+static void test_utf8_codepoint_count() {
+	assert(utf8_codepoint_count(""_v) == 0);
+	assert(utf8_codepoint_count("abc"_v) == 3);
+	assert(utf8_codepoint_count("ä"_v) == 1);
+	assert(utf8_codepoint_count("Prät."_v) == 5);
+	assert(utf8_codepoint_count("прыгать"_v) == 7);
+}
+
 int main() {
 	test_literal_and_indexing();
 	test_trim_variants();
@@ -125,4 +133,5 @@ int main() {
 	test_split_by_predicate();
 	test_copy_and_concat();
 	test_slice_and_from_chars();
+	test_utf8_codepoint_count();
 }

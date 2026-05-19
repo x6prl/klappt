@@ -88,6 +88,8 @@ struct StrView {
 	const char *end() const;
 };
 
+Size utf8_codepoint_count(StrView str);
+
 constexpr StrView operator""_v(const char *str, std::size_t size) noexcept {
 	return {str, static_cast<Size>(size)};
 }

@@ -190,6 +190,17 @@ const char *StrView::begin() const { return data; }
 
 const char *StrView::end() const { return data + size; }
 
+Size utf8_codepoint_count(StrView str) {
+	Size count{};
+	for (Size i{}; i < str.size; ++i) {
+		const auto ch = static_cast<unsigned char>(str[i]);
+		if ((ch & 0xC0u) != 0x80u) {
+			++count;
+		}
+	}
+	return count;
+}
+
 StrView StrView::from_chars(Arena &a, const char *data, int size) {
 	auto allocated = static_cast<char *>(a.push(size + 1));
 	memcpy(allocated, data, size);
