@@ -783,7 +783,7 @@ EM_JS(int, web_storage_size, (const char *key_ptr), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
-		if (value == = null) {
+			if (value == null) {
 			return -1;
 		}
 		return value.length;
@@ -797,10 +797,10 @@ EM_JS(int, web_storage_load, (const char *key_ptr, uint8_t *dst, int size), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
-		if (value == = null) {
+			if (value == null) {
 			return 0;
 		}
-		if (value.length != = size) {
+			if (value.length != size) {
 			return -1;
 		}
 		for (let i = 0; i < size; ++i) {
