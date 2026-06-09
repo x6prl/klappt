@@ -66,10 +66,8 @@ inline const char *screen_name(Screen s) {
 struct AppContext {
 	using Idx = int;
 	static constexpr Idx STACK_SIZE{16};
-#ifdef __EMSCRIPTEN__
 	static constexpr Size MAIN_ARENA_SIZE = 64 << 20;
 	static constexpr Size TMP_ARENA_SIZE = 8 << 20;
-#endif
 
 	SDL_Window *window{};
 	SDL_Renderer *renderer{};
@@ -77,13 +75,8 @@ struct AppContext {
 	Clay_Arena clay_arena{};
 	float scale{1.f}, display_width{1000.f};
 	uint64_t ticks{};
-#ifdef __EMSCRIPTEN__
 	Arena arena{MAIN_ARENA_SIZE};
-	Arena tmparena{TMP_ARENA_SIZE};
-#else
-	Arena arena{};
-	Arena tmparena{};
-#endif
+	Arena arena_frame{TMP_ARENA_SIZE};
 	TextCache *text{};
 	Words *words{};
 	WordStore word_store{};
@@ -95,6 +88,8 @@ struct AppContext {
 
 	Idx current{};
 	Screen stack[STACK_SIZE]{};
+	Arena arena_screen_list[STACK_SIZE]{};
+	Arena &arena_screen() { return arena_screen_list[current]; }
 
 	// used to burst high FPS for the next 1000ms
 	bool animate{false};
@@ -118,6 +113,9 @@ struct AppContext {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::anim");
 		animate = true;
 	}
+	void push_one_frame() {
+		anim(); // TODO: just push one frame
+	}
 	Screen screen() const { return stack[current]; }
 	/*
 	 * NOTE:
@@ -132,7 +130,7 @@ struct AppContext {
 		}
 		++current;
 		stack[current] = s;
-		anim(); // TODO: just push one frame
+		push_one_frame();
 		return true;
 	}
 	/*
@@ -150,7 +148,7 @@ struct AppContext {
 			current = 0;
 			stack[0] = s;
 		}
-		anim(); // TODO: just push one frame
+		push_one_frame();
 	}
 	bool pop() {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::pop");
@@ -159,8 +157,9 @@ struct AppContext {
 		}
 		KLAPPT_PROFILE_NAME_F("AppContext::pop -> %s",
 		                      screen_name(stack[current - 1]));
+		arena_screen_list[current].clear();
 		--current;
-		anim(); // TODO: just push one frame
+		push_one_frame();
 		return true;
 	}
 	bool is_backable() const { return current > 0; }

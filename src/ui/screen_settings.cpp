@@ -40,8 +40,8 @@ void screen_settings_draw(AppContext *ctx) {
 				auto new_theme = !is_dark ? Theme::Dark : Theme::Light;
 				theme_set(new_theme);
 				ctx->settings.theme_type = new_theme;
-				ctx->settings.save(ctx->tmparena);
-				ctx->anim();
+				ctx->settings.save(ctx->arena_frame);
+				ctx->push_one_frame();
 			}
 		}
 		CLAY(CLAY_ID("ExercisesPerRoundRow"),
@@ -77,7 +77,7 @@ void screen_settings_draw(AppContext *ctx) {
 			auto MINUS = ""_v;
 			auto current_value = ctx->settings.exercise_round_size;
 			auto current_value_str =
-				  StrView::from_number(ctx->tmparena, current_value);
+				  StrView::from_number(ctx->arena_frame, current_value);
 			auto button_minus = mobile_button(ctx, CLAY_ID("MinusButton"),
 			                                  MINUS, button_style);
 			draw_text(current_value_str, theme()->onSurface, text_size);
@@ -87,11 +87,11 @@ void screen_settings_draw(AppContext *ctx) {
 			constexpr auto ROUND_SIZE_MAX = 20;
 			if (button_minus.activated() && (current_value > 1)) {
 				ctx->settings.exercise_round_size -= 1;
-				ctx->settings.save(ctx->tmparena);
+				ctx->settings.save(ctx->arena_frame);
 			} else if (button_plus.activated() &&
 			           (current_value < ROUND_SIZE_MAX)) {
 				ctx->settings.exercise_round_size += 1;
-				ctx->settings.save(ctx->tmparena);
+				ctx->settings.save(ctx->arena_frame);
 			}
 		}
 		CLAY(CLAY_ID("LanguageRow"),
@@ -137,7 +137,7 @@ void screen_settings_draw(AppContext *ctx) {
 							Settings::translation_language_code(lang), style);
 					  if (btn.activated()) {
 						  ctx->settings.tr_language = lang;
-						  ctx->settings.save(ctx->tmparena);
+						  ctx->settings.save(ctx->arena_frame);
 						  ctx->app_status.push_error(
 								tr()->screen_settings_language_changed_exit);
 						  ctx->app_status.set_exit_normal();

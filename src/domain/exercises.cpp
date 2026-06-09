@@ -504,7 +504,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	DynArr<WordId> due_id;
 	DynArr<WordRef> due_ref;
 	// collecting due
-	if (!ctx->states.collect_due(ctx->tmparena, now, due_id)) {
+	if (!ctx->states.collect_due(ctx->arena_frame, now, due_id)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "LMDB error: cannot collect due");
 		ctx->app_status.push_error("Cannot collect due words"_v);
 		return 0;
@@ -512,7 +512,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	if (due_id.size == 0) {
 		return 0;
 	}
-	auto push_if_not_empty = [&a = ctx->tmparena](DynArr<StrView> *list,
+	auto push_if_not_empty = [&a = ctx->arena_frame](DynArr<StrView> *list,
 	                                              StrView str) {
 		if (str)
 			list->push(a, str);
@@ -532,7 +532,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	for (auto i = words.begin(); i < words.end(); i.advance(&words)) {
 		auto &word = words[i];
 		if (due_id.is_contains(word.word_id)) {
-			due_ref.push(ctx->tmparena, i);
+			due_ref.push(ctx->arena_frame, i);
 		}
 		auto text = word.p.text; // hä...  TODO: be more elegant
 		switch (word.type) {
@@ -571,11 +571,11 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	}
 	// extend phrase words list
 	auto phrase_words_list_and_nouns = DynArr<StrView>::concat(
-		  ctx->tmparena, phrase_words_list, noun_lemma_list);
+		  ctx->arena_frame, phrase_words_list, noun_lemma_list);
 	auto phrase_words_list_and_verbs = DynArr<StrView>::concat(
-		  ctx->tmparena, phrase_words_list, verb_infinitive_list);
+		  ctx->arena_frame, phrase_words_list, verb_infinitive_list);
 	auto phrase_words_list_and_adjectives = DynArr<StrView>::concat(
-		  ctx->tmparena, phrase_words_list, adjective_lemma_list);
+		  ctx->arena_frame, phrase_words_list, adjective_lemma_list);
 
 	SDL_Log("due in words list %d", due_ref.size);
 	// TODO: check the sizes of the lists
@@ -586,14 +586,14 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	const auto total_exercises = std::min(n, due_ref.size);
 	// the main list to generate exercises
 	auto exercise_words = DynArr<WordRef>::filled_zero_or_default(
-		  ctx->tmparena, total_exercises);
+		  ctx->arena_frame, total_exercises);
 
 	// we fill it randomly
 	auto rng_state = ctx->ticks;
 	for (exercise_words.size = 0; exercise_words.size < total_exercises;) {
 		auto i = random_num(0, due_ref.size, &rng_state);
 		if (!exercise_words.is_contains(due_ref[i])) {
-			exercise_words.push(ctx->tmparena, due_ref[i]);
+			exercise_words.push(ctx->arena_frame, due_ref[i]);
 		}
 	}
 
@@ -791,7 +791,7 @@ bool Exercises::handler_back_pressed(AppContext *ctx) {
 	}
 
 	exercise.response =
-		  actual_response_from_exercise(ctx->tmparena, a, exercise);
+		  actual_response_from_exercise(ctx->arena_frame, a, exercise);
 	if (exercise.response.size == 0) {
 		exercise.response = ExerciseState::EMPTY_ANSWER;
 	}
@@ -882,7 +882,7 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 	auto &exercise = exercises[exercise_current_idx];
 	auto has_more_stages = exercise.submit(pending_selection_index);
 	exercise.response =
-		  actual_response_from_exercise(ctx->tmparena, a, exercise);
+		  actual_response_from_exercise(ctx->arena_frame, a, exercise);
 	if (has_more_stages) {
 		// there are more stages/substages to go
 	} else {
@@ -892,7 +892,7 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 		auto &word = (*ctx->words)[exercise.word_ref];
 		// mark the word as one that has been submited at least once
 		if (!word.was_learned) {
-			ctx->word_store.set_was_learned(ctx->tmparena, word);
+			ctx->word_store.set_was_learned(ctx->arena_frame, word);
 		}
 
 		// switching to the next exercise

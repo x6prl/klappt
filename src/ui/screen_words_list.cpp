@@ -9,7 +9,7 @@
 void screen_words_list_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
 	ctx->go(Screen::WordsList);
-	ctx->anim();
+	ctx->push_one_frame();
 }
 
 void screen_words_list_draw(AppContext *ctx) {
@@ -32,7 +32,7 @@ void screen_words_list_draw(AppContext *ctx) {
 				  mobile_text_input(ctx, CLAY_ID("WordsSearch"),
 			                        &ctx->words_search, "Search words"_v);
 			if (search.changed || search.submitted || search.blurred) {
-				ctx->anim();
+				ctx->push_one_frame();
 			}
 		}
 		const auto query = ctx->words_search.view();
@@ -44,7 +44,7 @@ void screen_words_list_draw(AppContext *ctx) {
 				  ctx, CLAY_ID("WordsList"), total_words,
 				  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
 					  ctx->word_store.for_each_matching_word_range(
-							ctx->tmparena, query, window.first,
+							ctx->arena_frame, query, window.first,
 							window.last - window.first,
 							[&](Size index, Word &w) {
 								CLAY(CLAY_IDI("WordRow", index),
@@ -64,16 +64,16 @@ void screen_words_list_draw(AppContext *ctx) {
 										auto word = clone_word(ctx->arena, w);
 										if (0 != w.in_learning_list) {
 											add_word_to_learning_list(
-												  ctx->tmparena, &word,
+												  ctx->arena_frame, &word,
 												  ctx->words, &ctx->word_store,
 												  &ctx->states,
 												  &ctx->app_status);
 										} else {
 											remove_word_from_learning_list(
-												  ctx->tmparena, &word,
+												  ctx->arena_frame, &word,
 												  ctx->words, &ctx->word_store);
 										}
-										save_words_dat(ctx->tmparena,
+										save_words_dat(ctx->arena_frame,
 							                           ctx->settings,
 							                           *ctx->words);
 									} else if (tap_state ==

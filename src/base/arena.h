@@ -29,22 +29,12 @@ struct Arena {
 		~TempGuard() { a->offset = pos; }
 	};
 
-#ifndef __EMSCRIPTEN__
-	Arena(Size arena_size = 1 << 30 /* 1GB */) : allocated_size{arena_size} {
+	Arena(Size arena_size = 1 << 19) : allocated_size{arena_size} {
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
 		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		// memset(data, 0, std::min(16 << 20, arena_size));
+		printf("Created arena of size %d KiB\n", arena_size/1024);
 	}
-#else
-	Arena(Size arena_size = 16 << 20 /* 16MB */)
-		  : allocated_size{arena_size} {
-		data = static_cast<decltype(data)>(
-			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
-		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		// memset(data, 0, std::min(16 << 20, arena_size));
-	}
-#endif
 	Arena *ptr() { return this; }
 
 	void *push(Size size, Size allign = 32) {

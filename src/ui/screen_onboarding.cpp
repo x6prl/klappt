@@ -98,7 +98,7 @@ void screen_onboarding_draw(AppContext *ctx) {
 									button_style);
 							  if (btn.activated()) {
 								  settings.tr_language = lang;
-								  settings.save(ctx->tmparena);
+								  settings.save(ctx->arena_frame);
 								  load_language_data = 1;
 							  }
 						  });
@@ -106,7 +106,7 @@ void screen_onboarding_draw(AppContext *ctx) {
 				break;
 			default:
 				settings.onboarding_stage = -1;
-				settings.save(ctx->tmparena);
+				settings.save(ctx->arena_frame);
 				screen_start_go(ctx);
 			}
 		}

@@ -82,12 +82,12 @@ static bool dm = false;
 void app_bar_layout(AppContext *ctx, StrView title) {
 	if (ctx->app_status.error_msgs.size) {
 		StrViewArray strs{};
-		strs.push(ctx->tmparena, title);
-		strs.push(ctx->tmparena, "e:"_v);
-		strs.push(ctx->tmparena,
-		          StrView::from_number(ctx->tmparena,
+		strs.push(ctx->arena_frame, title);
+		strs.push(ctx->arena_frame, "e:"_v);
+		strs.push(ctx->arena_frame,
+		          StrView::from_number(ctx->arena_frame,
 		                               ctx->app_status.error_msgs.size));
-		title = strs.join(ctx->tmparena, ' ');
+		title = strs.join(ctx->arena_frame, ' ');
 	}
 	const auto app_bar_height = dpi(60.0f);
 	const auto app_bar_button_style = mobile_button_style_app_bar();
@@ -241,7 +241,7 @@ StrView exercise_x_of_n(AppContext *ctx) {
 	if (!etotal) {
 		return {};
 	}
-	auto &a = ctx->tmparena;
+	auto &a = ctx->arena_frame;
 	return str_view_x_of_n(a, ctx->exercises.exercise_current_idx, etotal);
 }
 
@@ -250,7 +250,7 @@ StrView review_x_of_n(AppContext *ctx) {
 	if (!etotal_to_show) {
 		return {};
 	}
-	auto &a = ctx->tmparena;
+	auto &a = ctx->arena_frame;
 	return str_view_x_of_n(a, ctx->exercises.exercise_current_idx,
 	                       etotal_to_show);
 }
@@ -319,7 +319,7 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.mobile_text_input_handle_event");
 		if (mobile_text_input_handle_event(ctx, event)) {
-			ctx->anim();
+			ctx->push_one_frame();
 			return SDL_APP_CONTINUE;
 		}
 	}
@@ -368,8 +368,8 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_iterate");
 	KLAPPT_PROFILE_NAME_F("ui_iterate:%s", screen_name(ctx->screen()));
-	auto _tmp_arena_guard = ctx->tmparena.guard();
-	auto g = ctx->tmparena.guard();
+	auto _tmp_arena_guard = ctx->arena_frame.guard();
+	auto g = ctx->arena_frame.guard();
 	static Uint64 frame_ticks_last = ctx->ticks;
 	const Uint64 frame_ticks = ctx->ticks;
 	const float frame_delta_time_seconds =

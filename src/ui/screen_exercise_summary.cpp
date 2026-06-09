@@ -23,15 +23,15 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 		 }) {
 		StrViewArray strs{};
 		{
-			strs.push(ctx->tmparena,
-			          StrView::from_number(ctx->tmparena,
+			strs.push(ctx->arena_frame,
+			          StrView::from_number(ctx->arena_frame,
 			                           ctx->exercises.correct_exercise_count));
-			strs.push(ctx->tmparena, " of "_v);
-			strs.push(ctx->tmparena,
-			          StrView::from_number(ctx->tmparena,
+			strs.push(ctx->arena_frame, " of "_v);
+			strs.push(ctx->arena_frame,
+			          StrView::from_number(ctx->arena_frame,
 			                           ctx->exercises.exercise_total()));
 		}
-		auto result_str = strs.join(ctx->tmparena);
+		auto result_str = strs.join(ctx->arena_frame);
 		CLAY(CLAY_ID("Result"),
 		     {
 				   .layout =
@@ -61,7 +61,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 			  }}) {
 			auto res_all = mobile_button(ctx, CLAY_ID("All"), "Show all"_v);
 			if (res_all.activated()) {
-				ctx->exercises.build_result_reviews(ctx->tmparena, false);
+				ctx->exercises.build_result_reviews(ctx->arena_frame, false);
 				if (!ctx->exercises.results.empty()) {
 					screen_exercise_review_push(ctx);
 				}
@@ -75,7 +75,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 				  mobile_button_style_primary());
 			if (res_errors_only.activated()) {
 				if (is_result_with_errors) {
-					ctx->exercises.build_result_reviews(ctx->tmparena, true);
+					ctx->exercises.build_result_reviews(ctx->arena_frame, true);
 					if (!ctx->exercises.results.empty()) {
 						screen_exercise_review_push(ctx);
 					}

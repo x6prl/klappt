@@ -279,9 +279,9 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			if (remove_this_word_from_learning_list.activated()) {
 				auto word_ref = ctx->exercises.current_result_review().word_ref;
 				auto &word = (*ctx->words)[word_ref];
-				remove_word_from_learning_list(ctx->tmparena, &word, ctx->words,
+				remove_word_from_learning_list(ctx->arena_frame, &word, ctx->words,
 				                               &ctx->word_store);
-				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
+				save_words_dat(ctx->arena_frame, ctx->settings, *ctx->words);
 			}
 			auto view_this_word = mobile_icon_button<false>(
 				  ctx, CLAY_ID("EditButton"), Icons::EDIT);

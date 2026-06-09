@@ -18,8 +18,8 @@ void screen_word_suggestions_go(AppContext *ctx) {
 
 	DynArr<WordId> candidates{};
 	ctx->word_store.for_each_word(
-		  ctx->tmparena,
-		  [a = &ctx->tmparena, list = &candidates](const Word &w) {
+		  ctx->arena_frame,
+		  [a = &ctx->arena_frame, list = &candidates](const Word &w) {
 			  if (0 == w.in_learning_list && 0 == w.was_learned &&
 		          WordType::Phrase != w.type) {
 				  list->push(*a, w.word_id);
@@ -36,9 +36,9 @@ void screen_word_suggestions_go(AppContext *ctx) {
 		if (candidates_used_indices.is_contains(rindex)) {
 			continue;
 		}
-		candidates_used_indices.push(ctx->tmparena, rindex);
+		candidates_used_indices.push(ctx->arena_frame, rindex);
 		Word tmpword;
-		store.get_by_id(ctx->tmparena, candidates[rindex], tmpword);
+		store.get_by_id(ctx->arena_frame, candidates[rindex], tmpword);
 		suggestions_list[suggestions_list.size] =
 			  clone_word(suggestions_arena, tmpword);
 		suggestions_list.size += 1;
@@ -100,21 +100,21 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 					if (!word.in_learning_list) {
 						continue;
 					}
-					add_word_to_learning_list(ctx->tmparena, &word, ctx->words,
+					add_word_to_learning_list(ctx->arena_frame, &word, ctx->words,
 					                          &ctx->word_store, &ctx->states, &ctx->app_status);
 				}
 				m.lap().printus("xapian and states");
-				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
+				save_words_dat(ctx->arena_frame, ctx->settings, *ctx->words);
 				m.lap().printus("words.dat");
 				screen_exercise_go(ctx, true);
 			} else if (add_all_res.activated()) {
 				Measure m{"adding new words"};
 				for (auto &word : ctx->suggestions_list) {
-					add_word_to_learning_list(ctx->tmparena, &word, ctx->words,
+					add_word_to_learning_list(ctx->arena_frame, &word, ctx->words,
 					                          &ctx->word_store, &ctx->states, &ctx->app_status);
 				}
 				m.lap().printus("xapian and states");
-				save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
+				save_words_dat(ctx->arena_frame, ctx->settings, *ctx->words);
 				m.lap().printus("words.dat");
 				screen_exercise_go(ctx, true);
 			}

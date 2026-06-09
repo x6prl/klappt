@@ -23,7 +23,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 				  mobile_text_input(ctx, CLAY_ID("WordsSearch"),
 			                        &ctx->learning_search, "Search words"_v);
 			if (search.changed || search.submitted || search.blurred) {
-				ctx->anim();
+				ctx->push_one_frame();
 			}
 		}
 		auto now = time(nullptr);

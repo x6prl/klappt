@@ -167,7 +167,7 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 		                               CLAY_ALIGN_Y_CENTER},
 					.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			  }}) {
-			draw_text(word_to_lexemme_str(ctx->tmparena, ctx->tmparena, w),
+			draw_text(word_to_lexemme_str(ctx->arena_frame, ctx->arena_frame, w),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(w.grammar, theme()->onSurface, udpi(16),
 			          FontID::MONOSPACE_REGULAR);
@@ -189,15 +189,15 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 		                               CLAY_ALIGN_Y_CENTER},
 					.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			  }}) {
-			auto trs = translations_from_raw(ctx->tmparena, w.translations_raw);
+			auto trs = translations_from_raw(ctx->arena_frame, w.translations_raw);
 			// draw_text(w.translations_raw, theme()->onSurface, udpi(16),
 			// FontID::MONOSPACE_REGULAR);
 			// TODO: add cues
 			StrViewArray strs{};
 			for (auto &tr : trs) {
-				strs.push(ctx->tmparena, tr.base);
+				strs.push(ctx->arena_frame, tr.base);
 			}
-			draw_text(strs.join(ctx->tmparena, "; "_v), theme()->onSurface,
+			draw_text(strs.join(ctx->arena_frame, "; "_v), theme()->onSurface,
 			          udpi(16), FontID::MONOSPACE_REGULAR);
 		}
 	}
@@ -220,39 +220,39 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 					.childGap = row_gap,
 					.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			  }}) {
-			draw_text(StrView::concat_with(ctx->tmparena, "Mode"_v,
+			draw_text(StrView::concat_with(ctx->arena_frame, "Mode"_v,
 			                               mode_name(s.mode), ':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(
 				  StrView::concat_with(
-						ctx->tmparena, "Successes to next mode"_v,
-						successful_reviews_to_next_mode(ctx->tmparena, s), ':'),
+						ctx->arena_frame, "Successes to next mode"_v,
+						successful_reviews_to_next_mode(ctx->arena_frame, s), ':'),
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
-			draw_text(StrView::concat_with(ctx->tmparena, "Due"_v,
-			                               format_due_delta(ctx->tmparena,
+			draw_text(StrView::concat_with(ctx->arena_frame, "Due"_v,
+			                               format_due_delta(ctx->arena_frame,
 			                                                std::time(nullptr),
 			                                                s.due),
 			                               ':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(StrView::concat_with(
-							ctx->tmparena, "Difficulty"_v,
-							StrView::from_number(ctx->tmparena, s.difficulty),
+							ctx->arena_frame, "Difficulty"_v,
+							StrView::from_number(ctx->arena_frame, s.difficulty),
 							':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(
 				  StrView::concat_with(
-						ctx->tmparena, "Reviews"_v,
-						StrView::from_number(ctx->tmparena, s.total_reviews),
+						ctx->arena_frame, "Reviews"_v,
+						StrView::from_number(ctx->arena_frame, s.total_reviews),
 						':'),
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(StrView::concat_with(
-							ctx->tmparena, "Lapses"_v,
-							StrView::from_number(ctx->tmparena, s.lapses), ':'),
+							ctx->arena_frame, "Lapses"_v,
+							StrView::from_number(ctx->arena_frame, s.lapses), ':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(
 				  StrView::concat_with(
-						ctx->tmparena, "Recent failures"_v,
-						StrView::from_number(ctx->tmparena, s.recent_failures),
+						ctx->arena_frame, "Recent failures"_v,
+						StrView::from_number(ctx->arena_frame, s.recent_failures),
 						':'),
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 		}
@@ -271,32 +271,32 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 				}
 
 				StrViewArray row{};
-				row.push(ctx->tmparena, mode_name(mode));
+				row.push(ctx->arena_frame, mode_name(mode));
 				{
 					StrViewArray reviews{};
 					reviews.push(
-						  ctx->tmparena,
-						  StrView::from_number(ctx->tmparena, m.reviews));
-					reviews.push(ctx->tmparena, "r"_v);
-					row.push(ctx->tmparena, reviews.join(ctx->tmparena));
+						  ctx->arena_frame,
+						  StrView::from_number(ctx->arena_frame, m.reviews));
+					reviews.push(ctx->arena_frame, "r"_v);
+					row.push(ctx->arena_frame, reviews.join(ctx->arena_frame));
 				}
 				{
 					StrViewArray quality{};
 					quality.push(
-						  ctx->tmparena,
-						  StrView::from_number(ctx->tmparena, m.quality_ewma));
-					quality.push(ctx->tmparena, "q"_v);
-					row.push(ctx->tmparena, quality.join(ctx->tmparena));
+						  ctx->arena_frame,
+						  StrView::from_number(ctx->arena_frame, m.quality_ewma));
+					quality.push(ctx->arena_frame, "q"_v);
+					row.push(ctx->arena_frame, quality.join(ctx->arena_frame));
 				}
 				{
 					StrViewArray stability{};
-					stability.push(ctx->tmparena,
-					               StrView::from_number(ctx->tmparena,
+					stability.push(ctx->arena_frame,
+					               StrView::from_number(ctx->arena_frame,
 					                                    m.stability_days));
-					stability.push(ctx->tmparena, "d"_v);
-					row.push(ctx->tmparena, stability.join(ctx->tmparena));
+					stability.push(ctx->arena_frame, "d"_v);
+					row.push(ctx->arena_frame, stability.join(ctx->arena_frame));
 				}
-				draw_text(row.join(ctx->tmparena, ' '), theme()->onSurface,
+				draw_text(row.join(ctx->arena_frame, ' '), theme()->onSurface,
 				          udpi(15), FontID::MONOSPACE_REGULAR);
 			}
 		}

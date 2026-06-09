@@ -136,7 +136,7 @@ mobile_button(AppContext *ctx, Clay_ElementId id, StrView label,
 		KLAPPT_PROFILE_NAME(label.data, static_cast<size_t>(label.size));
 	}
 	if (state.activated()) {
-		ctx->anim(); // TODO: just push one frame
+		ctx->push_one_frame();
 	}
 	CLAY(id, {
 				   .layout =

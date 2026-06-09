@@ -158,7 +158,7 @@ void screen_exercise_draw(AppContext *ctx) {
 				ctx->exercises.submit_result(tapped);
 				keypad_island_invalidate();
 				list_island_invalidate();
-				ctx->anim();
+				ctx->push_one_frame();
 			};
 			if (ss.is_keypad && ss.opts.size >= 3) {
 				keypad_island(ctx, CLAY_ID("KeypadIsland"), ss.opts.data,

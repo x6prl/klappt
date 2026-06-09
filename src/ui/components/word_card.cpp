@@ -324,7 +324,7 @@ bool word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
 			                         to_draw);
 			*res.ptr = time_ch;
 			already =
-				  StrView::from_chars(ctx->tmparena, str_buf,
+				  StrView::from_chars(ctx->arena_frame, str_buf,
 			                          static_cast<Size>(res.ptr - str_buf + 1));
 
 			// SDL_Log("due_mark %d %d %d", due_mark, min, hours);

@@ -196,7 +196,7 @@ static void update_learning_list_copy(AppContext *ctx, const Word &word) {
 	     ref.advance(ctx->words)) {
 		if ((*ctx->words)[ref].word_id == word.word_id) {
 			(*ctx->words)[ref] = word;
-			save_words_dat(ctx->tmparena, ctx->settings, *ctx->words);
+			save_words_dat(ctx->arena_frame, ctx->settings, *ctx->words);
 			return;
 		}
 	}
@@ -210,7 +210,7 @@ static void save_edit(AppContext *ctx) {
 	}
 
 	Word word = build_word_from_edit(ctx->arena, edit);
-	ctx->word_store.save(ctx->tmparena, word);
+	ctx->word_store.save(ctx->arena_frame, word);
 	update_learning_list_copy(ctx, word);
 
 	auto &view = *ctx->word_view_state;
@@ -256,7 +256,7 @@ static void draw_field(AppContext *ctx, Clay_ElementId id,
 		if (auto input = mobile_text_input(ctx, input_id, buffer, placeholder);
 		    input.changed || input.submitted || input.blurred) {
 			validate(*ctx->word_edit_state);
-			ctx->anim();
+			ctx->push_one_frame();
 		}
 	}
 }
