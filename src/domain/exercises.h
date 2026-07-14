@@ -131,7 +131,6 @@ struct Exercises {
 
 	DynArr<ExerciseState> exercises{};
 	DynArr<ExerciseResult> results{};
-	DynArr<Word *> words{};
 	Size exercise_current_idx{0};
 	Size exercise_total() const { return exercises.size; }
 	Size pending_selection_index{-1};
@@ -169,6 +168,12 @@ struct Exercises {
 	}
 
 	void submit_result(Size res) { pending_selection_index = res; }
+	bool asr_probe_user_voice_input(StrView input) {
+		const auto &exercise = exercises[exercise_current_idx];
+		// exercise.
+		// TODO: !!!!!!!!!!!!!!!
+
+	}
 	void next_result() { pending_selection_index = 0; }
 	void build_result_reviews(Arena &tmpa, bool is_only_failed);
 
@@ -184,13 +189,12 @@ struct Exercises {
 
 	void reset() {
 		SDL_Log("=======> %s <========= this=%p arena=%p offset=%td "
-		        "used_words=%d exercises=%d results=%d",
+		        "exercises=%d results=%d",
 		        __PRETTY_FUNCTION__, static_cast<void *>(this),
-		        static_cast<void *>(a.data), a.offset, words.size,
-		        exercises.size, results.size);
+		        static_cast<void *>(a.data), a.offset, exercises.size,
+		        results.size);
 		pending_selection_index = -1;
 		exercise_current_idx = 0;
-		words.reset_size_reserved();
 		exercises.reset_size_reserved();
 		results.reset_size_reserved();
 		a.clear();

@@ -5,6 +5,7 @@
 #include "ui/components/button.h"
 #include "ui/dpi.h"
 #include "ui/textcache.h"
+#include <SDL3/SDL_log.h>
 #include <SDL3/SDL_stdinc.h>
 #include <algorithm>
 
@@ -167,8 +168,9 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 		                               CLAY_ALIGN_Y_CENTER},
 					.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			  }}) {
-			draw_text(word_to_lexemme_str(ctx->arena_frame, ctx->arena_frame, w),
-			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
+			draw_text(
+				  word_to_lexemme_str(ctx->arena_frame, ctx->arena_frame, w),
+				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(w.grammar, theme()->onSurface, udpi(16),
 			          FontID::MONOSPACE_REGULAR);
 			// if (w.was_learned) {
@@ -189,7 +191,8 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 		                               CLAY_ALIGN_Y_CENTER},
 					.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			  }}) {
-			auto trs = translations_from_raw(ctx->arena_frame, w.translations_raw);
+			auto trs =
+				  translations_from_raw(ctx->arena_frame, w.translations_raw);
 			// draw_text(w.translations_raw, theme()->onSurface, udpi(16),
 			// FontID::MONOSPACE_REGULAR);
 			// TODO: add cues
@@ -226,7 +229,8 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			draw_text(
 				  StrView::concat_with(
 						ctx->arena_frame, "Successes to next mode"_v,
-						successful_reviews_to_next_mode(ctx->arena_frame, s), ':'),
+						successful_reviews_to_next_mode(ctx->arena_frame, s),
+						':'),
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(StrView::concat_with(ctx->arena_frame, "Due"_v,
 			                               format_due_delta(ctx->arena_frame,
@@ -234,11 +238,12 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			                                                s.due),
 			                               ':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
-			draw_text(StrView::concat_with(
-							ctx->arena_frame, "Difficulty"_v,
-							StrView::from_number(ctx->arena_frame, s.difficulty),
-							':'),
-			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
+			draw_text(
+				  StrView::concat_with(
+						ctx->arena_frame, "Difficulty"_v,
+						StrView::from_number(ctx->arena_frame, s.difficulty),
+						':'),
+				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(
 				  StrView::concat_with(
 						ctx->arena_frame, "Reviews"_v,
@@ -247,13 +252,14 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(StrView::concat_with(
 							ctx->arena_frame, "Lapses"_v,
-							StrView::from_number(ctx->arena_frame, s.lapses), ':'),
+							StrView::from_number(ctx->arena_frame, s.lapses),
+							':'),
 			          theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 			draw_text(
-				  StrView::concat_with(
-						ctx->arena_frame, "Recent failures"_v,
-						StrView::from_number(ctx->arena_frame, s.recent_failures),
-						':'),
+				  StrView::concat_with(ctx->arena_frame, "Recent failures"_v,
+			                           StrView::from_number(ctx->arena_frame,
+			                                                s.recent_failures),
+			                           ':'),
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
 		}
 
@@ -282,9 +288,9 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 				}
 				{
 					StrViewArray quality{};
-					quality.push(
-						  ctx->arena_frame,
-						  StrView::from_number(ctx->arena_frame, m.quality_ewma));
+					quality.push(ctx->arena_frame,
+					             StrView::from_number(ctx->arena_frame,
+					                                  m.quality_ewma));
 					quality.push(ctx->arena_frame, "q"_v);
 					row.push(ctx->arena_frame, quality.join(ctx->arena_frame));
 				}
@@ -294,7 +300,8 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 					               StrView::from_number(ctx->arena_frame,
 					                                    m.stability_days));
 					stability.push(ctx->arena_frame, "d"_v);
-					row.push(ctx->arena_frame, stability.join(ctx->arena_frame));
+					row.push(ctx->arena_frame,
+					         stability.join(ctx->arena_frame));
 				}
 				draw_text(row.join(ctx->arena_frame, ' '), theme()->onSurface,
 				          udpi(15), FontID::MONOSPACE_REGULAR);
@@ -360,7 +367,7 @@ void screen_word_view_push(AppContext *ctx, WordId word_id) {
 			ctx->app_status.push_error("lmdb get() error"_v);
 		}
 	}
-	state.title = most_meaningfull_lemma(state.word_copy);
+	state.title = word_most_meaningfull_lemma(state.word_copy);
 
 	ctx->push(Screen::WordView);
 }
@@ -412,10 +419,19 @@ void screen_word_view_draw(AppContext *ctx) {
 			// 	// TODO: prompt user
 			// 	// screen_word_edit_push(ctx, state.word_id);
 			// }
-			auto edit =
-				  mobile_icon_button(ctx, CLAY_ID("EditButton"), Icons::EDIT);
+			auto edit = mobile_icon_button<false>(ctx, CLAY_ID("EditButton"),
+			                                      Icons::EDIT);
 			if (edit.activated()) {
 				screen_word_edit_push(ctx);
+			}
+			auto play = mobile_icon_button<true>(ctx, CLAY_ID("PlayButton"),
+			                                     Icons::PLAY);
+
+			// play on pressed
+			if (play.activated()) {
+				auto tts_string = word_tts_full(
+					  ctx->arena_screen(), ctx->arena_frame, state.word_copy);
+				worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
 			}
 		}
 	}

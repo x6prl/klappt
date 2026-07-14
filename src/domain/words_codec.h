@@ -1,9 +1,12 @@
 #pragma once
 
+#include "SDL3/SDL_log.h"
 #include "base/arena.h"
 #include "base/profiler.h"
+#include "base/str_view.h"
 #include "words.h"
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 
@@ -92,30 +95,9 @@ inline bool read_str_view(const uint8_t *&cursor, const uint8_t *end,
 	return true;
 }
 
-template <class F> inline bool for_each_str_view(const Word &word, F &&f) {
-	if (!f(word.translations_raw) || !f(word.grammar)) {
-		return false;
-	}
-	switch (word.type) {
-	case WordType::Nil:
-		return false;
-	case WordType::Noun:
-		return f(word.n.lemma) && f(word.n.plural_suffix);
-	case WordType::Verb:
-		return f(word.v.infinitive) && f(word.v.third_person) &&
-		       f(word.v.praeteritum) && f(word.v.auxv_and_past_participle);
-	case WordType::Adj:
-		return f(word.a.lemma) && f(word.a.comparative) &&
-		       f(word.a.superlative);
-	case WordType::Phrase:
-		return f(word.p.text);
-	}
-
-	return false;
-}
-
-template <class F> inline bool for_each_str_view(Word &word, F &&f) {
-	if (!f(word.translations_raw) || !f(word.grammar)) {
+inline bool for_each_str_view(auto &word, auto &&f) {
+	if (!f(word.translations_raw) || !f(word.grammar) ||
+	    !f(word.json_payload)) {
 		return false;
 	}
 	switch (word.type) {
@@ -183,6 +165,7 @@ inline void log_invalid_word_for_encode(uint16_t ref, const Word &word) {
 
 	log_field("translations_raw", word.translations_raw);
 	log_field("grammar", word.grammar);
+	log_field("json_payload", word.json_payload);
 	switch (word.type) {
 	case WordType::Nil:
 		break;
@@ -325,6 +308,7 @@ inline bool decode_entry(uint8_t type, int8_t aux, uint64_t word_id,
 }
 
 inline StrView encode_word(Arena &a, const Word &word) {
+	KLAPPT_PROFILE_SCOPE_N("encode_word");
 	const auto total_size = encoded_word_size(word);
 	if (total_size <= 0 || total_size > MAX_ENCODED_BLOB_SIZE) {
 		return {};

@@ -1,5 +1,7 @@
+#include "app/worker.h"
 #include "app/words_init.h"
 #include "base/str_view.h"
+#include "domain/word.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/dpi.h"
@@ -60,7 +62,7 @@ bool promote_current_review_word_mode(AppContext *ctx) {
 } // namespace
 
 void screen_exercise_review_draw(AppContext *ctx) {
-	if (ctx->exercises.results.empty()) {
+	if (ctx->exercises.results.is_empty()) {
 		CLAY(CLAY_ID("ExDiffEmpty"),
 		     {.layout = {
 					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
@@ -112,6 +114,14 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			          source_font_id, CLAY_TEXT_WRAP_NEWLINES);
 			draw_text(diff.source_sub1, theme()->onSurface, udpi(20),
 			          source_font_id);
+			// play on pressed
+			if (ctx->tslt.is_tap() && Clay_Hovered()) {
+				auto &diff = ctx->exercises.current_result_review();
+				auto tts_string =
+					  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
+				                    (*ctx->words)[diff.word_ref]);
+				worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
+			}
 		}
 		CLAY(CLAY_ID("DiffBlock"),
 		     {.layout = {
@@ -254,6 +264,17 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						}
 					}
 				};
+				// auto play = mobile_icon_button<false>(ctx,
+				// CLAY_ID("PlayButton"), Icons::PLAY);
+
+				// play on pressed
+				if (ctx->tslt.is_tap() && Clay_Hovered()) {
+					auto &diff = ctx->exercises.current_result_review();
+					auto tts_string =
+						  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
+					                    (*ctx->words)[diff.word_ref]);
+					worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
+				}
 
 				draw_wrapped_parts("Correct answer"_v, false);
 				draw_wrapped_parts("Your answer"_v, true);
@@ -279,9 +300,10 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			if (remove_this_word_from_learning_list.activated()) {
 				auto word_ref = ctx->exercises.current_result_review().word_ref;
 				auto &word = (*ctx->words)[word_ref];
-				remove_word_from_learning_list(ctx->arena_frame, &word, ctx->words,
-				                               &ctx->word_store);
+				remove_word_from_learning_list(ctx->arena_frame, &word,
+				                               ctx->words, &ctx->word_store);
 				save_words_dat(ctx->arena_frame, ctx->settings, *ctx->words);
+				ctx->exercises.next_result();
 			}
 			auto view_this_word = mobile_icon_button<false>(
 				  ctx, CLAY_ID("EditButton"), Icons::EDIT);

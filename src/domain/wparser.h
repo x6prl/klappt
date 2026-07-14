@@ -157,16 +157,29 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 			return false;
 		}
 		line = next_line();
-		if (line) {
-			if ('[' == line.first() && ']' == line.last()) {
-				word.grammar = line.copy(a);
-				line = next_line();
+		auto is_json = [](StrView str) {
+			return '{' == str.first() && '}' == str.last();
+		};
+		auto is_grammar = [](StrView str) {
+			return '[' == str.first() && ']' == str.last();
+		};
+		if (line && !is_grammar(line) && !is_json(line)) {
+			if (is_grammar(line)) {
+			} else {
 			}
 			if (line) {
 				error("extra entry line is not allowed; store translatable "
 				      "examples as separate phrase entries");
 				return false;
 			}
+		}
+		if (is_grammar(line)) {
+			word.grammar = line.copy(a);
+			line = next_line();
+		}
+		if (is_json(line)) {
+			word.json_payload = line.copy(a);
+			line = next_line();
 		}
 		// print_word(word);
 	}
@@ -183,13 +196,17 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 // 	});
 // }
 
-inline bool wparse(Arena &a, const char *data, size_t size,
-                   DynArr<Word> &words, AppStatus *app_status) {
-	return wparse_entries(a, data, size, [&]() -> Word & {
-		words.push(a, Word{});
-		return words.last();
-	}, app_status);
+inline bool wparse(Arena &a, const char *data, size_t size, DynArr<Word> &words,
+                   AppStatus *app_status) {
+	return wparse_entries(
+		  a, data, size,
+		  [&]() -> Word & {
+			  words.push(a, Word{});
+			  return words.last();
+		  },
+		  app_status);
 }
 
 // bool wparse_file(Arena &a, const char *filename, Words &words);
-bool wparse_file(Arena &a, const char *filename, DynArr<Word> &words, AppStatus *app_status);
+bool wparse_file(Arena &a, const char *filename, DynArr<Word> &words,
+                 AppStatus *app_status);

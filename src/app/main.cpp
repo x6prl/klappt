@@ -1,7 +1,13 @@
 #include <cstdint>
+#include <cstdlib>
 
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_mutex.h"
 #include "SDL3/SDL_stdinc.h"
+#include "SDL3/SDL_thread.h"
 #include "app/event_codes.h"
+#include "app/net_worker.h"
+#include "app/worker.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
@@ -76,17 +82,28 @@ static const char *EventTypeName(Uint32 type) {
 #if defined(TRACY_ENABLE)
 static const char *FrameName(Screen screen) {
 	switch (screen) {
-	case Screen::Start: return "Frame/Start";
-	case Screen::Exercice: return "Frame/Exercise";
-	case Screen::ExerciceResultSummary: return "Frame/ExerciseSummary";
-	case Screen::ExerciseReview: return "Frame/ExerciseReview";
-	case Screen::WordsList: return "Frame/WordsList";
-	case Screen::LearningList: return "Frame/LearningList";
-	case Screen::WordSuggestions: return "Frame/WordSuggestions";
-	case Screen::Settings: return "Frame/Settings";
-	case Screen::WordView: return "Frame/WordView";
-	case Screen::WordEdit: return "Frame/WordEdit";
-	case Screen::Onboarding: return "Frame/Onboarding";
+	case Screen::Start:
+		return "Frame/Start";
+	case Screen::Exercice:
+		return "Frame/Exercise";
+	case Screen::ExerciceResultSummary:
+		return "Frame/ExerciseSummary";
+	case Screen::ExerciseReview:
+		return "Frame/ExerciseReview";
+	case Screen::WordsList:
+		return "Frame/WordsList";
+	case Screen::LearningList:
+		return "Frame/LearningList";
+	case Screen::WordSuggestions:
+		return "Frame/WordSuggestions";
+	case Screen::Settings:
+		return "Frame/Settings";
+	case Screen::WordView:
+		return "Frame/WordView";
+	case Screen::WordEdit:
+		return "Frame/WordEdit";
+	case Screen::Onboarding:
+		return "Frame/Onboarding";
 	}
 	return "Frame/Unknown";
 }
@@ -160,13 +177,13 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	SDL_Window *window{};
 	{
 		KLAPPT_PROFILE_SCOPE_N("CreateWindow");
-		window = SDL_CreateWindow("klappt", windowStartWidth, windowStartHeight,
-		                          SDL_WINDOW_RESIZABLE |
-		                                SDL_WINDOW_HIGH_PIXEL_DENSITY
-		                          // Well, using fullscreen implies dancing
-		                          // around safe area during text input //
-		                          // #ifdef ANDROID | SDL_WINDOW_FULLSCREEN
-		                          // #endif // ANDROID
+		window = SDL_CreateWindow(
+			  "klappt", windowStartWidth, windowStartHeight,
+			  SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY
+			  // Well, using fullscreen implies dancing
+		      // around safe area during text input //
+		      // #ifdef ANDROID | SDL_WINDOW_FULLSCREEN
+		      // #endif // ANDROID
 
 		);
 	}
@@ -179,7 +196,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 #ifdef __EMSCRIPTEN__
 	SDL_SetWindowFillDocument(window, true);
-	#endif
+#endif
 
 	// create a renderer
 	SDL_Renderer *renderer{};
@@ -216,6 +233,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	TTF_Font *icons_font{};
 	TTF_Font *monospace_regular_font{};
 	TTF_Font *monospace_bold_font{};
+	SDL_Log("PATH %s", ui_font_path.string().c_str());
 	{
 		KLAPPT_PROFILE_SCOPE_N("LoadFonts");
 		ui_font = TTF_OpenFont(ui_font_path.string().c_str(), 48);
@@ -280,6 +298,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	                     monospace_bold_font, arabic_ui_font}};
 	m.lap().printus("create text cache");
 
+	constexpr Size ASR_BUFFER_CAPACITY_BYTES =
+		  sizeof(float) * 16000 * 10; // 4 bytes * 16000kHz * 10 seconds
 	// set up the application data
 	auto ctx = new AppContext{
 		  .window = window,
@@ -291,10 +311,19 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .text = text_cache,
 		  .current = 0,
 		  .stack = {Screen::Onboarding},
+		  .sound_ctx =
+				new SoundContext{
+					  .audio = {.data = (float *)malloc(
+									  ASR_BUFFER_CAPACITY_BYTES),
+	                            .capacity_bytes = ASR_BUFFER_CAPACITY_BYTES}},
 		  // .track = mixerTrack,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
-	};
+		  .worker_job_queue = {
+				.mutex = SDL_CreateMutex(),
+				.cond = SDL_CreateCondition(),
+				.quit = false,
+		  }};
 	*appstate = ctx;
 	m.lap().printus("create app context");
 
@@ -303,7 +332,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 #if __ANDROID__
 	constexpr const char ANDROID_PACKAGED_MODULE_NAME[] = "libapp_hotreload.so";
 	const char *initial_hotreload_path = ANDROID_PACKAGED_MODULE_NAME;
-	#else
+#else
 	const char *initial_hotreload_path = HOTRELOAD_MODULE_PATH;
 #endif
 	bool healthy{};
@@ -340,8 +369,10 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	FileLoader settingsfl{};
 	if (settingsfl.load("settings.dat"_v)) {
-		if (!Settings::decode(settingsfl.data, settingsfl.size, &ctx->settings)) {
-			ctx->app_status.set_exit_with_error("cannot decode settings file"_v);
+		if (!Settings::decode(settingsfl.data, settingsfl.size,
+		                      &ctx->settings)) {
+			ctx->app_status.set_exit_with_error(
+				  "cannot decode settings file"_v);
 		}
 	}
 	m.lap().printus("load settings");
@@ -360,6 +391,16 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		m.lap().printus("init words");
 		ctx->go(Screen::Start);
 	}
+
+	{ // setup workers
+	  // SDL_Thread *worker =
+		SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
+		worker_job_push(ctx, {.type = Job::Type::INIT});
+		// SDL_Thread *net_worker =
+		SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
+		net_worker_job_push(ctx, {.type = NetJob::Type::INIT});
+	}
+
 	SDL_Log("Application started successfully!");
 	m.lap().printus("total");
 
@@ -440,9 +481,9 @@ extern "C" SDL_AppResult SDLCALL SDL_AppIterate(void *appstate) {
 		}
 		// update_ticks_array(&(ctx->last_ticksef), SDL_GetTicks());
 		m.lap();
-		if (m.tlap > uint64_t(st.avg()*2)) {
-			m.printms();
-			SDL_Log("and average %d us", st.avg()/1000);
+		if (m.tlap > uint64_t(st.avg() * 2)) {
+			// m.printms();
+			// SDL_Log("and average %d us", st.avg() / 1000);
 		}
 		st.push(static_cast<int>(m.tlap));
 		return ret;
@@ -479,8 +520,10 @@ extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	// TTF_Quit();
 	// MIX_Quit();
 	//
-	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled errors: %d", ctx->app_status.app_quit, ctx->app_status.error_msgs.size);
-	for (auto &emsg: ctx->app_status.error_msgs) {
+	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled "
+	        "errors: %d",
+	        ctx->app_status.app_quit, ctx->app_status.error_msgs.size);
+	for (auto &emsg : ctx->app_status.error_msgs) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, StrView_Fmt, StrView_Arg(emsg));
 	}
 }

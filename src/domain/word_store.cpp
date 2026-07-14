@@ -1,6 +1,8 @@
 #include "word_store.h"
 
 #include "SDL3/SDL_log.h"
+#include "base/str_view.h"
+#include "domain/word.h"
 #include "xapian.h"
 
 #include <filesystem>
@@ -315,9 +317,10 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 			  merge_unique_items(scratch, stored.translations_raw,
 		                         candidate.translations_raw, ';');
 		if (merged_translations != stored.translations_raw) {
-			SDL_Log(
-				  "word_store: merging translations for existing word_id=%llu",
-				  static_cast<unsigned long long>(word_id.value));
+			SDL_Log("word_store: merging translations for existing "
+			        "word_id=%llu |" StrView_Fmt "|",
+			        static_cast<unsigned long long>(word_id.value),
+			        StrView_Arg(word_most_meaningfull_lemma(stored)));
 			merged.translations_raw = merged_translations;
 			changed = true;
 		}
@@ -346,15 +349,14 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 
 WordStore::~WordStore() = default;
 
-bool WordStore::open(StrView requested_path) {
+bool WordStore::open(std::string requested_path) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::open");
 	close();
 	has_cached_word_count = false;
 	cached_word_count = 0;
 
-	path = requested_path
-	             ? std::string(requested_path.data,
-	                           static_cast<size_t>(requested_path.size))
+	path = !requested_path.empty()
+	             ? requested_path
 	             : default_word_store_path();
 	if (path.empty()) {
 		return false;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SDL3/SDL_log.h"
 #include "app/app_context.h"
 #include "base/pair.h"
 #include "ui/entry.h"
@@ -68,11 +69,11 @@ static Pair<bool, bool> hotreload(const char *path) {
 	const char *load_cstr = path;
 #endif
 
-	printf("loading hotreload module: %s\t", load_cstr);
+	SDL_Log("loading hotreload module: %s\t", load_cstr);
 	void *old_handle = handle;
 	handle = dlopen(load_cstr, RTLD_LAZY);
 	if (!handle) {
-		fprintf(stderr, "dlopen() failed: %s\n", dlerror());
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "dlopen() failed: %s\n", dlerror());
 		handle = old_handle;
 		return {false, false};
 	}
@@ -83,7 +84,7 @@ static Pair<bool, bool> hotreload(const char *path) {
 #define X(NAME, ARGS, RETURN_TYPE)                                             \
 	NAME = (NAME##_t)(dlsym(handle, #NAME));                                   \
 	if (!NAME)                                                                 \
-		fprintf(stderr, "dlsym() failed: %s\n", dlerror());
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "dlsym() failed: %s\n", dlerror());
 	UI_ENTRY_FUNCTIONS
 #undef X
 

@@ -3,16 +3,19 @@
 // TODO: rewrite
 #include "SDL3/SDL_keyboard.h"
 #include "SDL3/SDL_properties.h"
+#include "ui/components/button.h"
 #include "ui/dpi.h"
+#include "ui/textcache.h"
+#include <SDL3/SDL_log.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 extern "C" void mobile_text_input_web_wakeup();
 #endif
 
+#include "../themes.h"
 #include "app/app_context.h"
 #include "base/str_view.h"
-#include "../themes.h"
 #include "text_input_state.h"
 #include <clay/clay.h>
 
@@ -32,6 +35,7 @@ struct MobileTextInputStyle {
 	SDL_Capitalization capitalization{SDL_CAPITALIZE_SENTENCES};
 	bool autocorrect{true};
 	bool rtl{false};
+	bool clearable{true};
 	Clay_Color background{};
 	Clay_Color background_focused{};
 	Clay_Color border{};
@@ -294,17 +298,17 @@ mobile_text_input_web_capitalization(SDL_Capitalization capitalization) {
 inline bool mobile_text_input_web_should_use() {
 	return EM_ASM_INT({
 			   if (typeof navigator == 'undefined' ||
-			       typeof window == 'undefined') {
+		           typeof window == 'undefined') {
 				   return 0;
 			   }
 			   const ua = navigator.userAgent || "";
 			   const platform = navigator.platform || "";
-			   const mobilePattern =
-					 new RegExp('Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini',
-	                         'i');
+			   const mobilePattern = new RegExp(
+					 'Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini',
+					 'i');
 			   const mobileUA = mobilePattern.test(ua);
-			   const ipadDesktopMode =
-					 platform == 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;
+			   const ipadDesktopMode = platform == 'MacIntel' &&
+		                               (navigator.maxTouchPoints || 0) > 1;
 			   const coarsePointer =
 					 window.matchMedia &&
 					 window.matchMedia('(pointer: coarse)').matches;
@@ -379,12 +383,16 @@ inline void mobile_text_input_web_activate(const MobileTextInputBuffer *value,
 									  (typeof performance != 'undefined')
 											? performance.now()
 											: Date.now();
-								setTimeout(function() {
-									const current = Module.lexiSDLTextInput;
-									if (current && current.blurPendingAt) {
-										_mobile_text_input_web_wakeup();
-									}
-								}, 140);
+								setTimeout(
+									  function() {
+										  const current =
+												Module.lexiSDLTextInput;
+										  if (current &&
+						                      current.blurPendingAt) {
+											  _mobile_text_input_web_wakeup();
+										  }
+									  },
+									  140);
 							}
 							state.active = false;
 							_mobile_text_input_web_wakeup();
@@ -490,8 +498,8 @@ inline bool mobile_text_input_web_take_blurred() {
 			   let blurred = state.blurred ? 1 : 0;
 			   if (!blurred && state.blurPendingAt) {
 				   const now = (typeof performance != 'undefined')
-					                 ? performance.now()
-					                 : Date.now();
+			                         ? performance.now()
+			                         : Date.now();
 				   const inputStillFocused =
 						 state.input && document.activeElement == state.input;
 				   if (inputStillFocused) {
@@ -699,7 +707,9 @@ inline void mobile_text_input_end_frame(AppContext *ctx) {
 inline MobileTextInputResult mobile_text_input(
 	  AppContext *ctx, Clay_ElementId id, MobileTextInputBuffer *value,
 	  StrView placeholder,
-	  const MobileTextInputStyle &style = mobile_text_input_style_default()) {
+	  const MobileTextInputStyle &style = mobile_text_input_style_default(),
+	  Clay_ElementId detached_clear_button_id =
+			CLAY_ID("DetachedClearButton")) {
 	const uint16_t padding_x = udpi(style.padding_x);
 	const uint16_t padding_y = udpi(style.padding_y);
 	const uint16_t border_width = udpi(style.border_width);
@@ -718,15 +728,17 @@ inline MobileTextInputResult mobile_text_input(
 	}
 
 	auto &runtime = ctx->mobile_text_input;
+	const bool is_pointer_over =
+		  Clay_PointerOver(id) || Clay_PointerOver(detached_clear_button_id);
 
-	const bool tapped = Clay_PointerOver(id) && ctx->tslt.is_tap();
+	const bool tapped = is_pointer_over && ctx->tslt.is_tap();
 	if (tapped || runtime.activate_text_input) {
 		mobile_text_input_activate(ctx, id, value, effective_style);
 		runtime.activate_text_input = false;
 	}
 
-	if (runtime.focused_id == id.id && ctx->tslt.is_tap() &&
-	    !Clay_PointerOver(id) && !tapped) {
+	if (runtime.focused_id == id.id && ctx->tslt.is_tap() && !is_pointer_over &&
+	    !tapped) {
 		mobile_text_input_deactivate(ctx, true);
 	}
 
@@ -893,6 +905,37 @@ inline MobileTextInputResult mobile_text_input(
 							   .backgroundColor = style.caret,
 							   .cornerRadius = CLAY_CORNER_RADIUS(0),
 						 }) {}
+				}
+			}
+		}
+		if (style.clearable) {
+			CLAY(CLAY_ID("ClearButtonContainer"),
+			     {.floating = {
+						.attachPoints =
+							  {
+									.element = CLAY_ATTACH_POINT_RIGHT_CENTER,
+									.parent = CLAY_ATTACH_POINT_RIGHT_CENTER,
+							  },
+						.pointerCaptureMode =
+							  CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+						.attachTo = CLAY_ATTACH_TO_PARENT,
+				  }}) {
+				auto style = mobile_button_style_surface_container_high();
+				style.background.a = 0.f;
+				style.background_pressed.a = 0.f;
+				style.font_id = FontID::ICONS;
+				style.font_size *= 2;
+				if (value->size) {
+					style.text.a *= 0.5f;
+				} else {
+					style.text.a = 0.f;
+					style.text_pressed.a = 0.f;
+				}
+
+				auto b = mobile_button(ctx, CLAY_ID("ClearButton"),
+				                       Icons::CLEAR, style);
+				if (b.activated()) {
+					value->clear();
 				}
 			}
 		}

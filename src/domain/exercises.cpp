@@ -31,7 +31,7 @@ StrView populate_prompt_sub_fields(Arena &a, StrView trs_raw, StrView grammar,
                                    ExerciseState *exercise) {
 	auto [ret, rest] = trs_raw.split_by(';');
 	auto translations = translations_from_raw(a, rest);
-	if (!translations.empty()) {
+	if (!translations.is_empty()) {
 		StrViewArray strs{};
 		for (Size i{0}; i < translations.size; ++i) {
 			strs.push(a, translations[i].base);
@@ -513,7 +513,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		return 0;
 	}
 	auto push_if_not_empty = [&a = ctx->arena_frame](DynArr<StrView> *list,
-	                                              StrView str) {
+	                                                 StrView str) {
 		if (str)
 			list->push(a, str);
 	};
@@ -597,7 +597,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		}
 	}
 
-	SDL_Log("preparing exercises for:");
+	SDL_Log("preparing %d exercises for:", exercise_words.size);
 	for (auto &word_ref : exercise_words) {
 		// print_word(words[word_ref]);
 		auto &word = words[word_ref];

@@ -1,8 +1,11 @@
+#include "domain/word.h"
 #include "screen_helpers.h"
 #include "ui/components/fast_list.h"
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 #include "ui/dpi.h"
+#include "ui/tslt.h"
+#include <SDL3/SDL_log.h>
 
 void screen_learning_list_go(AppContext *ctx) { ctx->go(Screen::LearningList); }
 
@@ -62,12 +65,21 @@ void screen_learning_list_draw(AppContext *ctx) {
 														: static_cast<int>(due -
 							                                               now);
 									}
-									bool is_tapped = word_card_with_due(
+									auto tap_state = word_card_with_due(
 										  ctx, CLAY_IDI("Word", index), w,
 										  due_mark);
 
-									if (is_tapped) {
+									if (tap_state ==
+						                TapSwipeLongTap::State::Tap) {
 										screen_word_view_push(ctx, w.word_id);
+									} else if (tap_state ==
+						                       TapSwipeLongTap::State::
+						                             LongTap) {
+										auto tts_string = word_tts_full(
+											  ctx->arena_screen(),
+											  ctx->arena_frame, w);
+										worker_job_push(ctx, {.type = Job::Type::TTS,
+							                           .tts_text = tts_string});
 									}
 								}
 								return true;

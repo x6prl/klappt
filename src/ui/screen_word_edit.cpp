@@ -215,7 +215,7 @@ static void save_edit(AppContext *ctx) {
 
 	auto &view = *ctx->word_view_state;
 	view.word_copy = word;
-	view.title = most_meaningfull_lemma(view.word_copy);
+	view.title = word_most_meaningfull_lemma(view.word_copy);
 	if (view.has_state) {
 		view.state_copy.mode = edit.mode;
 		if (!ctx->states.set(view.word_id, view.state_copy)) {

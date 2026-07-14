@@ -23,3 +23,15 @@
 [submodule "tracy"]
 	path = tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "src/vendor/sherpa-onnx"]
+	path = src/vendor/sherpa-onnx
+	url = https://github.com/k2-fsa/sherpa-onnx.git
+[submodule "src/vendor/curl"]
+	path = src/vendor/curl
+	url = https://github.com/curl/curl
+[submodule "src/vendor/mbedtls"]
+	path = src/vendor/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "src/vendor/boringssl"]
+	path = src/vendor/boringssl
+	url = https://github.com/google/boringssl.git

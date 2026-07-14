@@ -712,7 +712,7 @@ DynArr<StrView> tokenize_verb(Arena &a, StrView word) {
 
 	peel_affixes(a, &core, right, VerbTables::infinitive_suffixes, 3,
 	             AffixSide::Suffix);
-	if (right.empty()) {
+	if (right.is_empty()) {
 		peel_affixes(a, &core, right, VerbTables::finite_suffixes, 3,
 		             AffixSide::Suffix);
 	}

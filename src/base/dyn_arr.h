@@ -17,7 +17,7 @@ template <class T> struct DynArr {
 	Size size{};
 	Size reserved{};
 
-	bool empty() const { return !size; }
+	bool is_empty() const { return !size; }
 	void reset_size_reserved() { size = reserved = 0; }
 	T &operator[](Size i) { return data[i]; }
 	const T &operator[](Size i) const { return data[i]; }

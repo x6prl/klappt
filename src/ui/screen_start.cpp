@@ -1,3 +1,4 @@
+#include "app/worker.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/dpi.h"
@@ -17,6 +18,17 @@ void screen_start_draw(AppContext *ctx) {
 		auto go = mobile_button(ctx, CLAY_ID("go"), "Go"_v);
 		if (go.activated()) {
 			screen_exercise_go(ctx, false);
+
+			// job_push(
+			// 	  ctx,
+			// 	  {.type = Job::Type::TTS,
+			//        .str =
+			//              "Das war eine kleine, gemütliche Stadt, gefüllt mit bescheidenen, aber freundlichen Menschen."_v});
+			// job_push(
+			// 	  ctx,
+			// 	  {.type = Job::Type::ASR,
+			//        .str =
+			//              "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"_v});
 		}
 	}
 }

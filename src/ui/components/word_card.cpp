@@ -2,9 +2,11 @@
 
 #include "../dpi.h"
 #include "../themes.h"
+#include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "ui/tslt.h"
+#include <SDL3/SDL_log.h>
 #include <charconv>
 
 namespace {
@@ -212,12 +214,13 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	return ret;
 }
 
-bool word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
+// tapped, longtapped
+TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
                         int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
 	const auto padding = udpi(6.f);
 	const auto height = dpi(WORD_CARD_HEIGHT);
-	bool ret{false};
+	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
 
 	CLAY(id,
 	     {
@@ -339,8 +342,11 @@ bool word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
 					  }));
 		}
 
-		if (Clay_Hovered() && ctx->tslt.state == TapSwipeLongTap::Tap) {
-			ret = true;
+
+		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
+		                          ctx->tslt.state == TapSwipeLongTap::LongTap);
+		if (Clay_Hovered() && is_tap_or_longtap) {
+			ret = ctx->tslt.state;
 		}
 	}
 	return ret;

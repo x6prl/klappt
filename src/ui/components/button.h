@@ -5,6 +5,7 @@
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "ui/dpi.h"
+#include <SDL3/SDL_log.h>
 #include <clay/clay.h>
 #include <cstdint>
 
@@ -12,9 +13,12 @@ namespace Icons {
 constexpr auto EDIT = ""_v;
 constexpr auto REMOVE = ""_v;
 constexpr auto NEXT = ""_v;
+constexpr auto PLAY = ""_v;
 constexpr auto SAVE = ""_v;
 constexpr auto CHEVRON_UP = ""_v;
 constexpr auto CHEVRON_DOWN = ""_v;
+constexpr auto CROSSHAIRS = ""_v;
+constexpr auto CLEAR = ""_v;
 } // namespace Icons
 
 struct MobileButtonStyle {

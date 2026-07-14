@@ -384,13 +384,11 @@ bool read_state_value(StrView key, const MDB_val &value, State &out) {
 } // namespace
 
 #ifndef __EMSCRIPTEN__
-bool States::open(StrView requested_path) {
+bool States::open(std::string requested_path) {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::open");
 	close();
 	const auto dir =
-		  requested_path ? std::string(requested_path.data,
-	                                   static_cast<size_t>(requested_path.size))
-						 : default_lmdb_path();
+		  !requested_path.empty() ? requested_path : default_lmdb_path();
 	if (dir.empty()) {
 		return false;
 	}
@@ -783,7 +781,7 @@ EM_JS(int, web_storage_size, (const char *key_ptr), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
-			if (value == null) {
+		if (value == null) {
 			return -1;
 		}
 		return value.length;
@@ -797,10 +795,10 @@ EM_JS(int, web_storage_load, (const char *key_ptr, uint8_t *dst, int size), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
-			if (value == null) {
+		if (value == null) {
 			return 0;
 		}
-			if (value.length != size) {
+		if (value.length != size) {
 			return -1;
 		}
 		for (let i = 0; i < size; ++i) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <SDL3/SDL_log.h>
 #include <cstdint>
 #include <cstring>
 
@@ -9,6 +10,7 @@
 #include "base/pair.h"
 #include "base/str_view.h"
 #include "base/str_view_list.h"
+#include "domain/grammar.h"
 #include "word_id.h"
 
 enum class WordType : int32_t { Nil = 0, Noun, Verb, Adj, Phrase };
@@ -278,9 +280,175 @@ struct Word {
 	};
 	StrView translations_raw{};
 	StrView grammar{};
+	StrView json_payload{}; // TODO: update decoder
 };
 
-inline StrView most_meaningfull_lemma(const Word &word) {
+inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
+                                                 const Noun &n) {
+	constexpr auto DIE_ = "die "_v;
+	auto suf = n.plural_suffix;
+	{ // NOTE: case — unchangable nouns
+		if (suf == "(sg.)"_v) {
+			return {};
+		}
+		if (suf == "(pl.)" || suf == "-") {
+			return StrView::concat(a, DIE_, n.lemma);
+		}
+	}
+	StrView lemma{};
+	if ('"' == suf.first()) {
+		suf = suf.slice(1); // skip " for the next handling stage
+		// NOTE: should add umlaut
+		auto base = n.lemma;
+		Size i{base.size - 1};
+		StrView um = ">error:PLURAL_UMLAUT_ERROR<"_v;
+		for (; i > 0; --i) {
+			char ch = base[i];
+			if ('a' == ch) {
+				um = "ä"_v;
+				break;
+			} else if ('u' == ch) {
+				um = "ü"_v;
+				break;
+			} else if ('o' == ch) {
+				um = "ö"_v;
+				break;
+			} else if ('A' == ch) {
+				um = "Ä"_v;
+				break;
+			} else if ('U' == ch) {
+				um = "Ü"_v;
+				break;
+			} else if ('O' == ch) {
+				um = "Ö"_v;
+				break;
+			}
+		}
+		i = i < 0 ? 0 : i;
+		StrViewArray builder{};
+		builder.push(tmp, base.slice(0, i));
+		builder.push(tmp, um);
+		builder.push(tmp, base.slice(i + 1));
+		lemma = builder.join(tmp);
+	} else {
+		lemma = n.lemma.copy(tmp);
+	}
+
+	if (lemma.size > 2 && lemma.slice(lemma.size - 2) == "um"_v) {
+		// NOTE: case — ends with _um_
+		if (suf == "-en"_v) {
+			// NOTE: latin nouns with german plural suffix
+			lemma[lemma.size - 2] = 'e';
+			lemma[lemma.size - 1] = 'n';
+		} else if (suf == "-a"_v) {
+			// NOTE: classic latin nouns
+			lemma[lemma.size - 2] = 'a';
+			lemma.size -= 1;
+
+		} else {
+			// ????
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             StrView_Fmt ": unknown suffix " StrView_Fmt ". %s: %d",
+			             StrView_Arg(n.lemma), StrView_Arg(suf), __FILE_NAME__,
+			             __LINE__);
+		}
+	} else {
+		suf.mut_split_by('-');
+		lemma = StrView::concat(tmp, lemma, suf);
+	}
+
+	return StrView::concat(a, DIE_, lemma);
+}
+
+inline StrView word_verb_get_perfect_full(Arena &tmp, Arena &a, const Verb &v) {
+	auto [aux, pp] = v.auxv_and_past_participle.split();
+	if (aux && pp) {
+		return v.auxv_and_past_participle;
+	}
+
+	StrViewArray builder{};
+	builder.push(tmp, aux ? aux : "hat"_v);
+	builder.push(tmp,
+	             pp ? pp : grammar::verb_form_pp(tmp, tmp, v.infinitive, true));
+	return builder.join(a, ' ');
+}
+
+inline StrView word_verb_get_praeteritum_full(Arena &tmp, Arena &a,
+                                              const Verb &v) {
+	if (v.praeteritum) {
+		return v.praeteritum;
+	} else {
+		return grammar::verb_form_with_ending(tmp, a, v.infinitive, "te"_v,
+		                                      true);
+	}
+}
+
+inline StrView word_verb_get_third_person_full(Arena &tmp, Arena &a,
+                                               const Verb &v) {
+	if (v.third_person) {
+		return v.third_person;
+	} else {
+		return grammar::verb_form_with_ending(tmp, a, v.infinitive, "t"_v,
+		                                      true);
+	}
+}
+
+inline StrView word_tts_full(Arena &tmp, Arena &a, const Word &word) {
+	switch (word.type) {
+	case WordType::Noun: {
+		StrViewArray builder{};
+		builder.push(tmp, gender_to_article_nominative_strview(word.n.gender));
+		builder.push(tmp, word.n.lemma);
+		builder.push(tmp, ".\n"_v);
+		builder.push(tmp, word_noun_get_plural_with_artikel(tmp, tmp, word.n));
+		return builder.join(a, ' ');
+	}
+	case WordType::Verb: {
+		StrViewArray builder{};
+		{ // present form
+			builder.push(tmp, word.v.infinitive);
+
+			// 3rd person
+			builder.push(tmp, ".\n er"_v);
+			builder.push(tmp,
+			             word_verb_get_third_person_full(tmp, tmp, word.v));
+		}
+
+		// past form
+		builder.push(tmp, ".\n"_v);
+		builder.push(tmp, word_verb_get_praeteritum_full(tmp, tmp, word.v));
+
+		// perfect
+		builder.push(tmp, ".\n"_v);
+		builder.push(tmp, word_verb_get_perfect_full(tmp, tmp, word.v));
+
+		return builder.join(a, ' ');
+	}
+	case WordType::Adj: {
+		if (word.a.is_indeclinable) {
+			return word.a.lemma.copy(a);
+		} else {
+			StrViewArray builder{};
+			builder.push(tmp, word.a.lemma);
+			if (word.a.comparative) {
+				builder.push(tmp, ".\n"_v);
+				builder.push(tmp, word.a.comparative);
+			}
+			if (word.a.superlative) {
+				builder.push(tmp, ".\n"_v);
+				builder.push(tmp, word.a.superlative);
+			}
+			return builder.join(a, ' ');
+		}
+	}
+	case WordType::Phrase:
+		return word.p.text.copy(a);
+	default:
+		return {};
+	}
+}
+
+inline StrView word_most_meaningfull_lemma(const Word &word) {
 	switch (word.type) {
 	case WordType::Noun:
 		return word.n.lemma;
@@ -329,7 +497,8 @@ inline bool word_store_matches_query(const Word &word, StrView query) {
 // The active store is scoped to a single target language, so translations may
 // vary within that language and can still be merged for duplicate lexemes.
 inline bool same_lexeme(const Word &lhs, const Word &rhs) {
-	if (lhs.type != rhs.type || lhs.grammar != rhs.grammar) {
+	if (lhs.type != rhs.type || lhs.grammar != rhs.grammar ||
+	    lhs.json_payload != rhs.json_payload) {
 		return false;
 	}
 
@@ -375,6 +544,7 @@ inline Word clone_word(Arena &a, const Word &src) {
 	dst.was_learned = src.was_learned;
 	dst.translations_raw = src.translations_raw.copy(a);
 	dst.grammar = src.grammar.copy(a);
+	dst.json_payload = src.json_payload.copy(a);
 
 	switch (src.type) {
 	case WordType::Nil:
@@ -403,4 +573,3 @@ inline Word clone_word(Arena &a, const Word &src) {
 
 	return dst;
 }
-

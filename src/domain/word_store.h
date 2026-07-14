@@ -21,7 +21,7 @@ struct WordStore {
 
 	~WordStore();
 
-	bool open(StrView path = {});
+	bool open(std::string path);
 	void close();
 	Size word_count() const;
 	Size matching_word_count(StrView query) const;

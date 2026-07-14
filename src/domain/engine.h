@@ -230,7 +230,7 @@ struct States {
 	MDB_dbi due_dbi{}; // secondary index
 #endif
 
-	bool open(StrView path = {});
+	bool open(std::string path);
 	void close();
 
 	// [is_success, is_found]

@@ -5,7 +5,9 @@
 #include <filesystem>
 
 #include "app/app_context.h"
+#include "base/arena.h"
 #include "base/measure.h"
+#include "base/str_view.h"
 #include "domain/word_store.h"
 #include "domain/words_codec.h"
 #include "domain/wparser.h"
@@ -104,7 +106,7 @@ inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
 		if (!store.ensure_word(scratch, imported, &was_new)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Importing parsed word #%d failed (" StrView_Fmt ")",
-			             i, StrView_Arg(most_meaningfull_lemma(word)));
+			             i, StrView_Arg(word_most_meaningfull_lemma(word)));
 			return false;
 		}
 		// SDL_Log("import parsed word #%d done new=%d id=%llu", i,
@@ -114,6 +116,9 @@ inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
 			continue;
 		}
 		++added_count;
+		if (added_count % 1024 == 0) {
+			SDL_Log("added %d of %d", added_count, parsed.size);
+		}
 	}
 	return true;
 }
@@ -220,9 +225,8 @@ inline bool seed_default_learning_list(const DynArr<Word> &parsed,
 				  StrView_Arg(spec.key));
 			return false;
 		}
-		if (!add_word_to_learning_list_seeded(ctx.arena_frame, word,
-		                                      *ctx.words, ctx.word_store,
-		                                      ctx.states)) {
+		if (!add_word_to_learning_list_seeded(ctx.arena_frame, word, *ctx.words,
+		                                      ctx.word_store, ctx.states)) {
 			ctx.app_status.push_error("Failed to seed learning list"_v);
 		}
 		added_any = true;
@@ -234,9 +238,8 @@ inline bool seed_default_learning_list(const DynArr<Word> &parsed,
 	return true;
 }
 
-inline bool init_words(AppContext &ctx,
-                       const std::filesystem::path &basePath) {
-	Measure m{__PRETTY_FUNCTION__};
+inline bool init_words(AppContext &ctx, const std::filesystem::path &basePath) {
+	Measure m{__FUNCTION__};
 	WebPersistBatch persist_batch;
 	const auto lang = ctx.settings.tr_language;
 	const auto lang_code = Settings::translation_language_code(lang);
@@ -249,15 +252,14 @@ inline bool init_words(AppContext &ctx,
 	        StrView_Arg(lang_code));
 
 	ctx.words = new Words;
-	const auto states_path = FileLoader::path_for(states_leaf);
-	if (states_path.empty() || !ctx.states.open(str_view(states_path))) {
+	auto states_path = FileLoader::path_for(states_leaf);
+	if (states_path.empty() || !ctx.states.open(states_path)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening states storage failed");
 		return false;
 	}
 	m.lap().printus("states");
 	const auto word_store_path = FileLoader::path_for(word_store_leaf);
-	if (word_store_path.empty() ||
-	    !ctx.word_store.open(str_view(word_store_path))) {
+	if (word_store_path.empty() || !ctx.word_store.open(word_store_path)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening Xapian words failed");
 		return false;
 	}
@@ -300,8 +302,7 @@ inline bool init_words(AppContext &ctx,
 	}
 	m.lap().printus("sync words snapshot");
 	Size added_states = 0;
-	if (!sync_learning_words_to_states(ctx.states, *ctx.words,
-	                                   added_states)) {
+	if (!sync_learning_words_to_states(ctx.states, *ctx.words, added_states)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Syncing learning list to states failed");
 		return false;
@@ -311,33 +312,40 @@ inline bool init_words(AppContext &ctx,
 		        static_cast<int>(added_states));
 	}
 	m.lap().printus("sync states snapshot");
+	Arena a(1 << 30); // TODO: think better
 	if (changed) {
 		save_words_dat(ctx.arena_frame, ctx.settings, *ctx.words);
 		m.lap().printus("save remapped snapshot");
 	}
 
-	{
-		auto guard = ctx.arena_frame.guard();
+	// ***************************************************
+	if (false) //
+	{          // .txt file parsing and xapian db update
+		auto guard = a.guard();
 		DynArr<Word> parsed_words;
 		const auto source_path =
 			  basePath / "word_data" /
 			  std::string(source_leaf.data,
 		                  static_cast<size_t>(source_leaf.size));
-		if (!wparse_file(ctx.arena_frame, source_path.c_str(), parsed_words,
+		if (!wparse_file(a, source_path.c_str(), parsed_words,
 		                 &ctx.app_status)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Loading source words from " StrView_Fmt " failed",
 			             StrView_Arg(source_leaf));
 			return false;
 		}
-		m.point().printus("file parsed");
-		if (parsed_words.size != ctx.word_store.word_count()) {
+		m.point().printus("txt file parsed");
+		if ( ///
+			  true &&
+			  ///
+			  parsed_words.size > ctx.word_store.word_count()) {
+			// TODO: update logic
 			SDL_Log("parsed %d, but we have %d. Should import the words",
 			        parsed_words.size, ctx.word_store.word_count());
 
 			Size added_count = 0;
-			if (!import_new_parsed_words(ctx.arena_frame, ctx.word_store,
-			                             parsed_words, added_count)) {
+			if (!import_new_parsed_words(a, ctx.word_store, parsed_words,
+			                             added_count)) {
 				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 				             "Importing parsed words from " StrView_Fmt
 				             " failed",
@@ -362,8 +370,9 @@ inline bool init_words(AppContext &ctx,
 			SDL_Log("parsed %d and we have %d", parsed_words.size,
 			        ctx.word_store.word_count());
 		}
+		m.lap().printus("import active dictionary");
 	}
-	m.lap().printus("import active dictionary");
+	// ***************************************************
 
 	SDL_Log("main arena usage after startup load: %td / %d bytes",
 	        ctx.arena.offset, ctx.arena.allocated_size);

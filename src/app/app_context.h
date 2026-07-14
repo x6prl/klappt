@@ -2,7 +2,11 @@
 
 #include "SDL3/SDL_timer.h"
 #include "app/app_status.h"
+#include "app/net_worker.h"
+#include "app/worker.h"
+#include "app/sound_context.h"
 #include "base/dyn_arr.h"
+#include "base/str_view.h"
 #include "domain/engine.h"
 #include "domain/exercises.h"
 #include "domain/settings.h"
@@ -14,6 +18,7 @@
 
 #include "base/arena.h"
 #include "base/profiler.h"
+#include "platform/sound.h"
 #include "ui/components/text_input_state.h"
 #include "ui/components/word_edit_state.h"
 #include "ui/components/word_view_state.h"
@@ -33,6 +38,7 @@ enum class Screen {
 	WordView,
 	WordEdit,
 	Onboarding,
+	TTS_ASR,
 };
 
 inline const char *screen_name(Screen s) {
@@ -59,11 +65,14 @@ inline const char *screen_name(Screen s) {
 		return "WordEdit";
 	case Screen::Onboarding:
 		return "Onboarding";
+	case Screen::TTS_ASR:
+		return "TTS/ASR";
 	}
 	return "Unknown";
 }
 
 struct AppContext {
+
 	using Idx = int;
 	static constexpr Idx STACK_SIZE{16};
 	static constexpr Size MAIN_ARENA_SIZE = 64 << 20;
@@ -97,14 +106,19 @@ struct AppContext {
 	SDL_TimerID animation_timer_id{0};
 
 	TapSwipeLongTap tslt{};
+	SoundContext *sound_ctx{nullptr};
 	// SDL_AudioDeviceID audioDevice{};
 	// MIX_Track *track{};
 	MobileTextInputState mobile_text_input{};
 	MobileTextInputBuffer words_search{};
 	MobileTextInputBuffer learning_search{};
+	MobileTextInputBuffer tts_input{};
+	StrView asr_result{};
 	WordViewState *word_view_state{};
 	WordEditState *word_edit_state{};
 	Settings settings{};
+	JobQueue<Job> worker_job_queue{};
+	JobQueue<NetJob> net_worker_job_queue{};
 
 	// uint64_t last_ticks[10]{};
 	// uint64_t last_ticksef[10]{};
@@ -117,6 +131,23 @@ struct AppContext {
 		anim(); // TODO: just push one frame
 	}
 	Screen screen() const { return stack[current]; }
+	void on_screen_change(Screen from, Screen to) {
+		(void)from;
+		(void)to;
+		switch (from) {
+		case Screen::TTS_ASR: {
+			// stop recording and turn off micro
+			if (SoundContext::TRUE == SDL_GetAtomicInt(&sound_ctx->is_recording)) {
+				record_stop(this);
+			}
+			if (SoundContext::TRUE == SDL_GetAtomicInt(&sound_ctx->is_initialized)) {
+				record_deinit(this);
+			}
+		}
+		default:
+			break;
+		}
+	}
 	/*
 	 * NOTE:
 	 * Do not use push method directly. Use transition functions instead.
@@ -140,6 +171,7 @@ struct AppContext {
 	void go(Screen s) {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::go");
 		KLAPPT_PROFILE_NAME_F("AppContext::go -> %s", screen_name(s));
+		const auto was = screen();
 		if (s != Screen::Start) {
 			current = 1;
 			stack[0] = Screen::Start;
@@ -148,6 +180,7 @@ struct AppContext {
 			current = 0;
 			stack[0] = s;
 		}
+		on_screen_change(was, screen());
 		push_one_frame();
 	}
 	bool pop() {

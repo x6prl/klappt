@@ -7,7 +7,6 @@
 #include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
-#include "ui/components/button.h"
 #include "ui/textcache.h"
 
 void screen_start_go(AppContext *ctx);
@@ -42,6 +41,9 @@ void screen_word_edit_draw(AppContext *ctx);
 
 void screen_onboarding_go(AppContext *ctx);
 void screen_onboarding_draw(AppContext *ctx);
+
+void screen_tts_asr_go(AppContext *ctx);
+void screen_tts_asr_draw(AppContext *ctx);
 
 inline void
 draw_text(StrView text, Clay_Color color, uint16_t font_size = 16,

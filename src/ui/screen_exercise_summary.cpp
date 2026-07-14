@@ -62,7 +62,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 			auto res_all = mobile_button(ctx, CLAY_ID("All"), "Show all"_v);
 			if (res_all.activated()) {
 				ctx->exercises.build_result_reviews(ctx->arena_frame, false);
-				if (!ctx->exercises.results.empty()) {
+				if (!ctx->exercises.results.is_empty()) {
 					screen_exercise_review_push(ctx);
 				}
 			}
@@ -76,7 +76,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 			if (res_errors_only.activated()) {
 				if (is_result_with_errors) {
 					ctx->exercises.build_result_reviews(ctx->arena_frame, true);
-					if (!ctx->exercises.results.empty()) {
+					if (!ctx->exercises.results.is_empty()) {
 						screen_exercise_review_push(ctx);
 					}
 				} else {

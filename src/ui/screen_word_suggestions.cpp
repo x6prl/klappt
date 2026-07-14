@@ -10,7 +10,7 @@ void screen_word_suggestions_go(AppContext *ctx) {
 	static Arena suggestions_arena(20 << 10); // 20KB
 	constexpr Size SUGGESTIONS_COUNT = 10;
 	auto &suggestions_list = ctx->suggestions_list;
-	if (suggestions_list.empty()) {
+	if (suggestions_list.is_empty()) {
 		suggestions_list =
 			  DynArr<Word>::filled_zero_or_default(suggestions_arena, SUGGESTIONS_COUNT);
 	}
