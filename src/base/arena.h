@@ -8,6 +8,7 @@
 
 #include <sys/mman.h>
 
+// NOTE: should be SIGNED
 using Size = int;
 
 // static void memzero(void *data, Size size) {

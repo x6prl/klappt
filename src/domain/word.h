@@ -9,7 +9,7 @@
 #include "base/dyn_arr.h"
 #include "base/pair.h"
 #include "base/str_view.h"
-#include "base/str_view_list.h"
+#include "base/str_builder.h"
 #include "domain/grammar.h"
 #include "word_id.h"
 
@@ -325,7 +325,7 @@ inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
 			}
 		}
 		i = i < 0 ? 0 : i;
-		StrViewArray builder{};
+		StrBuilder builder{};
 		builder.push(tmp, base.slice(0, i));
 		builder.push(tmp, um);
 		builder.push(tmp, base.slice(i + 1));
@@ -366,7 +366,7 @@ inline StrView word_verb_get_perfect_full(Arena &tmp, Arena &a, const Verb &v) {
 		return v.auxv_and_past_participle;
 	}
 
-	StrViewArray builder{};
+	StrBuilder builder{};
 	builder.push(tmp, aux ? aux : "hat"_v);
 	builder.push(tmp,
 	             pp ? pp : grammar::verb_form_pp(tmp, tmp, v.infinitive, true));
@@ -396,7 +396,7 @@ inline StrView word_verb_get_third_person_full(Arena &tmp, Arena &a,
 inline StrView word_tts_full(Arena &tmp, Arena &a, const Word &word) {
 	switch (word.type) {
 	case WordType::Noun: {
-		StrViewArray builder{};
+		StrBuilder builder{};
 		builder.push(tmp, gender_to_article_nominative_strview(word.n.gender));
 		builder.push(tmp, word.n.lemma);
 		builder.push(tmp, ".\n"_v);
@@ -404,7 +404,7 @@ inline StrView word_tts_full(Arena &tmp, Arena &a, const Word &word) {
 		return builder.join(a, ' ');
 	}
 	case WordType::Verb: {
-		StrViewArray builder{};
+		StrBuilder builder{};
 		{ // present form
 			builder.push(tmp, word.v.infinitive);
 
@@ -428,7 +428,7 @@ inline StrView word_tts_full(Arena &tmp, Arena &a, const Word &word) {
 		if (word.a.is_indeclinable) {
 			return word.a.lemma.copy(a);
 		} else {
-			StrViewArray builder{};
+			StrBuilder builder{};
 			builder.push(tmp, word.a.lemma);
 			if (word.a.comparative) {
 				builder.push(tmp, ".\n"_v);

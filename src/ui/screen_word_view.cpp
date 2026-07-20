@@ -1,6 +1,7 @@
 #include "base/str_view.h"
-#include "base/str_view_list.h"
+#include "base/str_builder.h"
 #include "domain/word.h"
+#include "platform/neuro.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/dpi.h"
@@ -85,7 +86,7 @@ static StrView successful_reviews_to_next_mode(Arena &a,
 
 static inline StrView word_to_lexemme_str(Arena &scratch, Arena &a,
                                           const Word &w) {
-	StrViewArray strs{};
+	StrBuilder strs{};
 	switch (w.type) {
 	case WordType::Nil:
 		return "<empty word>"_v;
@@ -196,7 +197,7 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 			// draw_text(w.translations_raw, theme()->onSurface, udpi(16),
 			// FontID::MONOSPACE_REGULAR);
 			// TODO: add cues
-			StrViewArray strs{};
+			StrBuilder strs{};
 			for (auto &tr : trs) {
 				strs.push(ctx->arena_frame, tr.base);
 			}
@@ -276,10 +277,10 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 					continue;
 				}
 
-				StrViewArray row{};
+				StrBuilder row{};
 				row.push(ctx->arena_frame, mode_name(mode));
 				{
-					StrViewArray reviews{};
+					StrBuilder reviews{};
 					reviews.push(
 						  ctx->arena_frame,
 						  StrView::from_number(ctx->arena_frame, m.reviews));
@@ -287,7 +288,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 					row.push(ctx->arena_frame, reviews.join(ctx->arena_frame));
 				}
 				{
-					StrViewArray quality{};
+					StrBuilder quality{};
 					quality.push(ctx->arena_frame,
 					             StrView::from_number(ctx->arena_frame,
 					                                  m.quality_ewma));
@@ -295,7 +296,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 					row.push(ctx->arena_frame, quality.join(ctx->arena_frame));
 				}
 				{
-					StrViewArray stability{};
+					StrBuilder stability{};
 					stability.push(ctx->arena_frame,
 					               StrView::from_number(ctx->arena_frame,
 					                                    m.stability_days));
@@ -313,7 +314,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 
 // // NOTE: unused
 // static inline StrView word_to_str(Arena &scratch, Arena &a, const Word &w) {
-// 	StrViewArray strs{};
+// 	StrBuilder strs{};
 // 	auto word_str = word_to_lexemme_str(scratch, a, w);
 // 	strs.push(scratch, word_str);
 // 	strs.push(scratch, w.translations_raw);
@@ -431,7 +432,8 @@ void screen_word_view_draw(AppContext *ctx) {
 			if (play.activated()) {
 				auto tts_string = word_tts_full(
 					  ctx->arena_screen(), ctx->arena_frame, state.word_copy);
-				worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
+				// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
+				run_tts(ctx, tts_string);
 			}
 		}
 	}

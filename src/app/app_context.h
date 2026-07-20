@@ -2,9 +2,8 @@
 
 #include "SDL3/SDL_timer.h"
 #include "app/app_status.h"
-#include "app/net_worker.h"
+#include "app/audio_context.h"
 #include "app/worker.h"
-#include "app/sound_context.h"
 #include "base/dyn_arr.h"
 #include "base/str_view.h"
 #include "domain/engine.h"
@@ -18,10 +17,12 @@
 
 #include "base/arena.h"
 #include "base/profiler.h"
-#include "platform/sound.h"
+#include "platform/audio.h"
+#include "ui/components/net_download.h"
 #include "ui/components/text_input_state.h"
 #include "ui/components/word_edit_state.h"
 #include "ui/components/word_view_state.h"
+#include "ui/components/net_download.h"
 #include "ui/textcache.h"
 #include "ui/tslt.h"
 #include <clay/clay.h>
@@ -106,7 +107,7 @@ struct AppContext {
 	SDL_TimerID animation_timer_id{0};
 
 	TapSwipeLongTap tslt{};
-	SoundContext *sound_ctx{nullptr};
+	UI_Audio_ASR_TTS audio_asr_tts_status;
 	// SDL_AudioDeviceID audioDevice{};
 	// MIX_Track *track{};
 	MobileTextInputState mobile_text_input{};
@@ -117,8 +118,16 @@ struct AppContext {
 	WordViewState *word_view_state{};
 	WordEditState *word_edit_state{};
 	Settings settings{};
+
 	JobQueue<Job> worker_job_queue{};
-	JobQueue<NetJob> net_worker_job_queue{};
+	JobQueue<Size> net_worker_job_queue{};
+	JobQueue<AudioJob> audio_worker_job_queue{};
+	JobQueue<NeuroJob> neuro_worker_job_queue{};
+
+	NetContext *net{nullptr};     // NOTE: created by NetThread
+	AudioContext *audio{nullptr}; //       created by AudioThread
+	NeuroContext *neuro{nullptr}; //       created by Neuro
+	DynArr<NetDownload> downloads{};
 
 	// uint64_t last_ticks[10]{};
 	// uint64_t last_ticksef[10]{};
@@ -137,12 +146,17 @@ struct AppContext {
 		switch (from) {
 		case Screen::TTS_ASR: {
 			// stop recording and turn off micro
-			if (SoundContext::TRUE == SDL_GetAtomicInt(&sound_ctx->is_recording)) {
-				record_stop(this);
-			}
-			if (SoundContext::TRUE == SDL_GetAtomicInt(&sound_ctx->is_initialized)) {
-				record_deinit(this);
-			}
+			// TODO: FINISH
+			// if (UIAudioContext::TRUE ==
+			//     SDL_GetAtomicInt(&sound_ctx->is_recording)) {
+			// 	record_stop(this);
+			// }
+			// if (UIAudioContext::TRUE ==
+			//     SDL_GetAtomicInt(&sound_ctx->is_initialized)) {
+			// 	record_deinit(this);
+			// }
+			record_stop_then_do_nothing(this);
+			record_deinit(this);
 		}
 		default:
 			break;

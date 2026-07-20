@@ -1,10 +1,8 @@
-#include "app/sound_context.h"
+#include "app/audio_context.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "base/str_view_list.h"
 #include "domain/word.h"
-#include "platform/sound.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/components/list_island.h"
@@ -161,12 +159,12 @@ void screen_exercise_draw(AppContext *ctx) {
 			           // .cornerRadius = CLAY_CORNER_RADIUS(dpi(16)),
 				 }) {
 
-				auto rec_start_ticks = ctx->sound_ctx->recording_start_ticks_ms;
-				if (ctx->sound_ctx->is_recording_button_pressed &&
+				auto rec_start_ticks = ctx->audio_asr_tts_status.recording_start_ticks_ms;
+				if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
 				    rec_start_ticks > 0) {
 					draw_text(StrView::from_number(
 									ctx->arena_frame,
-									SoundContext::ticks_diff_to_seconds(
+									UI_Audio_ASR_TTS::ticks_diff_to_seconds(
 										  rec_start_ticks, ctx->ticks)),
 					          theme()->onSurfaceContainer, udpi(16));
 					ctx->anim();
@@ -200,7 +198,9 @@ void screen_exercise_draw(AppContext *ctx) {
 						break;
 					}
 				}
-				if (ctx->sound_ctx->audio.size_bytes > 0) {
+				// NOTE: touching other thread data
+				if (ctx->audio->rec_audio_buffer.size_bytes > 0) {
+					// we have audio → showing play button
 					auto play_btn = mobile_icon_button<false>(
 						  ctx, CLAY_ID("ASRPlayButton"), Icons::PLAY);
 					if (play_btn.activated()) {
@@ -208,24 +208,27 @@ void screen_exercise_draw(AppContext *ctx) {
 					}
 				}
 				auto btn_style = mobile_button_style_surface_container_high();
-				bool is_rec = SoundContext::TRUE ==
-				              SDL_GetAtomicInt(&ctx->sound_ctx->is_recording);
-				if (ctx->sound_ctx->is_recording_button_pressed && is_rec) {
+				// bool is_rec = UIAudioContext::TRUE ==
+				//               SDL_GetAtomicInt(&ctx->sound_ctx->is_recording);
+				bool is_rec = ctx->audio_asr_tts_status.is_recording;
+				if (ctx->audio_asr_tts_status.is_recording_button_pressed && is_rec) {
+					// recording in progress
 					btn_style.background = theme()->primary;
 					btn_style.background_pressed = theme()->primary;
 				}
 				auto asr_btn = mobile_button(ctx, CLAY_ID("ASRRecordButton"),
 				                             "●"_v, btn_style);
 				if (asr_btn.held) {
-					if (!ctx->sound_ctx->is_recording_button_pressed &&
+					// recording button is being pressed
+					if (!ctx->audio_asr_tts_status.is_recording_button_pressed &&
 					    !is_rec) {
-						if (SoundContext::FALSE ==
-						    SDL_GetAtomicInt(&ctx->sound_ctx->is_initialized)) {
+						// but this is the first frame
+						if (!ctx->audio_asr_tts_status.is_recording_initialized) {
 							record_init(ctx);
 						}
 						record_start(ctx);
 						// NOTE: switching back handled in ui_event FINGER_UP
-						ctx->sound_ctx->is_recording_button_pressed = true;
+						ctx->audio_asr_tts_status.is_recording_button_pressed = true;
 						// recording = !recording;
 					}
 				} else { // NOTE: handled in ui_event FINGER_UP

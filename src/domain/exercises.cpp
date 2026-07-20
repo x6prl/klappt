@@ -9,7 +9,6 @@
 #include "base/profiler.h"
 #include "base/shuffle.h"
 #include "base/str_view.h"
-#include "base/str_view_list.h"
 #include "engine.h"
 #include "tokenizer.h"
 #include "words.h"
@@ -32,7 +31,7 @@ StrView populate_prompt_sub_fields(Arena &a, StrView trs_raw, StrView grammar,
 	auto [ret, rest] = trs_raw.split_by(';');
 	auto translations = translations_from_raw(a, rest);
 	if (!translations.is_empty()) {
-		StrViewArray strs{};
+		StrBuilder strs{};
 		for (Size i{0}; i < translations.size; ++i) {
 			strs.push(a, translations[i].base);
 		}
@@ -161,7 +160,7 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 
 	auto merge = [](Arena &a, DynArr<StrView> strs, auto indexes) -> StrView {
 		auto [from, to] = indexes;
-		StrViewArray arr{}; // TODO: do it straightforward
+		StrBuilder arr{}; // TODO: do it straightforward
 		for (auto i{from}; i < to; ++i) {
 			arr.push(a, strs[i]);
 		}
@@ -192,7 +191,7 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 		                .opts = opts});
 	}
 
-	StrViewArray answer_while_prompt_builder{};
+	StrBuilder answer_while_prompt_builder{};
 	answer_while_prompt_builder.push(a, left_part);
 	for (Size i{}; i < gap_len; ++i) {
 		answer_while_prompt_builder.push(a, "_"_v);
@@ -333,7 +332,7 @@ template <class OptionIndexFn>
 StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
                                         const ExerciseState &e,
                                         OptionIndexFn option_index_for) {
-	StrViewArray parts{};
+	StrBuilder parts{};
 	bool has_any_answer = false;
 	bool is_gaps_mode = e.mode == Mode::Gaps;
 	Size last_stage_index_with_content = 0;

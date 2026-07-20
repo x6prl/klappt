@@ -96,14 +96,14 @@ template <class T> struct DynArr {
 	}
 	static DynArr<T> from(T *data, Size size) { return {data, size, size}; }
 	static DynArr<T> filled(Arena &a, T val, Size count) {
-		DynArr ret{a.pushN<T>(count), 0, count};
+		DynArr ret{a.pushN<T>(count), count, count};
 		for (auto &x : ret) {
 			x = val;
 		}
 		return ret;
 	}
 	static DynArr<T> filled_zero_or_default(Arena &a, Size count) {
-		DynArr ret{a.pushN<T>(count), 0, count};
+		DynArr ret{a.pushN<T>(count), count, count};
 		if constexpr (std::is_trivially_constructible_v<T>) {
 			memset(ret.data, 0, count * sizeof(T));
 		} else {

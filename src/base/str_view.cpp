@@ -1,7 +1,35 @@
 #include "str_view.h"
 
 #include <cctype>
+#include <charconv>
 #include <cstring>
+
+namespace {
+StrView from_numberf_real(Arena &a, auto val, int precision) {
+	static_assert(std::is_floating_point_v<decltype(val)>,
+	              "from_numberf is only for floating point types");
+	constexpr Size BUF_SIZE = 32;
+	auto strbuf = a.pushN<char>(BUF_SIZE);
+	std::to_chars_result res;
+	res = std::to_chars(strbuf, strbuf + BUF_SIZE, val,
+	                    std::chars_format::fixed, precision);
+	return {strbuf, static_cast<Size>(res.ptr - strbuf)};
+}
+
+StrView from_number_real(Arena &a, auto val) {
+	static_assert(std::is_arithmetic_v<decltype(val)>,
+	              "from_number is only for arithmetic types");
+	constexpr Size BUF_SIZE = 32;
+	auto strbuf = a.pushN<char>(BUF_SIZE);
+	std::to_chars_result res;
+	if constexpr (std::is_integral_v<decltype(val)>) {
+		res = std::to_chars(strbuf, strbuf + BUF_SIZE, val);
+		return {strbuf, static_cast<Size>(res.ptr - strbuf)};
+	} else {
+		return from_numberf_real(a, val, 2);
+	}
+}
+} // namespace
 
 StrView::operator bool() const { return !!size; }
 
@@ -52,8 +80,7 @@ StrView StrView::copy(Arena &a) const {
 	return {copy, size};
 }
 
-StrView StrView::concat(Arena &arena, const StrView left,
-                        const StrView right) {
+StrView StrView::concat(Arena &arena, const StrView left, const StrView right) {
 	auto new_size = left.size + right.size;
 	auto new_mem = arena.pushN<char>(new_size);
 	memcpy(new_mem, left.data, left.size);
@@ -210,4 +237,37 @@ StrView StrView::from_chars(Arena &a, const char *data, int size) {
 
 StrView StrView::from_chars(Arena &a, const char *data) {
 	return from_chars(a, data, strlen(data));
+}
+
+StrView StrView::from_number(Arena &a, uint64_t val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, uint32_t val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, uint16_t val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, int64_t val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, int32_t val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, int16_t val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, float val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, double val) {
+	return from_number_real(a, val);
+}
+StrView StrView::from_number(Arena &a, float val, int precision) {
+
+	return from_numberf_real(a, val, precision);
+}
+StrView StrView::from_number(Arena &a, double val, int precision) {
+
+	return from_numberf_real(a, val, precision);
 }

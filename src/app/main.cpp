@@ -2,19 +2,19 @@
 #include <cstdlib>
 
 #include "SDL3/SDL_events.h"
-#include "SDL3/SDL_mutex.h"
 #include "SDL3/SDL_stdinc.h"
 #include "SDL3/SDL_thread.h"
 #include "app/event_codes.h"
-#include "app/net_worker.h"
+#include "app/net_context.h"
 #include "app/worker.h"
+#include "base/dyn_arr.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "domain/settings.h"
 #include "platform/files.h"
-#include "ui/components/word_edit_state.h"
-#include "ui/components/word_view_state.h"
+#include "platform/net_worker.h"
+#include "platform/neuro.h"
 #include "ui/textcache.h"
 #define SDL_MAIN_USE_CALLBACKS // This is necessary for the new callbacks API.
                                // To use the legacy API, don't define this.
@@ -22,8 +22,6 @@
 #include "SDL3/SDL_log.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-// #include <SDL3_image/SDL_image.h>
-// #include <SDL3_mixer/SDL_mixer.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <filesystem>
@@ -298,8 +296,6 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	                     monospace_bold_font, arabic_ui_font}};
 	m.lap().printus("create text cache");
 
-	constexpr Size ASR_BUFFER_CAPACITY_BYTES =
-		  sizeof(float) * 16000 * 10; // 4 bytes * 16000kHz * 10 seconds
 	// set up the application data
 	auto ctx = new AppContext{
 		  .window = window,
@@ -311,19 +307,15 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .text = text_cache,
 		  .current = 0,
 		  .stack = {Screen::Onboarding},
-		  .sound_ctx =
-				new SoundContext{
-					  .audio = {.data = (float *)malloc(
-									  ASR_BUFFER_CAPACITY_BYTES),
-	                            .capacity_bytes = ASR_BUFFER_CAPACITY_BYTES}},
 		  // .track = mixerTrack,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
-		  .worker_job_queue = {
-				.mutex = SDL_CreateMutex(),
-				.cond = SDL_CreateCondition(),
-				.quit = false,
-		  }};
+	};
+	ctx->downloads = DynArr<NetDownload>{
+		  .data = ctx->arena.pushN<NetDownload>(NetContext::MAX_REQUESTS),
+		  .size = 0,
+		  .reserved = NetContext::MAX_REQUESTS,
+	};
 	*appstate = ctx;
 	m.lap().printus("create app context");
 
@@ -395,10 +387,19 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	{ // setup workers
 	  // SDL_Thread *worker =
 		SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
-		worker_job_push(ctx, {.type = Job::Type::INIT});
+		auto init_workers_job = []() {
+			auto ctx = tctx()->app_ctx;
+			SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
+			SDL_CreateThread(NeuroWorkerThread, "NeuroWorkerThread", ctx);
+			SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
+			init_asr(ctx);
+			init_tts(ctx);
+		};
+		Worker::job_push(ctx, Job{.id = -2, .func = init_workers_job});
+		// worker_job_push(ctx, {.type = Job::Type::INIT});
 		// SDL_Thread *net_worker =
-		SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
-		net_worker_job_push(ctx, {.type = NetJob::Type::INIT});
+		// SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
+		// net_worker_job_push(ctx, {.type = NetJob::Type::INIT});
 	}
 
 	SDL_Log("Application started successfully!");

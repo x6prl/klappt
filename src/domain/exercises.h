@@ -3,7 +3,7 @@
 #include "SDL3/SDL_log.h"
 #include "base/dyn_arr.h"
 #include "base/str_view.h"
-#include "base/str_view_list.h"
+#include "base/str_builder.h"
 #include "engine.h"
 #include "words.h"
 
@@ -39,8 +39,8 @@ struct ExerciseState {
 		struct {
 			StrView left_part{};
 			StrView right_part{};
-			StrViewArray get_answer_for_str(Arena &a, StrView str) const {
-				StrViewArray arr{};
+			StrBuilder get_answer_for_str(Arena &a, StrView str) const {
+				StrBuilder arr{};
 				arr.push(a, left_part);
 				arr.push(a, str);
 				arr.push(a, right_part);

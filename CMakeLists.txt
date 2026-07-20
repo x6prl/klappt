@@ -13,7 +13,7 @@ project(klappt)
 
 include(CTest)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Og")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fwrapv -fsanitize=address,undefined ")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fwrapv -fsanitize=address,undefined,thread ")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Og -fno-omit-frame-pointer")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
@@ -270,7 +270,7 @@ set(CURL_DISABLE_WEBSOCKETS ON CACHE BOOL "" FORCE)
 set(CURL_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
 set(CURL_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
 set(CURL_DISABLE_ZSTD ON CACHE BOOL "" FORCE)
-set(CURL_DISABLE_VERBOSE_STRINGS ON CACHE BOOL "" FORCE)
+set(CURL_DISABLE_VERBOSE_STRINGS OFF CACHE BOOL "" FORCE)
 
 set(CURL_ENABLE_SSL ON CACHE BOOL "" FORCE)
 set(_OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
@@ -378,12 +378,13 @@ set(APP_UI_IMPL_FILES
 )
 set(APP_CORE_FILES
     src/app/worker.cpp
-    src/app/net_worker.cpp
+    src/platform/net_worker.cpp
 )
 set(APP_PLATFORM_FILES
     src/platform/web_persist.cpp
-    src/platform/sound.cpp
-    src/platform/net.cpp
+    src/platform/audio.cpp
+    src/platform/neuro.cpp
+    src/platform/zip.cpp
 )
 set(APP_BASE_FILES
     src/base/str_view.cpp
@@ -406,11 +407,16 @@ target_include_directories(${EXECUTABLE_NAME} SYSTEM PRIVATE
 target_include_directories(${EXECUTABLE_NAME} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/sherpa-onnx"
 )
-# 2. Link the C++ API (which includes the C API) to your target
-# Replace 'YourProjectTarget' with the actual name of your executable/library
+# link the C++ API (which includes the C API) to your target
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE sherpa-onnx-core sherpa-onnx-c-api)
 
-add_library(simdjson SHARED
+#
+add_library(miniz STATIC
+    src/vendor/miniz/miniz.c
+)
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE miniz)
+
+add_library(simdjson STATIC
     src/vendor/simdjson/simdjson.cpp
 )
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE simdjson)
@@ -420,6 +426,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         -Wall
         -Wextra
         -Wno-missing-field-initializers
+        -ffast-math # TODO: check the impact
     )
 endif()
 

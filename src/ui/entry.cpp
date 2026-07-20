@@ -1,6 +1,7 @@
 #include "entry.h"
 #include "app/app_context.h"
-#include "platform/sound.h"
+#include "platform/audio.h"
+#include "platform/neuro.h"
 #include "screen_helpers.h"
 
 #ifdef __EMSCRIPTEN__
@@ -15,8 +16,8 @@
 #include "app/event_codes.h"
 #include "base/pair.h"
 #include "base/profiler.h"
+#include "base/str_builder.h"
 #include "base/str_view.h"
-#include "base/str_view_list.h"
 #include "clay_support.h"
 #include "components/button.h"
 #include "components/keypad_island.h"
@@ -83,12 +84,10 @@ static bool dm = false;
 
 void app_bar_layout(AppContext *ctx, StrView title) {
 	if (ctx->app_status.error_msgs.size) {
-		StrViewArray strs{};
+		StrBuilder strs{};
 		strs.push(ctx->arena_frame, title);
 		strs.push(ctx->arena_frame, "e:"_v);
-		strs.push(ctx->arena_frame,
-		          StrView::from_number(ctx->arena_frame,
-		                               ctx->app_status.error_msgs.size));
+		strs.push(ctx->arena_frame, ctx->app_status.error_msgs.size);
 		title = strs.join(ctx->arena_frame, ' ');
 	}
 	const auto app_bar_height = dpi(60.0f);
@@ -234,10 +233,10 @@ void bottom_bar_layout(AppContext *ctx) {
 
 StrView str_view_x_of_n(Arena &a, Size x, Size n) {
 	++x;
-	StrViewArray strs{};
+	StrBuilder strs{};
 
-	strs.push(a, StrView::from_number(a, x));
-	strs.push(a, StrView::from_number(a, n));
+	strs.push(a, x);
+	strs.push(a, n);
 	return strs.join(a, '/');
 }
 
@@ -321,13 +320,15 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 		case SDL_EVENT_MOUSE_BUTTON_UP:
 		case SDL_EVENT_FINGER_UP:
 			SDL_Log("FINGER UP EVENT");
-			if (ctx->sound_ctx->is_recording_button_pressed &&
-			    SoundContext::TRUE ==
-			          SDL_GetAtomicInt(&ctx->sound_ctx->is_recording)) {
+			if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
+			    ctx->audio_asr_tts_status.is_recording
+			    // AudioContext::TRUE ==
+			    //       SDL_GetAtomicInt(&ctx->sound_ctx->is_recording)
+			) {
 				SDL_Log("FINGER UP EVENT");
-				ctx->sound_ctx->is_recording_button_pressed = false;
-				record_stop(ctx);
-				run_asr(ctx);
+				ctx->audio_asr_tts_status.is_recording_button_pressed = false;
+				record_stop_then_run_asr(ctx);
+				// run_asr(ctx);
 			}
 		default:;
 		}
@@ -392,35 +393,43 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			case ANIMATION_EVENT_CODE: {
 				// NOTE: nothing to do
 			} break;
-			case ASR_FINISHED_EVENT_CODE: {
-				auto asr_text =
-					  StrView::lit(static_cast<char *>(event->user.data1))
-							.copy(ctx->arena_screen());
-				SDL_Log(" ->> " StrView_Fmt, StrView_Arg(asr_text));
-				// memcpy(ctx->asr_result.data, asr_text.data,
-				//        std::min(asr_text.size, ctx->asr_result.max_size));
-				// ctx->asr_result.size = asr_text.size;
-				ctx->asr_result = asr_text;
-
-				// free the memory
-				// TODO: refactor
-				worker_job_push(ctx,
-				         {.type = Job::Type::ASR_DATA_FREE,
-				          .tts_text = {.data = (const char *)event->user.data1,
-				                       .size = 0}});
-				SDL_Log("ASR_FINISHED EVENT");
+			case MAIN_THREAD_RUN_FUNC_CODE: {
+				reinterpret_cast<MainThreadCallback>(event->user.data1)(ctx);
 			} break;
-			case ASR_NOTIFY_UI_RECORDING_START_CODE: {
-				SDL_Log("ASR_NOTIFY_UI_RECORDING_START_CODE");
-				ctx->sound_ctx->recording_start_ticks_ms = ctx->ticks;
+			case MAIN_THREAD_RUN_FUNC_WITH_PAYLOAD_CODE: {
+				reinterpret_cast<MainThreadCallbackWithPayload>(
+					  event->user.data1)(ctx, event->user.data2);
 			} break;
-			case ASR_NOTIFY_UI_RECORDING_STOP_CODE: {
-				SDL_Log("ASR_NOTIFY_UI_RECORDING_STOP_CODE");
-				ctx->sound_ctx->recording_start_ticks_ms = 0;
-			} break;
-			case ASR_NOTIFY_UI_GENERAL_CODE: {
-				SDL_Log("ASR_NOTIFY_UI_GENERAL_CODE");
-			} break;
+			// case ASR_FINISHED_EVENT_CODE: {
+			// 	auto asr_text =
+			// 		  StrView::lit(static_cast<char *>(event->user.data1))
+			// 				.copy(ctx->arena_screen());
+			// 	SDL_Log(" ->> " StrView_Fmt, StrView_Arg(asr_text));
+			// 	// memcpy(ctx->asr_result.data, asr_text.data,
+			// 	//        std::min(asr_text.size, ctx->asr_result.max_size));
+			// 	// ctx->asr_result.size = asr_text.size;
+			// 	ctx->asr_result = asr_text;
+			//
+			// 	// free the memory
+			// 	// TODO: refactor
+			// 	worker_job_push(
+			// 		  ctx,
+			// 		  {.type = Job::Type::ASR_DATA_FREE,
+			// 	       .tts_text = {.data = (const char *)event->user.data1,
+			// 	                    .size = 0}});
+			// 	SDL_Log("ASR_FINISHED EVENT");
+			// } break;
+			// case ASR_NOTIFY_UI_RECORDING_START_CODE: {
+			// 	SDL_Log("ASR_NOTIFY_UI_RECORDING_START_CODE");
+			// 	ctx->sound_ctx->recording_start_ticks_ms = ctx->ticks;
+			// } break;
+			// case ASR_NOTIFY_UI_RECORDING_STOP_CODE: {
+			// 	SDL_Log("ASR_NOTIFY_UI_RECORDING_STOP_CODE");
+			// 	ctx->sound_ctx->recording_start_ticks_ms = 0;
+			// } break;
+			// case ASR_NOTIFY_UI_GENERAL_CODE: {
+			// 	SDL_Log("ASR_NOTIFY_UI_GENERAL_CODE");
+			// } break;
 			default:
 				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 				             "unknown sdl event user.code %d",

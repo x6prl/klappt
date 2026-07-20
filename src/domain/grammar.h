@@ -1,7 +1,7 @@
 #pragma once
 #include "base/arr.h"
 #include "base/str_view.h"
-#include "base/str_view_list.h"
+#include "base/str_builder.h"
 #include <cctype>
 
 namespace grammar {
@@ -99,7 +99,7 @@ inline StrView verb_form_pp(Arena &tmp, Arena &a, StrView inf,
 
 	bool is_ending_en = (inf[inf.size - 2] == 'e');
 	auto base = inf.slice(0, is_ending_en ? inf.size - 2 : inf.size - 1);
-	StrViewArray builder{};
+	StrBuilder builder{};
 
 	if (pref) {
 		builder.push(tmp, pref);
@@ -157,7 +157,7 @@ inline StrView verb_form_with_ending(Arena &tmp, Arena &a, StrView inf,
 
 	bool is_ending_en = (inf[inf.size - 2] == 'e');
 	auto base = inf.slice(0, is_ending_en ? inf.size - 2 : inf.size - 1);
-	StrViewArray builder{};
+	StrBuilder builder{};
 	builder.push(tmp, base);
 
 	bool is_d_or_t = base.last() == 'd' || base.last() == 't';

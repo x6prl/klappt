@@ -21,7 +21,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 					 },
 			   .backgroundColor = theme()->surface,
 		 }) {
-		StrViewArray strs{};
+		StrBuilder strs{};
 		{
 			strs.push(ctx->arena_frame,
 			          StrView::from_number(ctx->arena_frame,

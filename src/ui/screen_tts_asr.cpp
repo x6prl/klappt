@@ -1,8 +1,8 @@
 #include "app/app_context.h"
+#include "app/audio_context.h"
 #include "app/worker.h"
-#include "app/sound_context.h"
 #include "base/str_view.h"
-#include "platform/sound.h"
+#include "platform/neuro.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/components/text_input.h"
@@ -74,8 +74,9 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			auto tts_btn =
 				  mobile_button(ctx, CLAY_ID("TTSPlayButton"), "Play"_v);
 			if (tts_btn.activated() && ctx->tts_input.size > 0) {
-				worker_job_push(ctx, Job{.type = Job::Type::TTS,
-				                  .tts_text = ctx->tts_input.view()});
+				run_tts(ctx, ctx->tts_input.view());
+				// worker_job_push(ctx, Job{.type = Job::Type::TTS,
+				//                   .tts_text = ctx->tts_input.view()});
 			}
 		}
 
@@ -91,9 +92,9 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			draw_text("ASR - Speech Recognition"_v, theme()->onSurface);
 		}
 
-		bool is_asr_initialized =
-			  SoundContext::TRUE ==
-			  SDL_GetAtomicInt(&ctx->sound_ctx->is_initialized);
+		bool is_asr_initialized = ctx->audio_asr_tts_status.is_asr_initialized;
+		// = UIAudioContext::TRUE ==
+		// SDL_GetAtomicInt(&ctx->sound_ctx->is_initialized);
 		if (is_asr_initialized) {
 			// ASR record button
 			CLAY(CLAY_ID("ASRSectionButtonSlot"),
@@ -106,13 +107,18 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			                               CLAY_ALIGN_Y_CENTER},
 				  }}) {
 				auto btn_style = mobile_button_style_surface_container_high();
-				bool is_rec = SoundContext::TRUE ==
-				              SDL_GetAtomicInt(&ctx->sound_ctx->is_recording);
-				if (ctx->sound_ctx->is_recording_button_pressed && is_rec) {
+				bool is_rec = ctx->audio_asr_tts_status.is_recording;
+
+				// = UIAudioContext::TRUE ==
+				//              SDL_GetAtomicInt(&ctx->sound_ctx->is_recording);
+				if (ctx->audio_asr_tts_status.is_recording_button_pressed && is_rec) {
 					btn_style.background = theme()->primary;
 					btn_style.background_pressed = theme()->primary;
 				}
-				if (ctx->sound_ctx->audio.size_bytes > 0) {
+				// NOTE: touching other thread controlled memory!!
+				// ***********************************************
+				if (ctx->audio->rec_audio_buffer.size_bytes >
+				    0 /* NOTE: here */) {
 					auto push_text_to_tts_field_btn =
 						  mobile_icon_button(ctx, CLAY_ID("PushTextToTTSField"),
 					                         Icons::CHEVRON_UP);
@@ -124,17 +130,19 @@ void screen_tts_asr_draw(AppContext *ctx) {
 						ctx->tts_input.data[ctx->asr_result.size] = '\0';
 					}
 				}
+				// NOTE: touching other thread controlled memory!!
+				// ***********************************************
 				auto asr_btn = mobile_button(ctx, CLAY_ID("ASRRecordButton"),
 				                             "● Record"_v, btn_style);
 				// static bool recording = false;
 				// SDL_Log(" ======================+>>>> %s %s <<",
 				//         asr_btn.held ? "HELD" : "", recording ? "REC" : "");
 				if (asr_btn.held) {
-					if (!ctx->sound_ctx->is_recording_button_pressed &&
+					if (!ctx->audio_asr_tts_status.is_recording_button_pressed &&
 					    !is_rec) {
 						record_start(ctx);
 						// NOTE: switching back handled in ui_event FINGER_UP
-						ctx->sound_ctx->is_recording_button_pressed = true;
+						ctx->audio_asr_tts_status.is_recording_button_pressed = true;
 						// recording = !recording;
 					}
 				} else { // NOTE: handled in ui_event FINGER_UP
@@ -145,13 +153,18 @@ void screen_tts_asr_draw(AppContext *ctx) {
 					     // 	// recording = !recording;
 					     // }
 				}
-				if (ctx->sound_ctx->audio.size_bytes > 0) {
+				// NOTE: touching other thread controlled memory!!
+				// ***********************************************
+				if (ctx->audio->rec_audio_buffer.size_bytes >
+				    0 /* NOTE: here */) {
 					auto play_btn = mobile_icon_button(
 						  ctx, CLAY_ID("ASRPlayButton"), Icons::PLAY);
 					if (play_btn.activated()) {
 						record_play(ctx);
 					}
 				}
+				// NOTE: touching other thread controlled memory!!
+				// ***********************************************
 			}
 
 			// ASR result field (read-only)
@@ -159,21 +172,24 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			     {.layout = {
 						.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(1)},
 						.padding = CLAY_PADDING_ALL(udpi(8.0f))}}) {
-				auto rec_start_ticks = ctx->sound_ctx->recording_start_ticks_ms;
-				if (ctx->sound_ctx->is_recording_button_pressed &&
+				auto rec_start_ticks = ctx->audio_asr_tts_status.recording_start_ticks_ms;
+				if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
 				    rec_start_ticks > 0) {
 					draw_text(StrView::from_number(
 									ctx->arena_frame,
-									SoundContext::ticks_diff_to_seconds(
+									UI_Audio_ASR_TTS::ticks_diff_to_seconds(
 										  rec_start_ticks, ctx->ticks)),
 					          theme()->onSurfaceContainer, udpi(16));
 					ctx->anim();
 				} else if (ctx->asr_result.size > 0) {
 					draw_text(ctx->asr_result, theme()->onSurfaceContainer,
 					          udpi(16));
-				} else if (SoundContext::TRUE ==
-				           SDL_GetAtomicInt(
-								 &ctx->sound_ctx->is_asr_in_progress)) {
+				} else if (ctx->audio_asr_tts_status.is_asr_in_progress
+
+				           // UIAudioContext::TRUE ==
+				           //          SDL_GetAtomicInt(
+				           // 		 &ctx->sound_ctx->is_asr_in_progress)
+				) {
 					draw_text("Performing transcription…"_v,
 					          theme()->onSurfaceContainer, udpi(16));
 				} else {

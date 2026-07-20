@@ -1,4 +1,5 @@
 #include "domain/word.h"
+#include "platform/neuro.h"
 #include "screen_helpers.h"
 #include "ui/components/fast_list.h"
 #include "ui/components/text_input.h"
@@ -78,8 +79,11 @@ void screen_learning_list_draw(AppContext *ctx) {
 										auto tts_string = word_tts_full(
 											  ctx->arena_screen(),
 											  ctx->arena_frame, w);
-										worker_job_push(ctx, {.type = Job::Type::TTS,
-							                           .tts_text = tts_string});
+										// worker_job_push(ctx, {.type =
+							            // Job::Type::TTS,
+							            //                         .tts_text =
+							            //                         tts_string});
+										run_tts(ctx, tts_string);
 									}
 								}
 								return true;
