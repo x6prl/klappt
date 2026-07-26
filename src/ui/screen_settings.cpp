@@ -129,12 +129,12 @@ void screen_settings_draw(AppContext *ctx) {
 			button_chosen_style.border = theme()->outline;
 			auto current_lang = ctx->settings.tr_language;
 			Settings::for_every_lang(
-				  [&](int i, Settings::TranslationLanguage lang) {
+				  [&](int i, Lang lang) {
 					  auto style = lang == current_lang ? button_chosen_style
 				                                        : button_unchosen_style;
 					  auto btn = mobile_button(
 							ctx, CLAY_IDI("LangButton", i),
-							Settings::translation_language_code(lang), style);
+							lang_code(lang), style);
 					  if (btn.activated()) {
 						  ctx->settings.tr_language = lang;
 						  ctx->settings.save(ctx->arena_frame);
@@ -143,6 +143,37 @@ void screen_settings_draw(AppContext *ctx) {
 						  ctx->app_status.set_exit_normal();
 					  }
 				  });
+		}
+		CLAY(CLAY_ID("About"),
+		     {.layout =
+		            {
+						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						  .padding = CLAY_PADDING_ALL(udpi(4.0f)),
+						  .childGap = udpi(14.0f),
+						  .childAlignment = {CLAY_ALIGN_X_CENTER,
+		                                     CLAY_ALIGN_Y_CENTER},
+						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					},
+		      .border = {
+					.color = theme()->outline,
+					.width = {.bottom = udpi(1.f)},
+			  }}) {
+			auto notes_text_size = udpi(18);
+			draw_text(
+				  "This product includes data from Wiktionary (https://www.wiktionary.org/)"_v,
+				  theme()->onSurface, notes_text_size,
+				  translation_font_id(ctx));
+			draw_text(
+				  "Wiktionary content is licensed under the Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)."_v,
+				  theme()->onSurface, notes_text_size,
+				  translation_font_id(ctx));
+			draw_text("https://creativecommons.org/licenses/by-sa/4.0/"_v,
+			          theme()->onSurface, notes_text_size,
+			          translation_font_id(ctx));
+			draw_text(
+				  "The data has been extracted and transformed using Wiktextract and then selfmade scripts."_v,
+				  theme()->onSurface, notes_text_size,
+				  translation_font_id(ctx));
 		}
 	}
 }

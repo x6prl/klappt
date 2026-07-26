@@ -14,7 +14,6 @@
 #include "domain/words_codec.h"
 #include "domain/wparser.h"
 #include "platform/files.h"
-#include "platform/fs.h"
 #include "platform/neuro.h"
 #include "platform/web_persist.h"
 #include "ui/translations/langs.h"
@@ -253,7 +252,6 @@ inline bool txt_to_xapian(AppContext &ctx,
 	// const auto word_store_leaf = Settings::word_store_leaf(lang);
 	// const auto states_leaf = Settings::states_store_leaf(lang);
 
-	const auto lcode = lang_code(lang);
 	Arena a(1 << 30); // TODO: think harder
 
 	// ***************************************************
@@ -316,7 +314,6 @@ inline bool init_runtime_data(AppContext &ctx) {
 		init_asr(&ctx);
 	}
 
-	auto basePath = get_app_base_path();
 	Measure m{__FUNCTION__};
 
 	WebPersistBatch persist_batch;

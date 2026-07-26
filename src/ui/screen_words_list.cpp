@@ -63,59 +63,63 @@ void screen_words_list_draw(AppContext *ctx) {
 			}
 		}
 		// NOTE: at least 2 chars to start searching
-		if (ctx->words_search.size < 2) {
-			continue;
-		}
-		const auto query = ctx->words_search.view();
-		const auto total_words = ctx->word_store.matching_word_count(query);
-		CLAY(CLAY_ID("WordsListSlot"),
-		     {.layout = {
-					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)}}}) {
-			fast_list(
-				  ctx, CLAY_ID("WordsList"), total_words,
-				  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
-					  ctx->word_store.for_each_matching_word_range(
-							ctx->arena_frame, query, window.first,
-							window.last - window.first,
-							[&](Size index, Word &w) {
-								CLAY(CLAY_IDI("WordRow", index),
-					                 {.layout = {
-											.sizing = {
-												  CLAY_SIZING_GROW(0),
-												  CLAY_SIZING_FIXED(dpi(
-														WORD_CARD_ROW_HEIGHT))}}}) {
-									auto tap_state = word_card_words_list(
-										  ctx, CLAY_IDI("Word", index), w);
-									if (tap_state == TapSwipeLongTap::LongTap) {
-										SDL_Log(
-											  StrView_Fmt,
-											  StrView_Arg(w.translations_raw));
-										w.in_learning_list =
-											  w.in_learning_list ^ 1u;
-										auto word = clone_word(ctx->arena, w);
-										if (0 != w.in_learning_list) {
-											add_word_to_learning_list(
-												  ctx->arena_frame, &word,
-												  ctx->words, &ctx->word_store,
-												  &ctx->states,
-												  &ctx->app_status);
-										} else {
-											remove_word_from_learning_list(
-												  ctx->arena_frame, &word,
-												  ctx->words, &ctx->word_store);
+		if (ctx->words_search.size >= 2) {
+			const auto query = ctx->words_search.view();
+			const auto total_words = ctx->word_store.matching_word_count(query);
+			CLAY(CLAY_ID("WordsListSlot"),
+			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
+			                            CLAY_SIZING_GROW(0)}}}) {
+				fast_list(
+					  ctx, CLAY_ID("WordsList"), total_words,
+					  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
+						  ctx->word_store.for_each_matching_word_range(
+								ctx->arena_frame, query, window.first,
+								window.last - window.first,
+								[&](Size index, Word &w) {
+									CLAY(CLAY_IDI("WordRow", index),
+						                 {.layout = {
+												.sizing = {
+													  CLAY_SIZING_GROW(0),
+													  CLAY_SIZING_FIXED(dpi(
+															WORD_CARD_ROW_HEIGHT))}}}) {
+										auto tap_state = word_card_words_list(
+											  ctx, CLAY_IDI("Word", index), w);
+										if (tap_state ==
+							                TapSwipeLongTap::LongTap) {
+											SDL_Log(StrView_Fmt,
+								                    StrView_Arg(
+														  w.translations_raw));
+											w.in_learning_list =
+												  w.in_learning_list ^ 1u;
+											auto word =
+												  word_clone(ctx->arena, w);
+											if (0 != w.in_learning_list) {
+												add_word_to_learning_list(
+													  ctx->arena_frame, &word,
+													  ctx->words,
+													  &ctx->word_store,
+													  &ctx->states,
+													  &ctx->app_status);
+											} else {
+												remove_word_from_learning_list(
+													  ctx->arena_frame, &word,
+													  ctx->words,
+													  &ctx->word_store);
+											}
+											save_words_dat(ctx->arena_frame,
+								                           ctx->settings,
+								                           *ctx->words);
+										} else if (tap_state ==
+							                       TapSwipeLongTap::Tap) {
+											screen_word_view_push(ctx,
+								                                  w.word_id);
 										}
-										save_words_dat(ctx->arena_frame,
-							                           ctx->settings,
-							                           *ctx->words);
-									} else if (tap_state ==
-						                       TapSwipeLongTap::Tap) {
-										screen_word_view_push(ctx, w.word_id);
 									}
-								}
-								return true;
-							});
-					  return true;
-				  });
+									return true;
+								});
+						  return true;
+					  });
+			}
 		}
 	}
 }

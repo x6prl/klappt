@@ -119,7 +119,6 @@ static void init_edit_from_view(AppContext *ctx) {
 		edit.mode = view.state_copy.mode;
 	}
 	assign_buffer(edit.translations_raw, word.translations_raw);
-	assign_buffer(edit.grammar, word.grammar);
 
 	switch (word.type) {
 	case WordType::Noun:
@@ -157,7 +156,6 @@ static Word build_word_from_edit(Arena &arena, const WordEditState &edit) {
 	word.in_learning_list = edit.in_learning_list;
 	word.was_learned = edit.was_learned;
 	word.translations_raw = edit.translations_raw.view().copy(arena);
-	word.grammar = edit.grammar.view().copy(arena);
 
 	switch (edit.type) {
 	case WordType::Noun:
@@ -412,8 +410,6 @@ void screen_word_edit_draw(AppContext *ctx) {
 			draw_field(ctx, CLAY_ID("TranslationsField"),
 			           CLAY_ID("TranslationsInput"), &edit.translations_raw,
 			           "Translations"_v);
-			draw_field(ctx, CLAY_ID("GrammarField"), CLAY_ID("GrammarInput"),
-			           &edit.grammar, "Grammar"_v);
 			draw_mode_row(ctx);
 			if (!edit.valid) {
 				draw_text(edit.validation_error, theme()->error, udpi(15),

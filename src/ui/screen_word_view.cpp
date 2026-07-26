@@ -1,5 +1,5 @@
-#include "base/str_view.h"
 #include "base/str_builder.h"
+#include "base/str_view.h"
 #include "domain/word.h"
 #include "platform/neuro.h"
 #include "screen_helpers.h"
@@ -172,8 +172,8 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 			draw_text(
 				  word_to_lexemme_str(ctx->arena_frame, ctx->arena_frame, w),
 				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
-			draw_text(w.grammar, theme()->onSurface, udpi(16),
-			          FontID::MONOSPACE_REGULAR);
+			// draw_text(w.grammar, theme()->onSurface, udpi(16),
+			//           FontID::MONOSPACE_REGULAR);
 			// if (w.was_learned) {
 			// 	draw_text("wl"_v, theme()->onSurface, udpi(16),
 			// 	          FontID::MONOSPACE_REGULAR);
@@ -196,13 +196,16 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 				  translations_from_raw(ctx->arena_frame, w.translations_raw);
 			// draw_text(w.translations_raw, theme()->onSurface, udpi(16),
 			// FontID::MONOSPACE_REGULAR);
-			// TODO: add cues
+			// SDL_Log("%d", trs.size);
 			StrBuilder strs{};
 			for (auto &tr : trs) {
-				strs.push(ctx->arena_frame, tr.base);
+				StrBuilder v{};
+				v.push(ctx->arena_frame, tr.grammar);
+				v.push(ctx->arena_frame, tr.text);
+				strs.push(ctx->arena_frame, v.join(ctx->arena_frame, ' '));
 			}
-			draw_text(strs.join(ctx->arena_frame, "; "_v), theme()->onSurface,
-			          udpi(16), FontID::MONOSPACE_REGULAR);
+			draw_text(strs.join(ctx->arena_frame, "\n"_v), theme()->onSurface,
+			          udpi(16), FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 		}
 	}
 }
@@ -432,7 +435,8 @@ void screen_word_view_draw(AppContext *ctx) {
 			if (play.activated()) {
 				auto tts_string = word_tts_full(
 					  ctx->arena_screen(), ctx->arena_frame, state.word_copy);
-				// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
+				// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text =
+				// tts_string});
 				run_tts(ctx, tts_string);
 			}
 		}

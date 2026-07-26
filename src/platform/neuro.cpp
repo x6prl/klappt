@@ -297,15 +297,6 @@ const std::vector<std::string> espeak_ng_data_files = {
 	  "espeak-ng-data/lang/zlw/sk",
 };
 
-static std::string get_storage_base_path() {
-
-#if __ANDROID__
-	return SDL_GetAndroidExternalStoragePath();
-#else
-	return SDL_GetBasePath();
-#endif
-}
-
 /**
  * Create all parent directories in the given path.
  */

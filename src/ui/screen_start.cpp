@@ -1,9 +1,15 @@
 #include "app/worker.h"
+#include "base/measure.h"
 #include "base/str_view.h"
+#include "platform/net_worker.h"
+#include "platform/zip.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
+#include "ui/components/net_download_row.h"
 #include "ui/dpi.h"
 #include <SDL3/SDL_log.h>
+#include <filesystem>
+#include <string_view>
 
 void screen_start_go(AppContext *ctx) { ctx->go(Screen::Start); }
 
@@ -18,20 +24,30 @@ void screen_start_draw(AppContext *ctx) {
 	                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
 		 }) {
 		auto go = mobile_button(ctx, CLAY_ID("go"), "Go"_v);
-		static Size req_pool_index_1 = -1, r2 = -1;
 		if (go.activated()) {
-			// auto on_f_file = [](Size slot_index, int32_t request_id, int status,
-			//                     DynArr<uint8_t> memory_buffer) {
+			// auto on_zip_downloaded = [](Size slot_index, int32_t request_id,
+			//                             int status, StrView file_name,
+			//                             DynArr<uint8_t> memory_buffer) {
+			// 	Measure m{};
 			// 	SDL_Log("file loaded %d, status %d", request_id, status);
+			// 	std::filesystem::path out =
+			// 		  std::string_view(file_name.data, file_name.size);
+			// 	SDL_Log("unzipping %s", out.c_str());
+			// 	out = out.parent_path();
+			// 	unpack(file_name, StrView::lit(out.c_str()));
+			// 	SDL_Log("unzipped to %s", out.c_str());
+			// 	m.lap().print();
 			// };
-			// auto on_f_mem = [](Size slot_index, int32_t request_id, int status,
+			// auto on_f_mem = [](Size slot_index, int32_t request_id, int
+			// status,
 			//                    DynArr<uint8_t> memory_buffer) {
 			// 	SDL_Log("mem loaded %d, status %d", request_id, status);
 			// };
 			// req_pool_index_1 = Worker::net_download_file(
 			// 	  ctx,
 			// 	  "http://0.0.0.0:8000/sherpa-onnx-whisper-base/base-decoder.onnx"_v,
-			// 	  "/tmp/get.html"_v, on_f_file);
+			// 	  "/tmp/get.html"_v, on_zip_downloaded);
+			// download_track(ctx, req_pool_index_1, "onnx"_v);
 			// r2 = Worker::net_download_memory(
 			// 	  ctx,
 			// 	  "https://www.openthesaurus.de/synonyme/search?q=test&format=application/json"_v,
@@ -41,7 +57,6 @@ void screen_start_draw(AppContext *ctx) {
 			// 			.reserved = 2048,
 			// 	  },
 			// 	  on_f_mem);
-			// track_download(ctx, req_pool_index_1, "onnx"_v);
 			// track_download(ctx, r2, "very long api call"_v);
 
 			screen_exercise_go(ctx, false);

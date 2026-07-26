@@ -21,24 +21,7 @@ void screen_tts_asr_go(AppContext *ctx) {
 	ctx->push_one_frame();
 }
 
-static void update_asr_result_ui(AppContext *ctx) {
-	// Check if worker thread has an ASR result ready for the UI
-	// char *result = job_pop_asr_result();
-	// if (result) {
-	// 	ctx->asr_result.clear();
-	// 	size_t len = strlen(result);
-	// 	Size copy_len = len < MobileTextInputBuffer::max_size ?
-	// static_cast<Size>(len) : MobileTextInputBuffer::max_size - 1;
-	// 	memcpy(ctx->asr_result.data, result, copy_len);
-	// 	ctx->asr_result.data[copy_len] = '\0';
-	// 	ctx->asr_result.size = copy_len;
-	// 	free(result);
-	// }
-}
-
 void screen_tts_asr_draw(AppContext *ctx) {
-	update_asr_result_ui(ctx);
-
 	const auto header_height = dpi(40.0f);
 	const auto input_height = dpi(56.0f);
 	const auto btn_height = dpi(48.0f);

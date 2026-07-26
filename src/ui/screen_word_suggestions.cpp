@@ -40,7 +40,7 @@ void screen_word_suggestions_go(AppContext *ctx) {
 		Word tmpword;
 		store.get_by_id(ctx->arena_frame, candidates[rindex], tmpword);
 		suggestions_list[suggestions_list.size] =
-			  clone_word(suggestions_arena, tmpword);
+			  word_clone(suggestions_arena, tmpword);
 		suggestions_list.size += 1;
 	}
 

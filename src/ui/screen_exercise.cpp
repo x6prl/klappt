@@ -85,7 +85,7 @@ void screen_exercise_draw(AppContext *ctx) {
 				   .backgroundColor = theme()->surface,
 			 }) {
 
-			Size text_lenght = utf8_codepoint_count(es.source());
+			Size text_lenght = es.source().utf8_length();
 			float source_font_size = get_font_size_based_on_str_size(
 				  ctx->display_width, ctx->scale, text_lenght, 20.f, 48.f);
 
@@ -97,9 +97,9 @@ void screen_exercise_draw(AppContext *ctx) {
 			if (es.source_sub0().size > 0)
 				draw_text(es.source_sub0(), sub_color, udpi(12), source_font_id,
 				          CLAY_TEXT_WRAP_NEWLINES);
-			if (es.source_sub1().size > 0)
-				draw_text(es.source_sub1(), sub_color, udpi(12),
-				          source_font_id);
+			// if (es.source_sub1().size > 0)
+			// 	draw_text(es.source_sub1(), sub_color, udpi(12),
+			// 	          source_font_id);
 		}
 		CLAY(CLAY_ID("AnswerContainer"),
 		     {
@@ -137,107 +137,117 @@ void screen_exercise_draw(AppContext *ctx) {
 				draw_text(es.response(), theme()->onSurfaceContainer, udpi(18),
 				          FontID::MONOSPACE_REGULAR);
 			}
-			CLAY(CLAY_ID("ASRContainer"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_PERCENT(0.4f)},
-								   .padding =
-										 {
-											   .left = udpi(16),
-											   .right = udpi(16),
-											   .top = udpi(8),
-											   .bottom = udpi(8),
-										 },
-								   .childGap = udpi(8),
-								   .childAlignment = {CLAY_ALIGN_X_RIGHT,
-			                                          CLAY_ALIGN_Y_CENTER},
-								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
-							 },
-					   // .backgroundColor = theme()->surfaceContainer,
-			           // .cornerRadius = CLAY_CORNER_RADIUS(dpi(16)),
-				 }) {
+			// TODO: :c
+			if (false) {
+				CLAY(CLAY_ID("ASRContainer"),
+				     {
+						   .layout =
+								 {
+									   .sizing = {CLAY_SIZING_GROW(0),
+				                                  CLAY_SIZING_PERCENT(0.4f)},
+									   .padding =
+											 {
+												   .left = udpi(16),
+												   .right = udpi(16),
+												   .top = udpi(8),
+												   .bottom = udpi(8),
+											 },
+									   .childGap = udpi(8),
+									   .childAlignment = {CLAY_ALIGN_X_RIGHT,
+				                                          CLAY_ALIGN_Y_CENTER},
+									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+								 },
+						   // .backgroundColor = theme()->surfaceContainer,
+				           // .cornerRadius = CLAY_CORNER_RADIUS(dpi(16)),
+					 }) {
 
-				auto rec_start_ticks = ctx->audio_asr_tts_status.recording_start_ticks_ms;
-				if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
-				    rec_start_ticks > 0) {
-					draw_text(StrView::from_number(
-									ctx->arena_frame,
-									UI_Audio_ASR_TTS::ticks_diff_to_seconds(
-										  rec_start_ticks, ctx->ticks)),
-					          theme()->onSurfaceContainer, udpi(16));
-					ctx->anim();
-				} else if (ctx->asr_result.size > 0) {
-					draw_text(ctx->asr_result, theme()->onSurfaceContainer,
-					          udpi(16));
-				} else {
-					auto word_ref =
-						  es.exercises[es.exercise_current_idx].word_ref;
-					auto &word = (*ctx->words)[word_ref];
-					switch (word.type) {
-					case WordType::Noun: {
-						draw_text(
-							  "Press ● and say the answer.\nE.g. das Wort, die Wörter"_v,
-							  theme()->onSurfaceContainer, udpi(16));
-					} break;
-					case WordType::Verb: {
-						draw_text(
-							  "Press ● and say the answer.\nE.g. lesen, liest, las, hat gelesen"_v,
-							  theme()->onSurfaceContainer, udpi(16));
-					} break;
-					case WordType::Adj: {
-						draw_text("Press ● and say the answer.\nE.g. süß"_v,
+					auto rec_start_ticks =
+						  ctx->audio_asr_tts_status.recording_start_ticks_ms;
+					if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
+					    rec_start_ticks > 0) {
+						draw_text(StrView::from_number(
+										ctx->arena_frame,
+										UI_Audio_ASR_TTS::ticks_diff_to_seconds(
+											  rec_start_ticks, ctx->ticks)),
 						          theme()->onSurfaceContainer, udpi(16));
-					} break;
-					case WordType::Phrase: {
-						draw_text("Press ● and say the phrase."_v,
-						          theme()->onSurfaceContainer, udpi(16));
-					} break;
-					default:
-						break;
-					}
-				}
-				// NOTE: touching other thread data
-				if (ctx->audio->rec_audio_buffer.size_bytes > 0) {
-					// we have audio → showing play button
-					auto play_btn = mobile_icon_button<false>(
-						  ctx, CLAY_ID("ASRPlayButton"), Icons::PLAY);
-					if (play_btn.activated()) {
-						record_play(ctx);
-					}
-				}
-				auto btn_style = mobile_button_style_surface_container_high();
-				// bool is_rec = UIAudioContext::TRUE ==
-				//               SDL_GetAtomicInt(&ctx->sound_ctx->is_recording);
-				bool is_rec = ctx->audio_asr_tts_status.is_recording;
-				if (ctx->audio_asr_tts_status.is_recording_button_pressed && is_rec) {
-					// recording in progress
-					btn_style.background = theme()->primary;
-					btn_style.background_pressed = theme()->primary;
-				}
-				auto asr_btn = mobile_button(ctx, CLAY_ID("ASRRecordButton"),
-				                             "●"_v, btn_style);
-				if (asr_btn.held) {
-					// recording button is being pressed
-					if (!ctx->audio_asr_tts_status.is_recording_button_pressed &&
-					    !is_rec) {
-						// but this is the first frame
-						if (!ctx->audio_asr_tts_status.is_recording_initialized) {
-							record_init(ctx);
+						ctx->anim();
+					} else if (ctx->asr_result.size > 0) {
+						draw_text(ctx->asr_result, theme()->onSurfaceContainer,
+						          udpi(16));
+					} else {
+						auto word_ref =
+							  es.exercises[es.exercise_current_idx].word_ref;
+						auto &word = (*ctx->words)[word_ref];
+						switch (word.type) {
+						case WordType::Noun: {
+							draw_text(
+								  "Press ● and say the answer.\nE.g. das Wort, die Wörter"_v,
+								  theme()->onSurfaceContainer, udpi(16));
+						} break;
+						case WordType::Verb: {
+							draw_text(
+								  "Press ● and say the answer.\nE.g. lesen, liest, las, hat gelesen"_v,
+								  theme()->onSurfaceContainer, udpi(16));
+						} break;
+						case WordType::Adj: {
+							draw_text("Press ● and say the answer.\nE.g. süß"_v,
+							          theme()->onSurfaceContainer, udpi(16));
+						} break;
+						case WordType::Phrase: {
+							draw_text("Press ● and say the phrase."_v,
+							          theme()->onSurfaceContainer, udpi(16));
+						} break;
+						default:
+							break;
 						}
-						record_start(ctx);
-						// NOTE: switching back handled in ui_event FINGER_UP
-						ctx->audio_asr_tts_status.is_recording_button_pressed = true;
-						// recording = !recording;
 					}
-				} else { // NOTE: handled in ui_event FINGER_UP
-					     // if (recording) {
-					     // 	record_stop(ctx);
-					     // 	run_asr(ctx);
-					     // 	record_deinit(ctx);
-					     // 	// recording = !recording;
-					     // }
+					// NOTE: touching other thread data
+					if (ctx->audio->rec_audio_buffer.size_bytes > 0) {
+						// we have audio → showing play button
+						auto play_btn = mobile_icon_button<false>(
+							  ctx, CLAY_ID("ASRPlayButton"), Icons::PLAY);
+						if (play_btn.activated()) {
+							record_play(ctx);
+						}
+					}
+					auto btn_style =
+						  mobile_button_style_surface_container_high();
+					// bool is_rec = UIAudioContext::TRUE ==
+					//               SDL_GetAtomicInt(&ctx->sound_ctx->is_recording);
+					bool is_rec = ctx->audio_asr_tts_status.is_recording;
+					if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
+					    is_rec) {
+						// recording in progress
+						btn_style.background = theme()->primary;
+						btn_style.background_pressed = theme()->primary;
+					}
+					auto asr_btn = mobile_button(
+						  ctx, CLAY_ID("ASRRecordButton"), "●"_v, btn_style);
+					if (asr_btn.held) {
+						// recording button is being pressed
+						if (!ctx->audio_asr_tts_status
+						           .is_recording_button_pressed &&
+						    !is_rec) {
+							// but this is the first frame
+							if (!ctx->audio_asr_tts_status
+							           .is_recording_initialized) {
+								record_init(ctx);
+							}
+							record_start(ctx);
+							// NOTE: switching back handled in ui_event
+							// FINGER_UP
+							ctx->audio_asr_tts_status
+								  .is_recording_button_pressed = true;
+							// recording = !recording;
+						}
+					} else { // NOTE: handled in ui_event FINGER_UP
+						     // if (recording) {
+						     // 	record_stop(ctx);
+						     // 	run_asr(ctx);
+						     // 	record_deinit(ctx);
+						     // 	// recording = !recording;
+						     // }
+					}
 				}
 			}
 		}

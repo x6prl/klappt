@@ -269,25 +269,9 @@ extern "C" void ui_clay_init(AppContext *ctx) {
 
 extern "C" void ui_settings_init(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
-	SDL_Log("SETTINGS INIT");
+	SDL_Log("UI SETTINGS INIT");
 	theme_set(ctx->settings.theme_type);
-	switch (ctx->settings.tr_language) {
-	case Settings::TranslationLanguage::Arabic:
-		set_language(lang_ar);
-		break;
-	case Settings::TranslationLanguage::English:
-		set_language(lang_en);
-		break;
-	case Settings::TranslationLanguage::Russian:
-		set_language(lang_ru);
-		break;
-	case Settings::TranslationLanguage::Turkish:
-		set_language(lang_tr);
-		break;
-	default:
-		set_language(lang_ru);
-		break;
-	}
+	set_language(ctx->settings.tr_language);
 }
 
 extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {

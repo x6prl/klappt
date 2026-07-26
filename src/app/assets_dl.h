@@ -94,6 +94,7 @@ struct AssetsDL {
 		case Type::_COUNT:
 			std::unreachable();
 		}
+			std::unreachable();
 	}
 
 	static constexpr StrView words_snapshot_leaf(Lang lang) {

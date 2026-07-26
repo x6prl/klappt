@@ -1,10 +1,11 @@
 #pragma once
 
-#include <algorithm>
+#include <SDL3/SDL_log.h>
 
+#include "base/arena.h"
+#include "base/shuffle.h"
 #include "app/app_context.h"
 #include "app/app_status.h"
-#include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
 #include "ui/textcache.h"
@@ -61,7 +62,7 @@ draw_text(StrView text, Clay_Color color, uint16_t font_size = 16,
 }
 
 inline uint16_t translation_font_id(const AppContext *ctx) {
-	return ctx->settings.tr_language == Settings::TranslationLanguage::Arabic
+	return ctx->settings.tr_language == lang_ar
 	             ? FontID::ARABIC_MAIN
 	             : FontID::MAIN;
 }
@@ -120,7 +121,7 @@ inline void remove_word_from_learning_list(Arena &tmparena, Word *word,
 }
 
 template <class F>
-bool for_each_matching_learning_word_range(const Words &words, StrView query,
+bool for_each_matching_learning_word_range(Arena &scratch, const Words &words, StrView query,
                                            Size start, Size count,
                                            F &&visitor) {
 	query.mut_trim();
@@ -128,7 +129,7 @@ bool for_each_matching_learning_word_range(const Words &words, StrView query,
 	Size emitted = 0;
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
 		const auto &word = words[ref];
-		if (!word_store_matches_query(word, query)) {
+		if (!word_store_matches_query(scratch, word, query)) {
 			continue;
 		}
 		if (matched < start) {
@@ -147,11 +148,12 @@ bool for_each_matching_learning_word_range(const Words &words, StrView query,
 	return true;
 }
 
-inline Size matching_learning_word_count(const Words &words, StrView query) {
+inline Size matching_learning_word_count(Arena &a, const Words &words,
+                                         StrView query) {
 	query.mut_trim();
 	Size count = 0;
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
-		if (word_store_matches_query(words[ref], query)) {
+		if (word_store_matches_query(a, words[ref], query)) {
 			++count;
 		}
 	}

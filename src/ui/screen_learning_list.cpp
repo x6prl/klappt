@@ -32,15 +32,15 @@ void screen_learning_list_draw(AppContext *ctx) {
 		}
 		auto now = time(nullptr);
 		const auto query = ctx->learning_search.view();
-		const auto total_words =
-			  matching_learning_word_count(*ctx->words, query);
+		const auto total_words = matching_learning_word_count(
+			  ctx->arena_frame, *ctx->words, query);
 		CLAY(CLAY_ID("WordsListSlot"),
 		     {.layout = {
 					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)}}}) {
 			fast_list(
 				  ctx, CLAY_ID("WordsList"), total_words,
 				  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
-					  for_each_matching_learning_word_range(
+					  for_each_matching_learning_word_range(ctx->arena_frame,
 							*ctx->words, query, window.first,
 							window.last - window.first,
 							[&](Size index, const Word &w) {
@@ -51,7 +51,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 												  CLAY_SIZING_FIXED(dpi(
 														WORD_CARD_ROW_HEIGHT))}}}) {
 									Engine::State state{};
-									auto [is_success, is_present] =
+									// auto [is_success, is_present] =
 										  ctx->states.get(w.word_id, state);
 									// SDL_Log("%s %s",
 						            //                  is_success ? "SUC" :
