@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <curl/curl.h>
+#include <filesystem>
+#include <utility>
 
 #include "SDL3/SDL_log.h"
 #include "SDL3/SDL_timer.h"
@@ -17,10 +19,14 @@
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "curl/multi.h"
+#include "curl/system.h"
+#include "domain/settings.h"
+#include "platform/zip.h"
 
 namespace {
-static size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
-                                    void *userp) {
+
+size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
+                             void *userp) {
 	size_t realsize = size * nmemb;
 	auto *slot = static_cast<NetContext::NetRequestSlot *>(userp);
 	auto *data = static_cast<uint8_t *>(contents);
@@ -48,6 +54,7 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 extern thread_local ThreadContext *_tctx; // in worker.cpp
 
 int SDLCALL NetWorkerThread(void *userdata) {
+	KLAPPT_PROFILE_THREAD("net");
 	auto app_ctx = static_cast<AppContext *>(userdata);
 	auto &job_queue = app_ctx->net_worker_job_queue;
 
@@ -64,7 +71,6 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	};
 
 	_tctx->net = &netctx;
-	app_ctx->net = &netctx;
 
 	for (Size i{0}; i < netctx.requests_pool.size; ++i) {
 		netctx.requests_pool[i].index_in_the_pool = i;
@@ -80,6 +86,13 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	FixedSet<Size, NetContext::MAX_REQUESTS> pending_requests{};
 	bool is_queue_empty = false;
 	uint64_t queue_touched_last_time_ticks_ms = 0;
+
+	// NOTE: reading from other thread data
+	MT::run_with_payload(&netctx, [](AppContext *ctx, void *ptr) {
+		SDL_Log("  SETTING NET CTX ");
+		ctx->net = static_cast<NetContext *>(ptr);
+	});
+
 	constexpr auto TOUCH_QUEUE_NOT_FASTER_THAN_MS = 16;
 	for (;;) {
 		bool is_still_have_enough_work =
@@ -168,7 +181,26 @@ int SDLCALL NetWorkerThread(void *userdata) {
 					curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA,
 					                 &pool_slot);
 				} else {
-					FILE *file = fopen(req.file_name.mutable_to_cstr(), "wb");
+					FILE *file{nullptr};
+
+					using namespace std::filesystem;
+					path fpath = req.file_name.mutable_to_cstr();
+					curl_off_t foffset{0};
+					if (exists(fpath) && is_regular_file(fpath) &&
+					    (foffset = file_size(fpath))) {
+						file = fopen(req.file_name.mutable_to_cstr(), "ab");
+					} else {
+						if (exists(fpath) && foffset) {
+							SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+							             "something strange instead of a file "
+							             "%s... removing all",
+							             req.file_name.mutable_to_cstr());
+							remove_all(fpath);
+							foffset = 0;
+						}
+						file = fopen(req.file_name.mutable_to_cstr(), "wb");
+					}
+
 					if (!file) {
 						is_error_occured = true;
 						curl_easy_cleanup(easy_handle);
@@ -183,8 +215,13 @@ int SDLCALL NetWorkerThread(void *userdata) {
 						req.error.copy_from(strs.join(tctx()->a));
 						continue;
 					}
+
 					pool_slot.int_data.file_handle = file;
+					pool_slot.int_data.bytes_offset = foffset;
+
 					curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, file);
+					curl_easy_setopt(easy_handle, CURLOPT_RESUME_FROM_LARGE,
+					                 foffset);
 				}
 
 				auto mcode =
@@ -210,7 +247,9 @@ int SDLCALL NetWorkerThread(void *userdata) {
 					if (pool_slot.req.on_finished_func) {
 						pool_slot.req.on_finished_func(
 							  pool_slot.index_in_the_pool, req.request_id,
-							  NetRequest::STATUS_ERROR, req.memory_buffer);
+							  NetRequest::STATUS_ERROR,
+							  pool_slot.req.file_name.view(),
+							  req.memory_buffer);
 					}
 					netctx.thread_safe_release_slot(req_index);
 				}
@@ -221,14 +260,12 @@ int SDLCALL NetWorkerThread(void *userdata) {
 			constexpr auto PROGRESS_UPDATE_FREQUENCY_MS = 50;
 
 			int running_handles{};
-			// TODO: switch from dedicated thread to using curl_multi_perform in
-			// the main thread, increasing fps for the time of downloads?
 			curl_multi_perform(netctx.multi_handle, &running_handles);
 			auto g = tctx()->a.guard();
 			DynArr<Size> to_cancel{};
 
 			// getting progress for active downloads
-			// TODO: replace with a callback with timeout
+			// TODO: replace with a callback with timeout?...........
 			for (Size i = 0; i < netctx.active_requests_indices.size; ++i) {
 				auto &slot =
 					  netctx.requests_pool[netctx.active_requests_indices[i]];
@@ -242,14 +279,17 @@ int SDLCALL NetWorkerThread(void *userdata) {
 					}
 				}
 
-				curl_off_t bytes_downloaded = 0;
+				// TODO: check storage space
 				curl_off_t bytes_total = 0;
-
-				curl_easy_getinfo(easy_handle, CURLINFO_SIZE_DOWNLOAD_T,
-				                  &bytes_downloaded);
 				curl_easy_getinfo(easy_handle,
 				                  CURLINFO_CONTENT_LENGTH_DOWNLOAD_T,
 				                  &bytes_total);
+				bytes_total += slot.int_data.bytes_offset;
+
+				curl_off_t bytes_downloaded = 0;
+				curl_easy_getinfo(easy_handle, CURLINFO_SIZE_DOWNLOAD_T,
+				                  &bytes_downloaded);
+				bytes_downloaded += slot.int_data.bytes_offset;
 
 				if (bytes_downloaded != slot.int_data.bytes_downloaded) {
 					slot.int_data.bytes_downloaded = bytes_downloaded;
@@ -310,7 +350,18 @@ int SDLCALL NetWorkerThread(void *userdata) {
 						            slot->req.memory_buffer.size);
 					}
 
-					bool is_success = (msg->data.result == CURLE_OK);
+					// NOTE: the network request itself
+					bool is_result_ok = (msg->data.result == CURLE_OK);
+					int response_code{0};
+					if (is_result_ok) {
+						curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE,
+						                  &response_code);
+					}
+
+					// NOTE: the answer for the request
+					bool is_success = is_result_ok && (206 == response_code ||
+					                                   200 == response_code);
+
 					bool is_cancelled = slot->int_data.is_cancelled;
 
 					int req_status =
@@ -318,18 +369,37 @@ int SDLCALL NetWorkerThread(void *userdata) {
 								? (is_cancelled ? NetRequest::STATUS_CANCELLED
 					                            : NetRequest::STATUS_FINISHED)
 								: NetRequest::STATUS_ERROR;
+					SDL_Log("REQ %d STATUS %s", slot->req.request_id,
+					        req_status == NetRequest::STATUS_FINISHED
+					              ? "FINISHED"
+					              : "not finished");
 					Atomic::set(&slot->req.status, req_status);
 
 					if (!is_success) {
-						SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-						             "NET: Request %d error: %s",
-						             slot->req.request_id,
-						             curl_easy_strerror(msg->data.result));
+						if (!is_result_ok) {
+							SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+							             "NET: Request %d error: %s",
+							             slot->req.request_id,
+							             curl_easy_strerror(msg->data.result));
+							slot->req.error.copy_from(StrView::lit(
+								  curl_easy_strerror(msg->data.result)));
+						} else { // HTTP code is not 200 or 206
+							StrView estr{};
+							switch (response_code) {
+							case 404:
+								estr = "File not found"_v;
+								break;
+							default: {
+								auto g = tctx()->a.guard();
+								estr = StrView::concat(
+									  tctx()->a, "Code: "_v,
+									  StrView::from_number(tctx()->a,
+								                           response_code));
+							} break;
+							}
+							slot->req.error.copy_from(estr);
+						}
 
-						// auto g = tctx()->a.guard();
-						// StrBuilder strs{};
-						slot->req.error.copy_from(StrView::lit(
-							  curl_easy_strerror(msg->data.result)));
 					} else if (is_cancelled) {
 						SDL_Log("NET: Request %d was cancelled",
 						        slot->req.request_id);
@@ -338,11 +408,18 @@ int SDLCALL NetWorkerThread(void *userdata) {
 						        slot->req.request_id);
 					}
 
+					// closing file before calling on_finished
+					if (slot->int_data.file_handle) {
+						fclose(slot->int_data.file_handle);
+						slot->int_data.file_handle = nullptr;
+					}
+
 					// calling on_finished before cleaning
 					if (slot->req.on_finished_func) {
 						slot->req.on_finished_func(
 							  slot->index_in_the_pool, slot->req.request_id,
-							  req_status, slot->req.memory_buffer);
+							  req_status, slot->req.file_name.view(),
+							  slot->req.memory_buffer);
 					}
 
 					// cleanup
@@ -350,11 +427,6 @@ int SDLCALL NetWorkerThread(void *userdata) {
 						curl_multi_remove_handle(netctx.multi_handle,
 						                         easy_handle);
 						curl_easy_cleanup(easy_handle);
-
-						if (slot->int_data.file_handle) {
-							fclose(slot->int_data.file_handle);
-							slot->int_data.file_handle = nullptr;
-						}
 
 						netctx.active_requests_indices.remove_by_val(
 							  slot->index_in_the_pool);
@@ -382,20 +454,19 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	return 0;
 }
 
-void Worker::net_cancel_all(AppContext *ctx) {
-	// for (auto req_index : ctx->net->active_requests_indices) {
-	Measure m{__FUNCTION__};
-	for (Size i{0}; i < ctx->net->requests_pool.size; ++i) { // like really all
-		Worker::net_cancel_request(ctx, i);
-	}
-	m.lap().print("atomics");
-	SDL_LockMutex(ctx->net_worker_job_queue.mutex);
-	while (!ctx->net_worker_job_queue.queue.empty()) {
-		ctx->net_worker_job_queue.queue.pop();
-	}
-	SDL_UnlockMutex(ctx->net_worker_job_queue.mutex);
-	m.lap().print("mutex");
-}
+// void Worker::net_cancel_all(AppContext *ctx) {
+// 	Measure m{__FUNCTION__};
+// 	for (Size i{0}; i < ctx->net->requests_pool.size; ++i) { // like really all
+// 		Worker::net_cancel_request(ctx, i);
+// 	}
+// 	m.lap().print("atomics");
+// 	SDL_LockMutex(ctx->net_worker_job_queue.mutex);
+// 	while (!ctx->net_worker_job_queue.queue.empty()) {
+// 		ctx->net_worker_job_queue.queue.pop();
+// 	}
+// 	SDL_UnlockMutex(ctx->net_worker_job_queue.mutex);
+// 	m.lap().print("mutex");
+// }
 
 void Worker::net_cancel_request(AppContext *ctx, Size req_index_in_the_pool) {
 	Atomic::set_true(
@@ -431,8 +502,137 @@ Size Worker::net_download_memory(AppContext *ctx, StrView url,
 	return req_idx;
 }
 
+namespace {
+using AType = AssetsDL::Type;
+template <AType ASSET_TYPE> //
+struct AssetsCallbacks {
+	static void set_asset_zip_ready_to_unpack(AppContext *ctx, void *payload) {
+		Size bytes_total = reinterpret_cast<int64_t>(payload);
+		ctx->settings.asset(ASSET_TYPE).expected_size = bytes_total;
+		ctx->settings.asset(ASSET_TYPE).is_zip_ready_to_unpack = true;
+		ctx->settings.save(ctx->arena_frame);
+		SDL_Log("downloaded SET %d", (int)(ASSET_TYPE));
+	};
+	static void set_asset_unpacked_and_remove_zip(AppContext *ctx) {
+		auto g = ctx->arena_frame.guard();
+		ctx->settings.asset(ASSET_TYPE).is_unpacked = true;
+		SDL_Log("unpacked SET %d", (int)ASSET_TYPE);
+		ctx->settings.asset(ASSET_TYPE).is_zip_ready_to_unpack = false;
+		SDL_Log("zip ready UNSET %d", (int)ASSET_TYPE);
+		auto zip_path = ctx->settings.assets.zip_path(
+			  ctx->arena_frame, ASSET_TYPE, ctx->settings.tr_language);
+		ctx->settings.save(ctx->arena_frame);
+		std::filesystem::remove(
+			  std::string_view{zip_path.data, (size_t)zip_path.size});
+		ctx->settings.asset(ASSET_TYPE).is_zip_removed = true;
+		ctx->settings.save(ctx->arena_frame);
+		SDL_Log("zip REMOVED %d", (int)ASSET_TYPE);
+	};
+	static void job_asset_unpack() {
+		bool res = false;
+		auto &a = tctx()->a;
+		auto g = a.guard();
+		auto &s = tctx()->app_ctx->settings;
+		res = unpack_asset(s.assets.zip_path(a, ASSET_TYPE, s.tr_language));
+		if (res) {
+			MT::run(set_asset_unpacked_and_remove_zip);
+		} else {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s, %d: failed to unpack",
+			             __FILE__, __LINE__);
+		}
+	};
+	static void on_zip_downloaded(Size slot_index, int32_t request_id,
+	                              int status, StrView file_name,
+	                              DynArr<uint8_t> memory_buffer) {
+		(void)request_id;
+		(void)memory_buffer;
+		auto &slot = tctx()->net->requests_pool[slot_index];
+		if (status == NetRequest::STATUS_FINISHED) {
+			MT::run_with_payload(
+				  (void *)(int64_t)Atomic::get(&slot.req.bytes_total),
+				  set_asset_zip_ready_to_unpack);
+			Worker::job_push(tctx()->app_ctx, {.func = job_asset_unpack});
+		} else {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "%s, %d: Downloading of " StrView_Fmt
+			             " wasn't successfull",
+			             __FILE__, __LINE__, StrView_Arg(file_name));
+		}
+	};
+};
+
+template <AType... Types> struct AssetsCallbacksTables {
+	static constexpr auto on_zip_downloaded_table =
+		  std::array{&AssetsCallbacks<Types>::on_zip_downloaded...};
+
+	static constexpr auto job_asset_unpack_table =
+		  std::array{&AssetsCallbacks<Types>::job_asset_unpack...};
+};
+
+// NOTE: thorougly check the order)
+// enum class Type : int32_t {
+// 	XAPIAN_TR = 0,
+// 	OPTIONAL_XAPIAN_DE = 1,
+// 	OPTIONAL_TTS,
+// 	OPTIONAL_ASR,
+// 	_COUNT
+// };
+using AssetsCbs =
+	  AssetsCallbacksTables<AType::XAPIAN_TR, AType::OPTIONAL_XAPIAN_DE,
+                            AType::OPTIONAL_TTS, AType::OPTIONAL_ASR>;
+
+} // namespace
+
+Size Worker::net_download_and_unpack_asset(AppContext *ctx,
+                                           AssetsDL::Type asset_type) {
+	auto &a = ctx->arena_frame;
+	StrView out_fname = ctx->settings.assets.zip_path(
+		  ctx->arena_frame, asset_type, ctx->settings.tr_language);
+
+	bool is_zip_dowloaded_and_present =
+		  ctx->settings.asset(asset_type).is_zip_ready_to_unpack;
+
+	if (is_zip_dowloaded_and_present) {
+		std::filesystem::path p = {out_fname.to_cstr(a)};
+		if (!std::filesystem::exists(p)             // does not exist
+		    || !std::filesystem::is_regular_file(p) // not a regular file
+		    || (std::filesystem::file_size(p) !=
+		        (uintmax_t)ctx->settings.asset(asset_type)
+		              .expected_size) // file size mismatch
+		) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "got wrong is_zip_ready_to_unpack flag for %d asset",
+			             std::to_underlying(asset_type));
+			std::filesystem::remove_all(p);
+			is_zip_dowloaded_and_present = false;
+		}
+	}
+
+	StrView url = ctx->settings.assets.zip_url(ctx->arena_frame, asset_type,
+	                                           ctx->settings.tr_language);
+	if (!is_zip_dowloaded_and_present) {
+		return Worker::net_download_file(
+			  ctx, url, out_fname,
+			  AssetsCbs::on_zip_downloaded_table[std::to_underlying(
+					asset_type)]);
+	} else {
+		SDL_Log(StrView_Fmt " already downloaded", StrView_Arg(out_fname));
+		auto is_unpacked = ctx->settings.asset(asset_type).is_unpacked;
+		if (!is_unpacked) {
+			Worker::job_push(
+				  tctx()->app_ctx,
+				  {.func = AssetsCbs::job_asset_unpack_table[std::to_underlying(
+						 asset_type)]});
+		} else {
+			SDL_Log(StrView_Fmt " already unpacked", StrView_Arg(out_fname));
+			return -2;
+		}
+		return -1;
+	}
+}
+
 void Worker::net_request_push(AppContext *ctx, Size req_index_in_the_pool) {
-	static AtomicInt request_id_counter{0};
+	static AtomicInt request_id_counter{1};
 	auto &req = ctx->net->requests_pool[req_index_in_the_pool].req;
 	if (req.request_id < 0) {
 		req.request_id = Atomic::inc(&request_id_counter);
@@ -445,3 +645,13 @@ void Worker::net_request_push(AppContext *ctx, Size req_index_in_the_pool) {
 	SDL_SignalCondition(ctx->net_worker_job_queue.cond);
 	SDL_UnlockMutex(ctx->net_worker_job_queue.mutex);
 }
+// void Worker::net_request_retry(AppContext *ctx, Size req_index_in_the_pool) {
+// 	auto &req = ctx->net->requests_pool[req_index_in_the_pool].req;
+// 	req.request_id = -1;
+// 	Atomic::set(&req.bytes_downloaded, 0);
+// 	Atomic::set(&req.bytes_total, 0);
+// 	Atomic::set(&req.speed_kbit_sec, 0);
+// 	Atomic::set(&req.status, NetRequest::STATUS_INIT);
+// 	Atomic::set(&req.is_cancelled, false);
+// 	net_request_push(ctx, req_index_in_the_pool);
+// }

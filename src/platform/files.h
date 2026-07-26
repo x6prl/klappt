@@ -1,67 +1,53 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_iostream.h>
-#include <string>
+#include <SDL3/SDL_filesystem.h>
 
 #include "base/arena.h"
+#include "base/str_builder.h"
 #include "base/str_view.h"
-#include "platform/web_persist.h"
+#include "platform/fs.h"
 
-constexpr auto ORG = "lexi";
-constexpr auto APP = "lexi.sdl";
+inline StrView get_writable_file_path_for(Arena &a, StrView file_name,
+                                          StrView suffix = {}) {
+	auto w = get_writable_path();
+	if (suffix) {
+		StrBuilder strs{};
+		strs.push(a, w);
+		strs.push(a, file_name);
+		strs.push(a, suffix);
+		return strs.join(a);
+	} else {
+		return StrView::concat(a, w, file_name);
+	}
+}
 
-inline bool file_save(StrView file_name, const void *data, Size size) {
+inline bool file_save(Arena &scratch, StrView file_name, const void *data,
+                      Size size) {
+	auto g = scratch.guard();
+	auto path = get_writable_file_path_for(scratch, file_name).to_cstr(scratch);
+	const bool ok = SDL_SaveFile(path, data, size);
 #ifdef __EMSCRIPTEN__
-	std::string path = web_persist_path_for(file_name);
-	const bool ok = SDL_SaveFile(path.c_str(), data, size);
 	if (ok) {
 		web_persist_sync();
 	}
-	return ok;
-#else
-	char *pref = SDL_GetPrefPath(ORG, APP);
-	if (!pref) {
-		SDL_Log("SDL_GetPrefPath failed: %s", SDL_GetError());
-		return false;
-	}
-
-	std::string path =
-		  std::string(pref) + std::string(file_name.data, file_name.size);
-	SDL_free(pref);
-
-	return SDL_SaveFile(path.c_str(), data, size);
 #endif
+	return ok;
 }
 
 struct FileLoader {
 	void *data{nullptr};
-	Size size{};
+	Size size{0};
 
-	static std::string path_for(StrView file_name) {
-#ifdef __EMSCRIPTEN__
-		return web_persist_path_for(file_name);
-#else
-		char *pref = SDL_GetPrefPath(ORG, APP);
-		if (!pref) {
-			SDL_Log("SDL_GetPrefPath failed: %s", SDL_GetError());
-			return {};
-		}
-		std::string path =
-			  std::string(pref) + std::string(file_name.data, file_name.size);
-		SDL_free(pref);
-		return path;
-#endif
-	}
-
-	bool load(StrView file_name) {
-		auto path = path_for(file_name);
-		if (!path.size()) {
+	bool load(Arena &scratch, StrView file_name) {
+		auto g = scratch.guard();
+		auto path = get_writable_file_path_for(scratch, file_name);
+		if (!path) {
 			return false;
 		}
 
 		size_t _size{};
-		data = SDL_LoadFile(path.c_str(), &_size);
+		data = SDL_LoadFile(path.to_cstr(scratch), &_size);
 		size = static_cast<Size>(_size);
 		if (!data) {
 			return false;

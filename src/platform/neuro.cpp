@@ -9,16 +9,13 @@
 
 #include "app/neuro_context.h"
 #include "base/measure.h"
+#include "platform/fs.h"
 
 #include <cassert>
 #include <filesystem>
 
 namespace {
 
-// constexpr auto ORG = "lexi";
-// constexpr auto APP = "lexi.sdl";
-
-// List of paths inside APK (relative path)
 constexpr auto ASSET_NAME_PIPER_ONNX =
 	  "Thorsten-Voice-Piper/de_DE-thorsten-medium.onnx";
 constexpr auto ASSET_NAME_PIPER_TOKENS = "Thorsten-Voice-Piper/tokens.txt";
@@ -329,19 +326,10 @@ static bool mkdir_all(std::string dir) {
 	return true;
 }
 
-/**
- * Main extraction function: reads all models from APK, writes them to internal
- * storage. Returns the base path of extracted files, or empty string on
- * failure.
- */
 static std::filesystem::path sherpa_check_and_load_assets() {
-	std::filesystem::path base_path = get_storage_base_path();
-	if (base_path.empty())
-		return {};
-
-	// #ifdef __ANDROID__
-	// #else
-	// On desktop (non-Android), just log what's available
+	auto _base_path = get_writable_path();
+	auto base_path = std::filesystem::path{
+		  std::string{_base_path.data, (size_t)_base_path.size}};
 	std::vector<std::string> files = {
 		  ASSET_NAME_PIPER_ONNX,      ASSET_NAME_PIPER_TOKENS,
 		  ASSET_NAME_WHISPER_TOKENS,  ASSET_NAME_WHISPER_DECODER,
@@ -351,27 +339,18 @@ static std::filesystem::path sherpa_check_and_load_assets() {
 	files.insert(files.begin(), espeak_ng_data_files.begin(),
 	             espeak_ng_data_files.end());
 	for (auto f : files) {
-		std::string full = base_path / f;
-
-		SDL_PathInfo info;
-		bool ok = SDL_GetPathInfo(full.c_str(), &info);
-		if (!ok) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_GetPathInfo failed: %s",
-			             SDL_GetError());
-			// exit(1);
-		}
-		// Size pos = 0;
-		// void *data = nullptr;
-		// size_t sz = 0;
+		auto full = base_path / f;
 
 		// data = SDL_LoadFile(full.c_str(), &sz);
-		if (ok && (info.type == SDL_PATHTYPE_FILE && info.size > 0
-		           // ||
-		           // info.type == SDL_PATHTYPE_DIRECTORY)
-		           )) {
+		if (std::filesystem::is_regular_file(full) &&
+		    std::filesystem::file_size(full) > 0
+		    // ||
+		    // info.type == SDL_PATHTYPE_DIRECTORY)
+		) {
 			SDL_Log("Found asset on disk: %s", full.c_str());
 		} else {
 			SDL_Log("Asset not found on disk: %s", full.c_str());
+			return {};
 			{
 				SDL_Log("GETTING %s to %s", f.c_str(), full.c_str());
 				// https://github.com/espeak-ng/espeak-ng/raw/refs/heads/master/espeak-ng-data/lang/art/ia
@@ -534,6 +513,13 @@ void init_asr(AppContext *ctx) {
 
 			  // TODO: split checker
 			  std::filesystem::path base_path = sherpa_check_and_load_assets();
+			  if (base_path.empty()) {
+				  SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			                   "Failed initializing ASR: assets check and load "
+			                   "failed");
+				  return;
+			  }
+
 			  if (sherpa_init_asr(nnctx, base_path)) {
 				  MT::run([](AppContext *ctx) {
 					  ctx->audio_asr_tts_status.is_asr_initialized = true;

@@ -1,10 +1,5 @@
 #pragma once
 
-#include <string>
-
-#include "base/str_view.h"
-
-std::string web_persist_path_for(StrView file_name);
 void web_persist_sync();
 void web_persist_begin_batch();
 void web_persist_end_batch();

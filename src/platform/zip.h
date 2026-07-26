@@ -2,4 +2,4 @@
 
 #include "base/str_view.h"
 
-bool unzip(StrView in, StrView out_dir);
+bool unpack_asset(StrView fname);

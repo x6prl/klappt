@@ -1,7 +1,5 @@
 #include "platform/web_persist.h"
 
-#include <string>
-
 #ifdef __EMSCRIPTEN__
 #include <SDL3/SDL_log.h>
 #include <emscripten.h>
@@ -9,17 +7,11 @@
 
 namespace {
 
-constexpr char WEB_PERSIST_ROOT[] = "/persist/";
 #ifdef __EMSCRIPTEN__
 int web_persist_batch_depth = 0;
 bool web_persist_batch_pending = false;
 #endif
 
-}
-
-std::string web_persist_path_for(StrView file_name) {
-	return std::string(WEB_PERSIST_ROOT) +
-	       std::string(file_name.data, static_cast<size_t>(file_name.size));
 }
 
 #ifdef __EMSCRIPTEN__
