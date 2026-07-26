@@ -131,11 +131,10 @@ namespace {
 // }
 template <class JobType, class GetQueue>
 int worker_job_push_generic(AppContext *ctx, JobType job, GetQueue get_queue) {
-	static AtomicInt job_id_counter{0};
+	static AtomicInt job_id_counter{1};
 	if (job.id < 0) {
 		job.id = Atomic::inc(&job_id_counter);
 	}
-	SDL_Log("Main Thread: Pushing Job %d to the worker queue.", job.id);
 	auto queue = get_queue(ctx);
 
 	SDL_LockMutex(queue->mutex);
@@ -249,6 +248,7 @@ void Worker::job_push(AppContext *ctx, Job job) {
 }
 
 int SDLCALL WorkerThread(void *userdata) {
+	KLAPPT_PROFILE_THREAD("worker");
 	worker_thread_generic<Job>(
 		  userdata,
 		  [](AppContext *ctx) -> decltype(ctx->worker_job_queue) * {
@@ -616,6 +616,7 @@ int SDLCALL WorkerThread(void *userdata) {
 }
 
 int SDLCALL AudioWorkerThread(void *userdata) {
+	KLAPPT_PROFILE_THREAD("audio");
 	worker_thread_generic<AudioJob>(
 		  userdata,
 		  [](AppContext *ctx) -> JobQueue<AudioJob> * {
@@ -628,8 +629,9 @@ int SDLCALL AudioWorkerThread(void *userdata) {
 						  .data = (float *)malloc(ASR_BUFFER_CAPACITY_BYTES),
 						  .capacity_bytes = ASR_BUFFER_CAPACITY_BYTES}};
 			  tctx()->audio = audio_ctx;
-			  // NOTE: writing to another thread directly
-			  ctx->audio = audio_ctx;
+			  MT::run_with_payload(&audio_ctx, [](AppContext *ctx, void *ptr) {
+				  ctx->audio = static_cast<AudioContext *>(ptr);
+			  });
 			  return &ctx->audio_worker_job_queue;
 		  },
 		  [](AudioJob &job) {
@@ -643,6 +645,7 @@ int SDLCALL AudioWorkerThread(void *userdata) {
 }
 
 int SDLCALL NeuroWorkerThread(void *userdata) {
+	KLAPPT_PROFILE_THREAD("neuro");
 	worker_thread_generic<NeuroJob>(
 		  userdata,
 		  [](AppContext *ctx) -> JobQueue<NeuroJob> * {
@@ -657,9 +660,9 @@ int SDLCALL NeuroWorkerThread(void *userdata) {
 			  for (Size i{0}; i < pp_pool_size; ++i) {
 				  pp_pool[i].pp_index = i;
 			  }
-			  // TODO: should be more careful?
-		      // NOTE: writing to another thread directly
-			  ctx->neuro = neuro_ctx;
+			  MT::run_with_payload(&neuro_ctx, [](AppContext *ctx, void *ptr) {
+				  ctx->neuro = static_cast<NeuroContext *>(ptr);
+			  });
 			  return &ctx->neuro_worker_job_queue;
 		  },
 		  [](NeuroJob &job) { job.func(tctx()->neuro, &job.payload); });

@@ -1,11 +1,23 @@
+#include "ui/components/download_data.h"
 #include <cstdint>
 #include <cstdlib>
 
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL_stdinc.h"
-#include "SDL3/SDL_thread.h"
+#define SDL_MAIN_USE_CALLBACKS // This is necessary for the new callbacks API.
+                               // To use the legacy API, don't define this.
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_thread.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
+#include "app/app_context.h"
 #include "app/event_codes.h"
+#include "app/hotreload.h"
 #include "app/net_context.h"
+#include "app/words_init.h"
 #include "app/worker.h"
 #include "base/dyn_arr.h"
 #include "base/measure.h"
@@ -13,27 +25,14 @@
 #include "base/str_view.h"
 #include "domain/settings.h"
 #include "platform/files.h"
+#include "platform/fs.h"
 #include "platform/net_worker.h"
 #include "platform/neuro.h"
 #include "ui/textcache.h"
-#define SDL_MAIN_USE_CALLBACKS // This is necessary for the new callbacks API.
-                               // To use the legacy API, don't define this.
-#include "SDL3/SDL_init.h"
-#include "SDL3/SDL_log.h"
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3_ttf/SDL_ttf.h>
-
-#include <filesystem>
-
-#include "app/hotreload.h"
-#include "app/words_init.h"
-
-#include "app/app_context.h"
 
 constexpr uint32_t windowStartWidth = 1200 / 3;
 constexpr uint32_t windowStartHeight = 2670 / 3;
-
+extern thread_local ThreadContext *_tctx;
 #if defined(TRACY_ENABLE)
 static const char *EventTypeName(Uint32 type) {
 	switch (type) {
@@ -102,6 +101,8 @@ static const char *FrameName(Screen screen) {
 		return "Frame/WordEdit";
 	case Screen::Onboarding:
 		return "Frame/Onboarding";
+	case Screen::TTS_ASR:
+		return "Frame/TTS_ASR";
 	}
 	return "Frame/Unknown";
 }
@@ -207,31 +208,23 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 	m.lap().printus("create renderer");
 
-	// load the font
-#if __ANDROID__
-	std::filesystem::path basePath =
-		  ""; // on Android we do not want to use basepath. Instead, assets are
-	          // available at the root directory.
-#else
-	auto basePathPtr = SDL_GetBasePath();
-	if (not basePathPtr) {
-		return SDL_Fail();
-	}
-	const std::filesystem::path basePath = basePathPtr;
-#endif
+	// load the fonts
+	auto base_pathv = get_app_base_path();
+	auto base_path =
+		  std::filesystem::path({base_pathv.data, (size_t)base_pathv.size});
 
-	const auto ui_font_path = basePath / "Inter-VariableFont.ttf";
-	const auto arabic_ui_font_path = basePath / "ReadexPro-Regular.ttf";
-	const auto icons_font_path = basePath / "Font-Awesome-7-Free-Solid-900.otf";
+	const auto ui_font_path = base_path / "Inter-VariableFont.ttf";
+	const auto arabic_ui_font_path = base_path / "ReadexPro-Regular.ttf";
+	const auto icons_font_path =
+		  base_path / "Font-Awesome-7-Free-Solid-900.otf";
 	const auto monospace_regular_font_path =
-		  basePath / "JetBrainsMono-Regular.ttf";
-	const auto monospace_bold_font_path = basePath / "JetBrainsMono-Bold.ttf";
+		  base_path / "JetBrainsMono-Regular.ttf";
+	const auto monospace_bold_font_path = base_path / "JetBrainsMono-Bold.ttf";
 	TTF_Font *ui_font{};
 	TTF_Font *arabic_ui_font{};
 	TTF_Font *icons_font{};
 	TTF_Font *monospace_regular_font{};
 	TTF_Font *monospace_bold_font{};
-	SDL_Log("PATH %s", ui_font_path.string().c_str());
 	{
 		KLAPPT_PROFILE_SCOPE_N("LoadFonts");
 		ui_font = TTF_OpenFont(ui_font_path.string().c_str(), 48);
@@ -311,8 +304,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
 	};
-	ctx->downloads = DynArr<NetDownload>{
-		  .data = ctx->arena.pushN<NetDownload>(NetContext::MAX_REQUESTS),
+	ctx->downloads = DynArr<DownloadData>{
+		  .data = ctx->arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
 		  .size = 0,
 		  .reserved = NetContext::MAX_REQUESTS,
 	};
@@ -353,34 +346,38 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	// redraw only on events
 	SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "waitevent");
-	constexpr auto UI_UPDATE_EVENT_TIME = 1000;
+	constexpr auto UI_UPDATE_EVENT_TIME_MS = 1000;
 	// add timer event to allow animations
-	SDL_AddTimer(UI_UPDATE_EVENT_TIME, WakeUpTimer,
-	             nullptr); // Wake up 10 times a second
+	SDL_AddTimer(UI_UPDATE_EVENT_TIME_MS, WakeUpTimer, nullptr);
 	m.lap().printus("render loop setup");
 
-	FileLoader settingsfl{};
-	if (settingsfl.load("settings.dat"_v)) {
-		if (!Settings::decode(settingsfl.data, settingsfl.size,
+	FileLoader settings_file{};
+	auto g = ctx->arena_frame.guard();
+	if (settings_file.load(ctx->arena_frame, "settings.dat"_v)) {
+		if (!Settings::decode(settings_file.data, settings_file.size,
 		                      &ctx->settings)) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot decode settings.dat");
 			ctx->app_status.set_exit_with_error(
 				  "cannot decode settings file"_v);
+		} else {
+			SDL_Log("settings.dat found and loaded");
 		}
+	} else {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot load settings.dat");
 	}
 	m.lap().printus("load settings");
+
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
 		ui_settings_init(ctx);
 	}
 	m.lap().printus("ui settings init");
+
 	if (ctx->settings.onboarding_stage < 0) {
-		{
-			KLAPPT_PROFILE_SCOPE_N("init_words");
-			if (!init_words(*ctx, basePath)) {
-				return SDL_APP_FAILURE;
-			}
+		if (!init_runtime_data(*ctx)) {
+			return SDL_APP_FAILURE;
 		}
-		m.lap().printus("init words");
+		m.lap().printus("runtime data initialized");
 		ctx->go(Screen::Start);
 	}
 
@@ -392,10 +389,14 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 			SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
 			SDL_CreateThread(NeuroWorkerThread, "NeuroWorkerThread", ctx);
 			SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
-			init_asr(ctx);
-			init_tts(ctx);
 		};
 		Worker::job_push(ctx, Job{.id = -2, .func = init_workers_job});
+
+		thread_local ThreadContext tctx_var = {
+			  .app_ctx = ctx,
+		};
+		_tctx = &tctx_var;
+
 		// worker_job_push(ctx, {.type = Job::Type::INIT});
 		// SDL_Thread *net_worker =
 		// SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);

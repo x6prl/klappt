@@ -11,12 +11,13 @@
 struct NetPlatformContext;
 
 struct NetContext {
-	static constexpr Size MAX_ACTIVE_REQUESTS = 2;
+	static constexpr Size MAX_ACTIVE_REQUESTS = 4;
 	static constexpr Size MAX_REQUESTS = 256;
 
 	struct NetRequestSlot {
 		struct NetThreadInternalData {
 			uint64_t last_syncronization_ticks{0};
+			Size bytes_offset{0};
 			Size bytes_downloaded{0};
 			Size bytes_total{0};
 			FILE *file_handle{nullptr};

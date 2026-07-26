@@ -18,11 +18,10 @@
 #include "base/arena.h"
 #include "base/profiler.h"
 #include "platform/audio.h"
-#include "ui/components/net_download.h"
+#include "ui/components/download_data.h"
 #include "ui/components/text_input_state.h"
 #include "ui/components/word_edit_state.h"
 #include "ui/components/word_view_state.h"
-#include "ui/components/net_download.h"
 #include "ui/textcache.h"
 #include "ui/tslt.h"
 #include <clay/clay.h>
@@ -127,7 +126,7 @@ struct AppContext {
 	NetContext *net{nullptr};     // NOTE: created by NetThread
 	AudioContext *audio{nullptr}; //       created by AudioThread
 	NeuroContext *neuro{nullptr}; //       created by Neuro
-	DynArr<NetDownload> downloads{};
+	DynArr<DownloadData> downloads{};
 
 	// uint64_t last_ticks[10]{};
 	// uint64_t last_ticksef[10]{};
