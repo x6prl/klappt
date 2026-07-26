@@ -2,6 +2,7 @@
 
 #include "SDL3/SDL_audio.h"
 #include "base/arena.h"
+#include "base/atomic.h"
 #include <cstdint>
 
 struct SherpaOnnxGeneratedAudio;
@@ -25,7 +26,7 @@ struct AudioContext {
 
 	struct {
 		void *data{nullptr};
-		Size size_bytes{0};
+		AtomicInt size_bytes{0};
 		const Size capacity_bytes{0};
 	} rec_audio_buffer;
 

@@ -138,7 +138,7 @@ void screen_exercise_draw(AppContext *ctx) {
 				          FontID::MONOSPACE_REGULAR);
 			}
 			// TODO: :c
-			if (false) {
+			if (false && ctx->settings.is_using_asr) {
 				CLAY(CLAY_ID("ASRContainer"),
 				     {
 						   .layout =
@@ -201,8 +201,9 @@ void screen_exercise_draw(AppContext *ctx) {
 							break;
 						}
 					}
-					// NOTE: touching other thread data
-					if (ctx->audio->rec_audio_buffer.size_bytes > 0) {
+					auto buffer_size_bytes =
+						  Atomic::get(&ctx->audio->rec_audio_buffer.size_bytes);
+					if (buffer_size_bytes > 0) {
 						// we have audio → showing play button
 						auto play_btn = mobile_icon_button<false>(
 							  ctx, CLAY_ID("ASRPlayButton"), Icons::PLAY);

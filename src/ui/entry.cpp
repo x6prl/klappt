@@ -212,6 +212,11 @@ void bottom_bar_layout(AppContext *ctx) {
 		style.border_width = 0.f;
 
 		for (Size i = 0; i < menu.size(); ++i) {
+			// NOTE: skipping tts/asr screen
+			if (1 == i && !ctx->settings.is_using_tts &&
+			    !ctx->settings.is_using_asr) {
+				continue;
+			}
 			CLAY(CLAY_IDI("ButtonParent", i), buttonParent) {
 				auto b = mobile_button(ctx, CLAY_IDI("Button", i),
 				                       menu[i].first, style);

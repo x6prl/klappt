@@ -1,7 +1,6 @@
 #include "neuro.h"
 
 #include "SDL3/SDL_audio.h"
-#include "SDL3/SDL_filesystem.h"
 #include "SDL3/SDL_log.h"
 #include "app/app_context.h"
 #include "app/audio_context.h"
@@ -9,6 +8,7 @@
 
 #include "app/neuro_context.h"
 #include "base/measure.h"
+#include "base/profiler.h"
 #include "platform/fs.h"
 
 #include <cassert>
@@ -297,79 +297,62 @@ const std::vector<std::string> espeak_ng_data_files = {
 	  "espeak-ng-data/lang/zlw/sk",
 };
 
-/**
- * Create all parent directories in the given path.
- */
-static bool mkdir_all(std::string dir) {
-#ifdef __ANDROID__
-	Size pos = 0;
-	while (true) {
-		pos = dir.find('/', pos + 1);
-		if (pos == std::string::npos)
-			break;
-		std::filesystem::path p(dir.substr(0, pos));
-		std::error_code ec;
-		SDL_Log("CREATE :::::  %s", p.c_str());
-		std::filesystem::create_directories(p, ec);
-	}
-#endif
-	(void)dir; // avoid unused warning on non-Android for now
-	return true;
-}
-
-static std::filesystem::path sherpa_check_and_load_assets() {
+static std::filesystem::path sherpa_check_tts_assets() {
+	KLAPPT_PROFILE_SCOPE_N("sherpa_check_tts_assets");
 	auto _base_path = get_writable_path();
 	auto base_path = std::filesystem::path{
 		  std::string{_base_path.data, (size_t)_base_path.size}};
 	std::vector<std::string> files = {
-		  ASSET_NAME_PIPER_ONNX,      ASSET_NAME_PIPER_TOKENS,
-		  ASSET_NAME_WHISPER_TOKENS,  ASSET_NAME_WHISPER_DECODER,
+		  ASSET_NAME_WHISPER_TOKENS,
+		  ASSET_NAME_WHISPER_DECODER,
 		  ASSET_NAME_WHISPER_ENCODER, // ASSET_NAME_ESPEAK_NG_DATA
+
+	};
+	for (auto f : files) {
+		auto full_path = base_path / f;
+
+		if (std::filesystem::is_regular_file(full_path) &&
+		    std::filesystem::file_size(full_path) > 0) {
+			// SDL_Log("Found asset on disk: %s", full_path.c_str());
+		} else {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Asset not found on disk: %s",
+			             full_path.c_str());
+		}
+	}
+	return base_path;
+}
+static std::filesystem::path sherpa_check_asr_assets() {
+	KLAPPT_PROFILE_SCOPE_N("sherpa_check_asr_assets");
+	auto _base_path = get_writable_path();
+	auto base_path = std::filesystem::path{
+		  std::string{_base_path.data, (size_t)_base_path.size}};
+	std::vector<std::string> files = {
+		  ASSET_NAME_PIPER_ONNX,
+		  ASSET_NAME_PIPER_TOKENS,
 
 	};
 	files.insert(files.begin(), espeak_ng_data_files.begin(),
 	             espeak_ng_data_files.end());
 	for (auto f : files) {
-		auto full = base_path / f;
+		auto full_path = base_path / f;
 
-		// data = SDL_LoadFile(full.c_str(), &sz);
-		if (std::filesystem::is_regular_file(full) &&
-		    std::filesystem::file_size(full) > 0
-		    // ||
-		    // info.type == SDL_PATHTYPE_DIRECTORY)
-		) {
-			SDL_Log("Found asset on disk: %s", full.c_str());
+		if (std::filesystem::is_regular_file(full_path) &&
+		    std::filesystem::file_size(full_path) > 0) {
+			// SDL_Log("Found asset on disk: %s", full_path.c_str());
 		} else {
-			SDL_Log("Asset not found on disk: %s", full.c_str());
-			return {};
-			{
-				SDL_Log("GETTING %s to %s", f.c_str(), full.c_str());
-				// https://github.com/espeak-ng/espeak-ng/raw/refs/heads/master/espeak-ng-data/lang/art/ia
-				std::string host = "http://10.42.0.1:8000/";
-				// if (f.contains("espeak-ng")) host =
-				// "https://github.com/espeak-ng/espeak-ng/raw/refs/heads/master/";
-				auto url = host + f;
-				mkdir_all(full);
-				assert(false);
-				// bool ok = net::get_and_write(url, full);
-				// if (!ok) {
-				// 	SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-				// 	             "Error getting from %s to %s", url.c_str(),
-				// 	             full.c_str());
-				// }
-			}
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Asset not found on disk: %s",
+			             full_path.c_str());
 		}
 	}
-	// #endif
 	return base_path;
 }
 
 bool sherpa_init_tts(NeuroContext *nnctx, std::filesystem::path base_path) {
+	KLAPPT_PROFILE_SCOPE_N("sherpa_init_tts");
 	// initialize TTS (Piper is a VITS model)
 	SherpaOnnxOfflineTtsConfig tts_config;
 	memset(&tts_config, 0, sizeof(tts_config));
 
-	// std::filesystem::path base_path = check_and_load_assets();
 	auto path_po = (base_path / ASSET_NAME_PIPER_ONNX);
 	auto path_pt = (base_path / ASSET_NAME_PIPER_TOKENS);
 	auto path_es = (base_path / ASSET_NAME_ESPEAK_NG_DATA);
@@ -377,19 +360,13 @@ bool sherpa_init_tts(NeuroContext *nnctx, std::filesystem::path base_path) {
 	tts_config.model.vits.tokens = path_pt.c_str();
 	tts_config.model.vits.data_dir = path_es.c_str();
 
-	{
-		for (auto p :
-		     {tts_config.model.vits.model, tts_config.model.vits.tokens,
-		      tts_config.model.vits.data_dir}) {
-			SDL_Log("FILE: %s", p);
-
-			// std::ifstream f(p, std::ios::binary);
-			// char buf[64]{};
-			// f.read(buf, sizeof(buf) - 1);
-			//
-			// SDL_Log("HEAD: %s", buf);
-		}
-	}
+	// {
+	// 	for (auto p :
+	// 	     {tts_config.model.vits.model, tts_config.model.vits.tokens,
+	// 	      tts_config.model.vits.data_dir}) {
+	// 		SDL_Log("FILE: %s", p);
+	// 	}
+	// }
 	tts_config.model.vits.noise_scale = 0.667f;
 	tts_config.model.vits.noise_scale_w = 0.8f;
 	tts_config.model.vits.length_scale = 1.0f;
@@ -423,26 +400,20 @@ bool sherpa_init_asr(NeuroContext *nnctx, std::filesystem::path base_path) {
 	asr_config.model_config.whisper.encoder = path_we.c_str();
 	asr_config.model_config.whisper.decoder = path_wd.c_str();
 	asr_config.model_config.tokens = path_wt.c_str();
-	{
-		SDL_Log("<<<<<<<<<<>>>>>>>>>>>>>>");
-		for (auto p : {asr_config.model_config.whisper.encoder,
-		               asr_config.model_config.whisper.decoder,
-		               asr_config.model_config.tokens}) {
-			SDL_Log("FILE: %s", p);
-
-			// std::ifstream f(p, std::ios::binary);
-			// char buf[64]{};
-			// f.read(buf, sizeof(buf) - 1);
-			//
-			// SDL_Log("HEAD: %s", buf);
-		}
-	}
+	// {
+	// 	SDL_Log("<<<<<<<<<<>>>>>>>>>>>>>>");
+	// 	for (auto p : {asr_config.model_config.whisper.encoder,
+	// 	               asr_config.model_config.whisper.decoder,
+	// 	               asr_config.model_config.tokens}) {
+	// 		SDL_Log("FILE: %s", p);
+	// 	}
+	// }
 	asr_config.model_config.whisper.language = "de";
 	asr_config.model_config.whisper.task = "transcribe";
 	asr_config.model_config.whisper.tail_paddings = -1;
 
 	asr_config.model_config.num_threads = 2;
-	asr_config.model_config.provider = "cpu";
+	asr_config.model_config.provider = "cpu"; // TODO: play more
 
 	asr_config.decoding_method = "greedy_search";
 	asr_config.max_active_paths = 4;
@@ -460,21 +431,21 @@ bool sherpa_init_asr(NeuroContext *nnctx, std::filesystem::path base_path) {
 }
 
 // TODO: just wipe it...........
-void cleanup_sherpa_engines(NeuroContext *nnctx) {
-	auto &s = nnctx->sherpa_ctx;
-	if (s.offline_tts) {
-		SherpaOnnxDestroyOfflineTts(s.offline_tts);
-		s.offline_tts = nullptr;
-	}
-	if (s.offline_recognizer) {
-		SherpaOnnxDestroyOfflineRecognizer(s.offline_recognizer);
-		s.offline_recognizer = nullptr;
-	}
-	if (s.offline_stream) {
-		SherpaOnnxDestroyOfflineStream(s.offline_stream);
-		s.offline_stream = nullptr;
-	}
-}
+// void cleanup_sherpa_engines(NeuroContext *nnctx) {
+// 	auto &s = nnctx->sherpa_ctx;
+// 	if (s.offline_tts) {
+// 		SherpaOnnxDestroyOfflineTts(s.offline_tts);
+// 		s.offline_tts = nullptr;
+// 	}
+// 	if (s.offline_recognizer) {
+// 		SherpaOnnxDestroyOfflineRecognizer(s.offline_recognizer);
+// 		s.offline_recognizer = nullptr;
+// 	}
+// 	if (s.offline_stream) {
+// 		SherpaOnnxDestroyOfflineStream(s.offline_stream);
+// 		s.offline_stream = nullptr;
+// 	}
+// }
 } // namespace
 
 void init_tts(AppContext *ctx) {
@@ -484,7 +455,7 @@ void init_tts(AppContext *ctx) {
 			  (void)payload;
 
 			  // TODO: split checker
-			  std::filesystem::path base_path = sherpa_check_and_load_assets();
+			  std::filesystem::path base_path = sherpa_check_tts_assets();
 			  if (sherpa_init_tts(nnctx, base_path)) {
 				  MT::run([](AppContext *ctx) {
 					  ctx->audio_asr_tts_status.is_tts_initialized = true;
@@ -503,7 +474,7 @@ void init_asr(AppContext *ctx) {
 			  (void)payload;
 
 			  // TODO: split checker
-			  std::filesystem::path base_path = sherpa_check_and_load_assets();
+			  std::filesystem::path base_path = sherpa_check_asr_assets();
 			  if (base_path.empty()) {
 				  SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			                   "Failed initializing ASR: assets check and load "
@@ -531,9 +502,6 @@ void run_asr(AppContext *ctx) {
 
 			  Measure m{"JOB: ASR"};
 			  { // notify ui
-			    // SDL_SetAtomicInt(&ctx.is_asr_in_progress,
-			    // SoundContext::TRUE);
-			    // push_event(ASR_NOTIFY_UI_GENERAL_CODE, nullptr);
 				  MT::run([](AppContext *ctx) {
 					  ctx->audio_asr_tts_status.is_asr_in_progress = true;
 				  });
@@ -541,10 +509,6 @@ void run_asr(AppContext *ctx) {
 			  m.lap().printus("ui notified");
 			  char *spoken_text{nullptr};
 			  const SherpaOnnxOfflineRecognizerResult *sherpa_result{nullptr};
-			  // transcribe_audio(
-		      // 	  sound_ctx, (float *)ctx.audio.data,
-		      // 	  ctx.audio.size_bytes / sizeof(float),
-		      // 	  SoundContext::FREQUENCY);
 			  {
 				  auto &s = nnctx->sherpa_ctx;
 				  if (s.offline_recognizer) {
@@ -560,16 +524,16 @@ void run_asr(AppContext *ctx) {
 					      // *****************************************
 						  {
 							  AudioContext *actx = tctx()->app_ctx->audio;
-							  if (0 == actx->rec_audio_buffer.size_bytes) {
+							  auto size_bytes = Atomic::get(
+									&actx->rec_audio_buffer.size_bytes);
+							  if (0 == size_bytes) {
 								  SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 							                   "Cannot transcribe: rec buffer "
 							                   "is empty");
 								  return;
 							  }
 							  Measure awo{"ONNX: AcceptWaveformOffline"};
-							  auto samples_count =
-									actx->rec_audio_buffer.size_bytes /
-									sizeof(float);
+							  auto samples_count = size_bytes / sizeof(float);
 							  SherpaOnnxAcceptWaveformOffline(
 									s.offline_stream, AudioContext::FREQUENCY,
 									static_cast<float *>(

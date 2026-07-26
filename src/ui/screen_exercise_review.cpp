@@ -1,5 +1,5 @@
-#include "app/worker.h"
 #include "app/words_init.h"
+#include "app/worker.h"
 #include "base/str_view.h"
 #include "domain/word.h"
 #include "platform/neuro.h"
@@ -115,13 +115,15 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			          source_font_id, CLAY_TEXT_WRAP_NEWLINES);
 			draw_text(diff.source_sub1, theme()->onSurface, udpi(20),
 			          source_font_id);
-			// play on pressed
-			if (ctx->tslt.is_tap() && Clay_Hovered()) {
-				auto &diff = ctx->exercises.current_result_review();
-				auto tts_string =
-					  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
-				                    (*ctx->words)[diff.word_ref]);
-				run_tts(ctx, tts_string);
+			if (ctx->settings.is_using_tts) {
+				// play on pressed
+				if (ctx->tslt.is_tap() && Clay_Hovered()) {
+					auto &diff = ctx->exercises.current_result_review();
+					auto tts_string =
+						  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
+					                    (*ctx->words)[diff.word_ref]);
+					run_tts(ctx, tts_string);
+				}
 			}
 		}
 		CLAY(CLAY_ID("DiffBlock"),
@@ -268,14 +270,17 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				// auto play = mobile_icon_button<false>(ctx,
 				// CLAY_ID("PlayButton"), Icons::PLAY);
 
-				// play on pressed
-				if (ctx->tslt.is_tap() && Clay_Hovered()) {
-					auto &diff = ctx->exercises.current_result_review();
-					auto tts_string =
-						  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
-					                    (*ctx->words)[diff.word_ref]);
-					// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text = tts_string});
-					run_tts(ctx, tts_string);
+				if (ctx->settings.is_using_tts) {
+					// play on pressed
+					if (ctx->tslt.is_tap() && Clay_Hovered()) {
+						auto &diff = ctx->exercises.current_result_review();
+						auto tts_string = word_tts_full(
+							  ctx->arena_screen(), ctx->arena_frame,
+							  (*ctx->words)[diff.word_ref]);
+						// worker_job_push(ctx, {.type = Job::Type::TTS,
+						// .tts_text = tts_string});
+						run_tts(ctx, tts_string);
+					}
 				}
 
 				draw_wrapped_parts("Correct answer"_v, false);

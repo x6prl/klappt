@@ -86,16 +86,14 @@ template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
 			  }
 			  m.lap().printms();
 
+			  Size bytes_recorded = 0;
 			  { // copy audio to buffer
-				  actx->rec_audio_buffer.size_bytes = 0;
-				  Size bytes_recorded = 0;
+				  Atomic::set(&actx->rec_audio_buffer.size_bytes, 0);
 
-				  for (int i{0};; ++i) {
-					  SDL_Log("run_asr iter %d", i);
+				  for (;;) {
+					  // TODO: drain audio stream over buffer cap
 					  int available =
 							SDL_GetAudioStreamAvailable(actx->recording_stream);
-					  SDL_Log("run_asr avail: %d", available);
-					  SDL_Log("run_asr recorded: %d", bytes_recorded);
 					  if (bytes_recorded <
 				                actx->rec_audio_buffer.capacity_bytes &&
 				          available > 0) {
@@ -115,21 +113,31 @@ template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
 						  SDL_Log("run_asr read: %d", read);
 						  if (read > 0) {
 							  bytes_recorded += read;
+						  } else if (read < 0) {
+							  SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+						                   "SDL_GetAudioStreamData failed: %s",
+						                   SDL_GetError());
+							  break;
+						  } else if (read == 0) {
+							  break;
 						  }
 					  } else {
 						  break;
 					  }
 				  }
-				  actx->rec_audio_buffer.size_bytes = bytes_recorded;
+
+				  Atomic::set(&actx->rec_audio_buffer.size_bytes,
+			                  bytes_recorded);
+				  SDL_Log("run_asr buffer usage: %d of %d", bytes_recorded,
+			              actx->rec_audio_buffer.capacity_bytes);
 			  }
 			  constexpr auto _50ms = AudioContext::FREQUENCY * 4 / 20;
-			  if (actx->rec_audio_buffer.size_bytes < _50ms) {
+			  if (bytes_recorded < _50ms) {
 				  SDL_Log("< 50 ms");
 				  return;
 			  } else {
 				  SDL_Log("Recorded %f seconds",
-			              AudioContext::bytes_to_seconds(
-								actx->rec_audio_buffer.size_bytes));
+			              AudioContext::bytes_to_seconds(bytes_recorded));
 				  if constexpr (RUN_ASR_ON_FINISH) {
 					  run_asr(tctx()->app_ctx);
 				  }
@@ -137,80 +145,78 @@ template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
 			  m.lap().printms();
 		  }});
 }
+
+void job_rec_init(AudioContext *actx, AudioJob::Payload *payload) {
+	(void)payload;
+	Measure m{"JOB: REC INIT"};
+	SDL_AudioSpec spec;
+	spec.channels = 1;
+	spec.format = SDL_AUDIO_F32;
+	spec.freq = AudioContext::FREQUENCY;
+
+	int count{0};
+	SDL_AudioDeviceID *ids = SDL_GetAudioRecordingDevices(&count);
+	for (int i = 0; i < count; ++i) {
+		SDL_Log("Recording device: %s", SDL_GetAudioDeviceName(ids[i]));
+	}
+
+	SDL_Log("Opening rec device...");
+	SDL_Log("freq=%d format=%x channels=%d", spec.freq, spec.format,
+	        spec.channels);
+	SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(
+		  SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &spec, NULL, NULL);
+	SDL_Log("Got device: freq=%d format=%x channels=%d", spec.freq, spec.format,
+	        spec.channels);
+
+	if (!stream) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Couldn't create recording stream: %s", SDL_GetError());
+		return;
+	}
+	actx->recording_stream = stream;
+	{ // notify ui
+	  // SDL_SetAtomicInt(&ctx.is_initialized,
+	  // SoundContext::TRUE); worker_touch_ui();
+		MT::run([](AppContext *ctx) {
+			ctx->audio_asr_tts_status.is_recording_initialized = true;
+		});
+	}
+	m.lap().printms();
+}
+void job_rec_start(AudioContext *actx, AudioJob::Payload *payload) {
+	(void)payload;
+	Measure m{"JOB: REC START"};
+	// auto &ctx = *sound_ctx;
+	if (!actx->recording_stream) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Couldn't record audio: recording stream is not "
+		             "initialized");
+		return;
+	}
+	SDL_ResumeAudioStreamDevice(actx->recording_stream);
+	{ // notify ui that recording started
+	  // SDL_SetAtomicInt(&ctx.is_recording,
+	  // SoundContext::TRUE);
+	  // push_event(ASR_NOTIFY_UI_RECORDING_START_CODE,
+	  // nullptr);
+		MT::run([](AppContext *ctx) {
+			ctx->audio_asr_tts_status.is_recording = true;
+		});
+	}
+	m.lap().printms();
+}
+
 } // namespace
 
 void record_init(AppContext *ctx) {
 	// worker_job_push(ctx, {.type = Job::Type::ASR_RECORD_INIT});
-	Worker::audio_job_push(
-		  ctx,
-		  AudioJob{.func = [](AudioContext *actx, AudioJob::Payload *payload) {
-			  (void)payload;
-			  Measure m{"JOB: REC INIT"};
-			  SDL_AudioSpec spec;
-			  spec.channels = 1;
-			  spec.format = SDL_AUDIO_F32;
-			  spec.freq = AudioContext::FREQUENCY;
-
-			  int count{0};
-			  SDL_AudioDeviceID *ids = SDL_GetAudioRecordingDevices(&count);
-			  for (int i = 0; i < count; ++i) {
-				  SDL_Log("Recording device: %s",
-			              SDL_GetAudioDeviceName(ids[i]));
-			  }
-
-			  SDL_Log("Opening rec device...");
-			  SDL_Log("freq=%d format=%x channels=%d", spec.freq, spec.format,
-		              spec.channels);
-			  SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(
-					SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &spec, NULL, NULL);
-			  SDL_Log("Got device: freq=%d format=%x channels=%d", spec.freq,
-		              spec.format, spec.channels);
-
-			  if (!stream) {
-				  SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			                   "Couldn't create recording stream: %s",
-			                   SDL_GetError());
-				  return;
-			  }
-			  actx->recording_stream = stream;
-			  { // notify ui
-			    // SDL_SetAtomicInt(&ctx.is_initialized,
-			    // SoundContext::TRUE); worker_touch_ui();
-				  MT::run([](AppContext *ctx) {
-					  ctx->audio_asr_tts_status.is_recording_initialized = true;
-				  });
-			  }
-			  m.lap().printms();
-		  }});
+	Worker::audio_job_push(ctx, AudioJob{.func = job_rec_init});
 }
 
 void record_start(AppContext *ctx) {
 	ctx->asr_result = {};
 
-	Worker::audio_job_push(
-		  ctx,
-		  AudioJob{.func = [](AudioContext *actx, AudioJob::Payload *payload) {
-			  (void)payload;
-			  Measure m{"JOB: REC START"};
-			  // auto &ctx = *sound_ctx;
-			  if (!actx->recording_stream) {
-				  SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			                   "Couldn't record audio: recording stream is not "
-			                   "initialized");
-				  return;
-			  }
-			  SDL_ResumeAudioStreamDevice(actx->recording_stream);
-			  { // notify ui that recording started
-			    // SDL_SetAtomicInt(&ctx.is_recording,
-			    // SoundContext::TRUE);
-			    // push_event(ASR_NOTIFY_UI_RECORDING_START_CODE,
-			    // nullptr);
-				  MT::run([](AppContext *ctx) {
-					  ctx->audio_asr_tts_status.is_recording = true;
-				  });
-			  }
-			  m.lap().printms();
-		  }});
+	Worker::audio_job_push(ctx, AudioJob{.func = job_rec_start});
 	// worker_job_push(ctx, {.type = Job::Type::ASR_RECORD_START});
 }
 
@@ -232,6 +238,7 @@ void record_deinit(AppContext *ctx) {
 			  Measure m{"JOB: REC DEINIT"};
 			  if (actx->recording_stream) {
 				  SDL_DestroyAudioStream(actx->recording_stream);
+				  actx->recording_stream = nullptr;
 			  }
 			  { // notify UI
 				  MT::run([](AppContext *ctx) {
@@ -256,8 +263,9 @@ void record_play(AppContext *ctx) {
 			  spec.format = SDL_AUDIO_F32;
 			  spec.freq = AudioContext::FREQUENCY;
 
+			  auto size_bytes = Atomic::get(&actx->rec_audio_buffer.size_bytes);
 			  playback_play_(actx, spec, actx->rec_audio_buffer.data,
-		                     actx->rec_audio_buffer.size_bytes);
+		                     size_bytes);
 			  m.lap().printms();
 		  }});
 }

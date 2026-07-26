@@ -87,7 +87,6 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	bool is_queue_empty = false;
 	uint64_t queue_touched_last_time_ticks_ms = 0;
 
-	// NOTE: reading from other thread data
 	MT::run_with_payload(&netctx, [](AppContext *ctx, void *ptr) {
 		SDL_Log("  SETTING NET CTX ");
 		ctx->net = static_cast<NetContext *>(ptr);

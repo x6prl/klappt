@@ -205,7 +205,8 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 				strs.push(ctx->arena_frame, v.join(ctx->arena_frame, ' '));
 			}
 			draw_text(strs.join(ctx->arena_frame, "\n"_v), theme()->onSurface,
-			          udpi(16), FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+			          udpi(16), FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_WORDS,
+			          CLAY_TEXT_ALIGN_LEFT);
 		}
 	}
 }
@@ -428,16 +429,19 @@ void screen_word_view_draw(AppContext *ctx) {
 			if (edit.activated()) {
 				screen_word_edit_push(ctx);
 			}
-			auto play = mobile_icon_button<true>(ctx, CLAY_ID("PlayButton"),
-			                                     Icons::PLAY);
 
-			// play on pressed
-			if (play.activated()) {
-				auto tts_string = word_tts_full(
-					  ctx->arena_screen(), ctx->arena_frame, state.word_copy);
-				// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text =
-				// tts_string});
-				run_tts(ctx, tts_string);
+			if (ctx->settings.is_using_tts) {
+				auto play = mobile_icon_button<true>(ctx, CLAY_ID("PlayButton"),
+				                                     Icons::PLAY);
+				// play on pressed
+				if (play.activated()) {
+					auto tts_string =
+						  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
+					                    state.word_copy);
+					// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text =
+					// tts_string});
+					run_tts(ctx, tts_string);
+				}
 			}
 		}
 	}

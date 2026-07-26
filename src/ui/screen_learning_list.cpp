@@ -40,8 +40,8 @@ void screen_learning_list_draw(AppContext *ctx) {
 			fast_list(
 				  ctx, CLAY_ID("WordsList"), total_words,
 				  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
-					  for_each_matching_learning_word_range(ctx->arena_frame,
-							*ctx->words, query, window.first,
+					  for_each_matching_learning_word_range(
+							ctx->arena_frame, *ctx->words, query, window.first,
 							window.last - window.first,
 							[&](Size index, const Word &w) {
 								CLAY(CLAY_IDI("WordRow", index),
@@ -52,7 +52,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 														WORD_CARD_ROW_HEIGHT))}}}) {
 									Engine::State state{};
 									// auto [is_success, is_present] =
-										  ctx->states.get(w.word_id, state);
+									ctx->states.get(w.word_id, state);
 									// SDL_Log("%s %s",
 						            //                  is_success ? "SUC" :
 						            //                  "FAIL", is_present ?
@@ -76,14 +76,17 @@ void screen_learning_list_draw(AppContext *ctx) {
 									} else if (tap_state ==
 						                       TapSwipeLongTap::State::
 						                             LongTap) {
-										auto tts_string = word_tts_full(
-											  ctx->arena_screen(),
-											  ctx->arena_frame, w);
-										// worker_job_push(ctx, {.type =
-							            // Job::Type::TTS,
-							            //                         .tts_text =
-							            //                         tts_string});
-										run_tts(ctx, tts_string);
+										if (ctx->settings.is_using_tts) {
+											auto tts_string = word_tts_full(
+												  ctx->arena_screen(),
+												  ctx->arena_frame, w);
+											// worker_job_push(ctx, {.type =
+								            // Job::Type::TTS,
+								            //                         .tts_text
+								            //                         =
+								            //                         tts_string});
+											run_tts(ctx, tts_string);
+										}
 									}
 								}
 								return true;
