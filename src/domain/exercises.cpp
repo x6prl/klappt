@@ -17,8 +17,10 @@
 #include <ctime>
 
 namespace Engine {
+constexpr Size SUB_TRANSLATIONS_COUNT_MAX = 3;
 
 namespace {
+
 static uint64_t rng_state{50987654321};
 static Arr<StrView, 4> article_options_a = {"der"_v, "die"_v, "das"_v, "—"_v};
 static constexpr Arr<StrView, 8> plurals = {
@@ -26,18 +28,26 @@ static constexpr Arr<StrView, 8> plurals = {
 };
 
 // returns first translation
-StrView populate_prompt_sub_fields(Arena &a, StrView trs_raw, StrView grammar,
+StrView populate_prompt_sub_fields(Arena &a, StrView trs_raw,
                                    ExerciseState *exercise) {
 	auto [ret, rest] = trs_raw.split_by(';');
 	auto translations = translations_from_raw(a, rest);
 	if (!translations.is_empty()) {
 		StrBuilder strs{};
-		for (Size i{0}; i < translations.size; ++i) {
-			strs.push(a, translations[i].base);
+		Size n{0};
+		for(auto&tr: translations) {
+			if (n < SUB_TRANSLATIONS_COUNT_MAX) {
+				if(!tr.text.is_contains('#') && tr.text.utf8_length() < 25) {
+					strs.push(a,tr.text);
+					++n;
+				}
+			} else {
+				break;
+			}
 		}
 		exercise->source_sub0 = strs.join(a, '\n');
 	}
-	exercise->source_sub1 = grammar;
+	// exercise->source_sub1 = grammar;
 
 	return ret;
 }
@@ -170,7 +180,7 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 	auto left_part = merge(a, chunks, left_part_idxs);
 	auto gap = merge(a, chunks, gap_idxs);
 	auto right_part = merge(a, chunks, right_part_idxs);
-	const auto gap_len = utf8_codepoint_count(gap);
+	const auto gap_len = gap.utf8_length();
 
 	DynArr<ExerciseState::SubStage> substages{};
 
@@ -213,7 +223,7 @@ void append_common_stage_entire(Arena &a, const StrView correct_str,
                                 ExerciseState *exercise) {
 	constexpr Size OPTIONS_MAX = 5;
 
-	auto points_reward_for_that_stage = utf8_codepoint_count(correct_str);
+	auto points_reward_for_that_stage = correct_str.utf8_length();
 
 	Size opts_count =
 		  std::min(all_strs.size /* contains correct ref */, OPTIONS_MAX);
@@ -386,8 +396,8 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 	// 	}
 	// }
 
-	auto __r = parts.join(tmpa, '|');
-	SDL_Log("res: " StrView_Fmt, StrView_Arg(__r));
+	auto r = parts.join(tmpa, '|');
+	SDL_Log("res: " StrView_Fmt, StrView_Arg(r));
 	return parts.join(a);
 }
 
@@ -638,41 +648,28 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 
 		if (word.type == WordType::Noun) {
 			auto source = populate_prompt_sub_fields(a, word.translations_raw,
-			                                         word.grammar, &exercise);
+			                                         &exercise);
 			append_article_stage(a, word, source, &exercise);
 			append_common_stage(word.n.lemma, Tokenizer::Kind::Noun,
 			                    noun_lemma_list, source);
 			append_plural_stage(a, word, source, &exercise);
 		} else if (word.type == WordType::Verb) {
 			auto first_tr_raw = populate_prompt_sub_fields(
-				  a, word.translations_raw, word.grammar, &exercise);
+				  a, word.translations_raw, &exercise);
 			StrView source_inf;
 			StrView source_3p;
 			StrView source_past;
 			StrView source_aux;
 			StrView source_pp;
 			Translation first_translation{first_tr_raw};
-			source_inf = first_translation.base ? first_translation.base
+			source_inf = first_translation.text ? first_translation.text
 			                                    : first_tr_raw;
 			source_3p =
-				  first_translation.get_cue(Translation::Present3rdPerson);
-			if (!source_3p) {
-				source_3p =
-					  StrView::concat_with(a, source_inf, "(er/sie/es)"_v, ' ');
-			}
-			source_past = first_translation.get_cue(Translation::Past);
-			if (!source_past) {
-				source_past =
-					  StrView::concat_with(a, source_inf, "(Prät.)"_v, ' ');
-			}
-			source_aux = first_translation.get_cue(Translation::Aux);
-			if (!source_aux) {
-				source_aux = "hat oder sein?"_v;
-			}
-			source_pp = first_translation.get_cue(Translation::ParticipleII);
-			if (!source_pp) {
-				source_pp = StrView::concat_with(a, source_inf, "(PII)"_v, ' ');
-			}
+				  StrView::concat_with(a, source_inf, "(er/sie/es)"_v, ' ');
+			source_past = StrView::concat_with(a, source_inf, "(Prät.)"_v, ' ');
+			source_aux = "haben oder sein?"_v;
+			source_pp = StrView::concat_with(a, source_inf, "(PII)"_v, ' ');
+
 			{ // fill stages
 				append_common_stage(word.v.infinitive, Tokenizer::Kind::Verb,
 				                    verb_infinitive_list, source_inf);
@@ -692,23 +689,17 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 			}
 		} else if (word.type == WordType::Adj) {
 			auto first_tr_raw = populate_prompt_sub_fields(
-				  a, word.translations_raw, word.grammar, &exercise);
+				  a, word.translations_raw, &exercise);
 			StrView source_lemma;
 			StrView source_cmp;
 			StrView source_sup;
 			Translation first_translation{first_tr_raw};
-			source_lemma = first_translation.base ? first_translation.base
+			source_lemma = first_translation.text ? first_translation.text
 			                                      : first_tr_raw;
-			source_cmp = first_translation.get_cue(Translation::Comparative);
-			if (!source_cmp) {
-				source_cmp =
-					  StrView::concat_with(a, source_lemma, "(comp.)"_v, ' ');
-			}
-			source_sup = first_translation.get_cue(Translation::Superlative);
-			if (!source_sup) {
-				source_sup =
-					  StrView::concat_with(a, source_lemma, "(sup.)"_v, ' ');
-			}
+			source_cmp =
+				  StrView::concat_with(a, source_lemma, "(comp.)"_v, ' ');
+			source_sup = StrView::concat_with(a, source_lemma, "(sup.)"_v, ' ');
+
 			{ // fill stages
 				append_common_stage(word.a.lemma, Tokenizer::Kind::Adjective,
 				                    adjective_lemma_list, source_lemma);
@@ -725,7 +716,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 			}
 		} else if (word.type == WordType::Phrase) {
 			auto source = populate_prompt_sub_fields(a, word.translations_raw,
-			                                         word.grammar, &exercise);
+			                                         &exercise);
 			auto text = word.p.text;
 			for (auto w = text.mut_split(); w; w = text.mut_split()) {
 				SDL_Log("stage " StrView_Fmt, StrView_Arg(w));
@@ -850,7 +841,7 @@ void Exercises::build_result_reviews(Arena &tmpa, bool is_only_failed) {
 		              .word_ref = exercise.word_ref,
 		              .source = exercise.stages.first().source, // NOTE: ??? ok?
 		              .source_sub0 = exercise.source_sub0,
-		              .source_sub1 = exercise.source_sub1,
+		              // .source_sub1 = exercise.source_sub1,
 		              .expected_parts = expected_parts,
 		              .actual_parts = actual_parts,
 		              .is_right_actual_part = is_right_actual_part});

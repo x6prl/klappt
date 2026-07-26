@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "SDL3/SDL_log.h"
 #include "app/app_status.h"
 #include "base/measure.h"
 #include "base/stats.h"
@@ -37,9 +38,9 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 		if (!line) {
 			break;
 		}
-		// SDL_Log("\n=> %d parsing \n|" StrView_Fmt "|", linecount,
-		//         StrView_Arg(line));
 		if (line.size < 2) {
+			// SDL_Log("\n=> %d parsing \n|" StrView_Fmt "|", linecount,
+			//         StrView_Arg(line));
 			error("line is too small");
 			return false;
 		}
@@ -52,15 +53,21 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 			if (line.size > 5 && ' ' == line[3] &&
 			    str_to_gender(line.data) != Gender::unknown &&
 			    line.slice(5).is_contains('-')) {
-				word.type = WordType::Noun;
+				const char *dash = line.slice(5).find('-');
+				char prev = dash[-1];
+				if (' ' == prev || '"' == prev) {
+					word.type = WordType::Noun;
+				} else {
+					word.type = WordType::Phrase;
+				}
 				break;
 			}
 			if (tail == "(sg.)" || tail == "(pl.)") {
 				word.type = WordType::Noun;
 				break;
 			}
-			SDL_Log("Suggesting \"" StrView_Fmt "\" is a phrase.",
-			        StrView_Arg(line));
+			// SDL_Log("Suggesting \"" StrView_Fmt "\" is a phrase.",
+			//         StrView_Arg(line));
 			word.type = WordType::Phrase;
 			break;
 		case 'v':
@@ -81,7 +88,8 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 			word.type = WordType::Phrase;
 		}
 		switch (word.type) {
-		case WordType::Noun:
+		case WordType::Noun: {
+			auto c = line;
 			word.n.gender = str_to_gender(line.mut_split().data);
 			if (Gender::unknown == word.n.gender) {
 				error("cannot get gender of that line");
@@ -96,49 +104,64 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 			if (line) {
 				word.n.plural_suffix = line.copy(a);
 			} else {
+				SDL_Log("E \"" StrView_Fmt "\"", StrView_Arg(c));
 				error("plural suffix expected");
 				return false;
 			}
-			break;
+		} break;
 		case WordType::Verb:
 			// SDL_Log("Verb");
 			line = line.slice(2);
-			{
-				auto present = line.mut_split_by('/').trim();
-				auto exception = present;
-				word.v.infinitive = exception.mut_split_by('-').trim().copy(a);
-				if (exception) {
-					word.v.third_person = exception.trim().copy(a);
+			{ // inf and 3rd person exception
+				auto present_tense = line.mut_split_by('/');
+				auto [inf, exception] = present_tense.split_by('-');
+				constexpr char STRESS_CHAR = '\'';
+				if (STRESS_CHAR == inf.mut_trimr().first()) {
+					inf.mut_chopl();
+					word.v.is_separable_prefix = true;
+					if (inf.is_contains('\'')) {
+						SDL_Log("___ " StrView_Fmt,
+						        StrView_Arg(word.v.infinitive));
+					}
 				}
+				word.v.infinitive = inf.copy(a);
+				word.v.third_person = exception.triml().copy(a);
 			}
 			if (line.mut_trim()) {
 				auto pt = line.mut_split_by('/').trim();
 				if (pt && '-' != pt.first()) {
 					word.v.praeteritum = pt.copy(a);
 				}
+				word.v.auxv_and_past_participle = line.mut_trim().copy(a);
 			} else {
 				break;
 			}
-			if (line.mut_trim()) {
-				word.v.auxv_and_past_participle = line.copy(a);
-			}
 			break;
-		case WordType::Adj:
+		case WordType::Adj: {
 			// SDL_Log("Adj");
 			line = line.slice(2);
-			word.a.lemma = line.mut_split().copy(a);
-			if (!line) {
-				break;
+			auto [lemma, tail] = line.split();
+
+			bool is_valid_adj = (tail && lemma.first() == tail.first()) ||
+			                    tail.is_contains_substr("am "_v) ||
+			                    tail == "(indecl.)"_v;
+
+			if (!tail || is_valid_adj) {
+				word.a.lemma = lemma.copy(a);
+				if (!tail)
+					break;
+
+				word.a.is_indeclinable = (tail == "(indecl.)");
+				if (word.a.is_indeclinable)
+					break;
+
+				word.a.comparative = tail.mut_split().copy(a);
+				word.a.superlative = tail.copy(a);
+			} else {
+				word.type = WordType::Phrase;
+				word.p.text = line.copy(a);
 			}
-			word.a.is_indeclinable = (line == "(indecl.)");
-			if (word.a.is_indeclinable) {
-				break;
-			}
-			word.a.comparative = line.mut_split().copy(a);
-			if (line) {
-				word.a.superlative = line.copy(a);
-			}
-			break;
+		} break;
 		case WordType::Phrase:
 			// SDL_Log("Phrase");
 			word.type = WordType::Phrase;
@@ -150,36 +173,28 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 		}
 
 		line = next_line();
-		if (line) {
-			word.translations_raw = line.copy(a);
-		} else {
-			error("translations expected");
+		if (!line) {
+			error("expected translations line or json after lemma");
 			return false;
 		}
-		line = next_line();
 		auto is_json = [](StrView str) {
 			return '{' == str.first() && '}' == str.last();
 		};
-		auto is_grammar = [](StrView str) {
-			return '[' == str.first() && ']' == str.last();
-		};
-		if (line && !is_grammar(line) && !is_json(line)) {
-			if (is_grammar(line)) {
-			} else {
-			}
-			if (line) {
-				error("extra entry line is not allowed; store translatable "
-				      "examples as separate phrase entries");
-				return false;
-			}
-		}
-		if (is_grammar(line)) {
-			word.grammar = line.copy(a);
-			line = next_line();
-		}
 		if (is_json(line)) {
 			word.json_payload = line.copy(a);
 			line = next_line();
+		} else {
+			word.translations_raw = line.copy(a);
+			line = next_line();
+			if (line && is_json(line)) {
+				word.json_payload = line.copy(a);
+				line = next_line();
+			}
+		}
+
+		if (line) {
+			error("extra entry line");
+			return false;
 		}
 		// print_word(word);
 	}

@@ -9,13 +9,13 @@ static void test_codec() {
 		  .third_person = "3p"_v,
 		  .praeteritum = "präterit"_v,
 		  .auxv_and_past_participle = "aux"_v,
+		  .is_separable_prefix = true,
 	};
 	Word w0{
 		  .word_id = {1},
 		  .type = WordType::Verb,
 		  .in_learning_list = 1,
 		  .v = v,
-		  .grammar = {},
 		  .json_payload = {},
 	};
 	auto encoded = WordsCodec::encode_word(a, w0);

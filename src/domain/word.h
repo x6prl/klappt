@@ -5,11 +5,10 @@
 #include <cstring>
 
 #include "base/arena.h"
-#include "base/arr.h"
 #include "base/dyn_arr.h"
-#include "base/pair.h"
-#include "base/str_view.h"
+#include "base/profiler.h"
 #include "base/str_builder.h"
+#include "base/str_view.h"
 #include "domain/grammar.h"
 #include "word_id.h"
 
@@ -78,99 +77,20 @@ inline StrView gender_to_article_nominative_strview(Gender g) {
 }
 
 struct Translation {
-	enum Cue {
-		Present3rdPerson,
-		Past,
-		ParticipleII,
-		Aux,
-		Comparative,
-		Superlative
-	};
 
-	static constexpr Size MAX_CUES = 4;
-
-	StrView base{};
-	Arr<Pair<Cue, StrView>, MAX_CUES> cues{};
-	Size cue_count{}; // TODO: drop it?
-
-	static bool cue_from_tag(StrView tag, Cue &cue) {
-		tag.mut_trim();
-		if (tag == "prs"_v) {
-			cue = Present3rdPerson;
-			return true;
-		}
-		if (tag == "pst"_v) {
-			cue = Past;
-			return true;
-		}
-		if (tag == "par"_v) {
-			cue = ParticipleII;
-			return true;
-		}
-		if (tag == "aux"_v) {
-			cue = Aux;
-			return true;
-		}
-		if (tag == "cmp"_v) {
-			cue = Comparative;
-			return true;
-		}
-		if (tag == "sup"_v) {
-			cue = Superlative;
-			return true;
-		}
-		return false;
-	}
+	StrView grammar{};
+	StrView text{};
 
 	Translation() = default;
 	explicit Translation(StrView raw) {
-		raw.mut_trim();
-		if (!raw) {
-			return;
+		// NOTE: grammar should not contain spaces
+		if ('[' == raw.first()) {
+			auto [g, t] = raw.split();
+			grammar = g;
+			text = t;
+		} else {
+			text = raw;
 		}
-		base = raw;
-		if (raw.last() != '}') {
-			return;
-		}
-
-		Size brace_index = -1;
-		for (Size i = 0; i < raw.size; ++i) {
-			if (raw[i] == '{') {
-				brace_index = i;
-				break;
-			}
-		}
-		if (brace_index < 0) {
-			return;
-		}
-
-		base = raw.slice(0, brace_index);
-		base.mut_trimr();
-		auto cue_items = raw.slice(brace_index + 1, raw.size - 1);
-		cue_items.mut_trim();
-		for (; cue_items && cue_count < MAX_CUES;) {
-			auto cue_item = cue_items.mut_split_by(',').trim();
-			if (!cue_item) {
-				continue;
-			}
-			auto tag = cue_item.mut_split_by('=').trim();
-			auto value = cue_item.trim();
-			Cue cue{};
-			if (!value || !cue_from_tag(tag, cue)) {
-				continue;
-			}
-			cues[cue_count++] = {cue, value};
-		}
-	}
-
-	StrView get_cue(Cue cue) const {
-		for (Size i = 0; i < cue_count; ++i) {
-			const auto &c = cues[i];
-			if (c.first == cue) {
-				return c.second;
-			}
-		}
-		return {};
 	}
 };
 
@@ -217,43 +137,39 @@ inline bool word_matches_contains_ci(StrView haystack, StrView needle) {
 	return false;
 }
 
-inline bool word_matches_translation_query(StrView translations_raw,
-                                           StrView query) {
+inline bool word_matches_translation_query_cs(StrView translations_raw,
+                                              StrView query) {
 	for (; translations_raw;) {
 		auto item = translations_raw.mut_split_by(';').trim();
 		if (!item) {
 			continue;
 		}
 		Translation translation{item};
-		if (word_matches_contains_ci(translation.base, query)) {
+		if (translation.text.is_contains_substr(query)) {
 			return true;
-		}
-		for (Size i = 0; i < translation.cue_count; ++i) {
-			if (word_matches_contains_ci(translation.cues[i].second, query)) {
-				return true;
-			}
 		}
 	}
 	return false;
 }
 
 struct Noun {
-	StrView lemma;
-	StrView plural_suffix;
-	Gender gender;
+	StrView lemma{};
+	StrView plural_suffix{};
+	Gender gender{};
 };
 
 struct Verb {
-	StrView infinitive;
-	StrView third_person;
-	StrView praeteritum;
-	StrView auxv_and_past_participle;
+	StrView infinitive{};
+	StrView third_person{};
+	StrView praeteritum{};
+	StrView auxv_and_past_participle{};
+	bool is_separable_prefix{false};
 };
 
 struct Adj {
-	StrView lemma;
-	StrView comparative;
-	StrView superlative;
+	StrView lemma{};
+	StrView comparative{};
+	StrView superlative{};
 	bool is_indeclinable{false};
 };
 
@@ -272,15 +188,14 @@ struct Word {
 	int8_t was_learned{0};
 	int8_t padding[2]{0};
 	union {
-		Noun n;
 		Verb v;
+		Noun n;
 		Adj a;
 		Phrase p;
 		uint8_t _d[sizeof(Verb)]{0};
 	};
 	StrView translations_raw{};
-	StrView grammar{};
-	StrView json_payload{}; // TODO: update decoder
+	StrView json_payload{};
 };
 
 inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
@@ -463,30 +378,33 @@ inline StrView word_most_meaningfull_lemma(const Word &word) {
 	}
 }
 
-inline bool word_store_matches_query(const Word &word, StrView query) {
-	query.mut_trim();
+inline bool word_store_matches_query(Arena &a, const Word &word,
+                                        StrView query) {
+	query = query.mut_trim().utf8_to_lowercase(a);
 	if (!query) {
 		return true;
 	}
-	if (word_matches_translation_query(word.translations_raw, query) ||
-	    word_matches_contains_ci(word.grammar, query)) {
+	if (word_matches_translation_query_cs(word.translations_raw, query)) {
 		return true;
 	}
+	auto word_matches_contains_cs = [&a](StrView h, StrView n) {
+		return h.utf8_to_lowercase(a).is_contains_substr(n);
+	};
 	switch (word.type) {
 	case WordType::Noun:
-		return word_matches_contains_ci(word.n.lemma, query) ||
-		       word_matches_contains_ci(word.n.plural_suffix, query);
+		return word_matches_contains_cs(word.n.lemma, query) ||
+		       word_matches_contains_cs(word.n.plural_suffix, query);
 	case WordType::Verb:
-		return word_matches_contains_ci(word.v.infinitive, query) ||
-		       word_matches_contains_ci(word.v.third_person, query) ||
-		       word_matches_contains_ci(word.v.praeteritum, query) ||
-		       word_matches_contains_ci(word.v.auxv_and_past_participle, query);
+		return word_matches_contains_cs(word.v.infinitive, query) ||
+		       word_matches_contains_cs(word.v.third_person, query) ||
+		       word_matches_contains_cs(word.v.praeteritum, query) ||
+		       word_matches_contains_cs(word.v.auxv_and_past_participle, query);
 	case WordType::Adj:
-		return word_matches_contains_ci(word.a.lemma, query) ||
-		       word_matches_contains_ci(word.a.comparative, query) ||
-		       word_matches_contains_ci(word.a.superlative, query);
+		return word_matches_contains_cs(word.a.lemma, query) ||
+		       word_matches_contains_cs(word.a.comparative, query) ||
+		       word_matches_contains_cs(word.a.superlative, query);
 	case WordType::Phrase:
-		return word_matches_contains_ci(word.p.text, query);
+		return word_matches_contains_cs(word.p.text, query);
 	case WordType::Nil:
 		return false;
 	}
@@ -496,9 +414,8 @@ inline bool word_store_matches_query(const Word &word, StrView query) {
 // Lexeme identity is the learner-relevant German side only.
 // The active store is scoped to a single target language, so translations may
 // vary within that language and can still be merged for duplicate lexemes.
-inline bool same_lexeme(const Word &lhs, const Word &rhs) {
-	if (lhs.type != rhs.type || lhs.grammar != rhs.grammar ||
-	    lhs.json_payload != rhs.json_payload) {
+inline bool word_has_same_lexeme(const Word &lhs, const Word &rhs) {
+	if (lhs.type != rhs.type) {
 		return false;
 	}
 
@@ -512,7 +429,9 @@ inline bool same_lexeme(const Word &lhs, const Word &rhs) {
 		return lhs.v.infinitive == rhs.v.infinitive &&
 		       lhs.v.third_person == rhs.v.third_person &&
 		       lhs.v.praeteritum == rhs.v.praeteritum &&
-		       lhs.v.auxv_and_past_participle == rhs.v.auxv_and_past_participle;
+		       lhs.v.auxv_and_past_participle ==
+		             rhs.v.auxv_and_past_participle &&
+		       lhs.v.is_separable_prefix == rhs.v.is_separable_prefix;
 	case WordType::Adj:
 		return lhs.a.lemma == rhs.a.lemma &&
 		       lhs.a.comparative == rhs.a.comparative &&
@@ -527,23 +446,23 @@ inline bool same_lexeme(const Word &lhs, const Word &rhs) {
 
 // Full payload equality keeps the stricter comparison for callers which care
 // about annotations too.
-inline bool same_payload(const Word &lhs, const Word &rhs) {
-	return same_lexeme(lhs, rhs) &&
-	       lhs.translations_raw == rhs.translations_raw;
+inline bool word_has_same_payload(const Word &lhs, const Word &rhs) {
+	return word_has_same_lexeme(lhs, rhs) &&
+	       lhs.translations_raw == rhs.translations_raw &&
+	       lhs.json_payload == rhs.json_payload;
 }
 
 inline bool words_equal_ignoring_id(const Word &lhs, const Word &rhs) {
-	return same_payload(lhs, rhs);
+	return word_has_same_payload(lhs, rhs);
 }
 
-inline Word clone_word(Arena &a, const Word &src) {
+inline Word word_clone(Arena &a, const Word &src) {
 	Word dst{};
 	dst.word_id = src.word_id;
 	dst.type = src.type;
 	dst.in_learning_list = src.in_learning_list;
 	dst.was_learned = src.was_learned;
 	dst.translations_raw = src.translations_raw.copy(a);
-	dst.grammar = src.grammar.copy(a);
 	dst.json_payload = src.json_payload.copy(a);
 
 	switch (src.type) {
@@ -559,6 +478,7 @@ inline Word clone_word(Arena &a, const Word &src) {
 		dst.v.third_person = src.v.third_person.copy(a);
 		dst.v.praeteritum = src.v.praeteritum.copy(a);
 		dst.v.auxv_and_past_participle = src.v.auxv_and_past_participle.copy(a);
+		dst.v.is_separable_prefix = src.v.is_separable_prefix;
 		break;
 	case WordType::Adj:
 		dst.a.lemma = src.a.lemma.copy(a);

@@ -5,11 +5,10 @@
 #include "domain/word.h"
 #include "xapian.h"
 
+#include <cstddef>
 #include <filesystem>
-#include <string>
 
 #include "base/profiler.h"
-#include "platform/files.h"
 #ifdef __EMSCRIPTEN__
 #include "platform/web_persist.h"
 #endif
@@ -25,43 +24,36 @@ constexpr char TYPE_PREFIX[] = "XY";
 constexpr char LEMMA_PREFIX[] = "XL";
 constexpr char FORM_PREFIX[] = "XF";
 constexpr char TRANSLATION_PREFIX[] = "XT";
-constexpr char GRAMMAR_PREFIX[] = "XG";
 
-std::string default_word_store_path(StrView leaf = "words.xapian"_v) {
-	return FileLoader::path_for(leaf);
+constexpr int WEIGHT_HIGH = 5;
+constexpr int WEIGHT_NORM = 1;
+constexpr int WEIGHT_LOW = 1;
+
+std::string_view word_id_term(Arena &a, WordId word_id) {
+	auto str =
+		  StrView::concat(a, "Q"_v, StrView::from_number_hex(a, word_id.value));
+	return {str.data, (size_t)str.size};
 }
 
-std::string hex_u64(uint64_t value) {
-	static constexpr char HEX[] = "0123456789abcdef";
-	std::string out(16, '0');
-	for (int i = 15; i >= 0; --i) {
-		out[static_cast<size_t>(i)] = HEX[value & 0x0f];
-		value >>= 4;
-	}
-	return out;
+std::string_view content_hash_term(Arena &a, uint64_t hash) {
+	auto str = StrView::concat(a, "K"_v, StrView::from_number_hex(a, hash));
+	return {str.data, (size_t)str.size};
 }
 
-std::string word_id_term(WordId word_id) {
-	return "Q" + hex_u64(word_id.value);
-}
-
-std::string content_hash_term(uint64_t hash) { return "K" + hex_u64(hash); }
-
-std::string encode_be_u64(uint64_t value) {
-	std::string out(8, '\0');
+std::string_view encode_be_u64(Arena &a, uint64_t value) {
+	auto data = a.pushN<char>(16);
 	for (int i = 7; i >= 0; --i) {
-		out[static_cast<size_t>(7 - i)] =
-			  static_cast<char>((value >> (i * 8)) & 0xffu);
+		data[7 - i] = static_cast<char>((value >> (i * 8)) & 0xffu);
 	}
-	return out;
+	return {data, 8};
 }
 
-bool decode_be_u64(const std::string &data, uint64_t &value) {
+bool decode_be_u64(const std::string_view &data, uint64_t &value) {
 	if (data.size() != 8) {
 		return false;
 	}
 	value = 0;
-	for (unsigned char ch : data) {
+	for (uint8_t ch : data) {
 		value = (value << 8) | static_cast<uint64_t>(ch);
 	}
 	return true;
@@ -112,12 +104,12 @@ StrView merge_unique_items(Arena &a, StrView base, StrView extra,
 	return changed ? merged : base;
 }
 
-uint64_t content_hash(Arena &scratch, const Word &word) {
+uint64_t word_hash(Arena &scratch, const Word &word) {
 	auto guard = scratch.guard();
 	auto field_size = [](StrView v) {
 		return static_cast<Size>(sizeof(v.size) + (v ? v.size : 0));
 	};
-	Size size = 2 + field_size(word.grammar);
+	Size size = 2 + field_size(word.json_payload);
 	switch (word.type) {
 	case WordType::Nil:
 		break;
@@ -151,7 +143,7 @@ uint64_t content_hash(Arena &scratch, const Word &word) {
 	};
 	put_char(static_cast<char>(word.type));
 	put_char('\0');
-	feed(word.grammar);
+	feed(word.json_payload);
 	switch (word.type) {
 	case WordType::Nil:
 		break;
@@ -166,6 +158,8 @@ uint64_t content_hash(Arena &scratch, const Word &word) {
 		feed(word.v.third_person);
 		feed(word.v.praeteritum);
 		feed(word.v.auxv_and_past_participle);
+		put_char(static_cast<char>(word.v.is_separable_prefix));
+		put_char('\0');
 		break;
 	case WordType::Adj:
 		feed(word.a.lemma);
@@ -181,17 +175,17 @@ uint64_t content_hash(Arena &scratch, const Word &word) {
 	return hash_str_view({data, size});
 }
 
-void index_field(Xapian::TermGenerator &generator, StrView text,
+void index_field(Xapian::TermGenerator &generator, StrView text, int weight,
                  std::string_view prefix = {}) {
 	if (!text) {
 		return;
 	}
 	generator.index_text_without_positions(
-		  std::string_view{text.data, static_cast<size_t>(text.size)});
+		  std::string_view{text.data, static_cast<size_t>(text.size)}, weight);
 	if (!prefix.empty()) {
 		generator.index_text_without_positions(
-			  std::string_view{text.data, static_cast<size_t>(text.size)}, 1,
-			  prefix);
+			  std::string_view{text.data, static_cast<size_t>(text.size)},
+			  weight, prefix);
 	}
 }
 
@@ -199,11 +193,9 @@ void index_translation_fields(Arena &scratch, Xapian::TermGenerator &generator,
                               StrView translations_raw) {
 	auto translations = translations_from_raw(scratch, translations_raw);
 	for (const auto &translation : translations) {
-		index_field(generator, translation.base, TRANSLATION_PREFIX);
-		for (Size i = 0; i < translation.cue_count; ++i) {
-			index_field(generator, translation.cues[i].second,
-			            TRANSLATION_PREFIX);
-		}
+		// NOTE: we do not index grammar
+		index_field(generator, translation.text, WEIGHT_HIGH,
+		            TRANSLATION_PREFIX);
 	}
 }
 
@@ -217,30 +209,29 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 		break;
 	case WordType::Noun:
 		doc.add_boolean_term("XYnoun");
-		index_field(generator, word.n.lemma, LEMMA_PREFIX);
-		index_field(generator, word.n.plural_suffix, FORM_PREFIX);
+		index_field(generator, word.n.lemma, WEIGHT_HIGH, LEMMA_PREFIX);
+		index_field(generator, word.n.plural_suffix, WEIGHT_NORM, FORM_PREFIX);
 		break;
 	case WordType::Verb:
 		doc.add_boolean_term("XYverb");
-		index_field(generator, word.v.infinitive, LEMMA_PREFIX);
-		index_field(generator, word.v.third_person, FORM_PREFIX);
-		index_field(generator, word.v.praeteritum, FORM_PREFIX);
-		index_field(generator, word.v.auxv_and_past_participle, FORM_PREFIX);
+		index_field(generator, word.v.infinitive, WEIGHT_HIGH, LEMMA_PREFIX);
+		index_field(generator, word.v.third_person, WEIGHT_NORM, FORM_PREFIX);
+		index_field(generator, word.v.praeteritum, WEIGHT_NORM, FORM_PREFIX);
+		index_field(generator, word.v.auxv_and_past_participle, WEIGHT_NORM,
+		            FORM_PREFIX);
 		break;
 	case WordType::Adj:
 		doc.add_boolean_term("XYadj");
-		index_field(generator, word.a.lemma, LEMMA_PREFIX);
-		index_field(generator, word.a.comparative, FORM_PREFIX);
-		index_field(generator, word.a.superlative, FORM_PREFIX);
+		index_field(generator, word.a.lemma, WEIGHT_HIGH, LEMMA_PREFIX);
+		index_field(generator, word.a.comparative, WEIGHT_NORM, FORM_PREFIX);
+		index_field(generator, word.a.superlative, WEIGHT_NORM, FORM_PREFIX);
 		break;
 	case WordType::Phrase:
 		doc.add_boolean_term("XYphrase");
-		index_field(generator, word.p.text, LEMMA_PREFIX);
+		index_field(generator, word.p.text, WEIGHT_LOW, LEMMA_PREFIX);
 		break;
 	}
-
 	index_translation_fields(scratch, generator, word.translations_raw);
-	index_field(generator, word.grammar, GRAMMAR_PREFIX);
 }
 
 void configure_query_parser(Xapian::QueryParser &parser,
@@ -250,7 +241,6 @@ void configure_query_parser(Xapian::QueryParser &parser,
 	parser.add_prefix("lemma", LEMMA_PREFIX);
 	parser.add_prefix("form", FORM_PREFIX);
 	parser.add_prefix("tr", TRANSLATION_PREFIX);
-	parser.add_prefix("grammar", GRAMMAR_PREFIX);
 	parser.add_boolean_prefix("type", TYPE_PREFIX);
 }
 
@@ -263,10 +253,12 @@ bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc) {
 	}
 
 	doc = Xapian::Document{};
-	doc.set_data(std::string(payload.data, static_cast<size_t>(payload.size)));
-	doc.add_boolean_term(word_id_term(word.word_id));
-	doc.add_boolean_term(content_hash_term(content_hash(scratch, word)));
-	doc.add_value(WORD_ID_VALUE_SLOT, encode_be_u64(word.word_id.value));
+	doc.set_data(
+		  std::string_view{payload.data, static_cast<size_t>(payload.size)});
+	doc.add_boolean_term(word_id_term(scratch, word.word_id));
+	doc.add_boolean_term(content_hash_term(scratch, word_hash(scratch, word)));
+	doc.add_value(WORD_ID_VALUE_SLOT,
+	              encode_be_u64(scratch, word.word_id.value));
 	index_word_fields(scratch, doc, word);
 	return true;
 }
@@ -289,8 +281,8 @@ bool get_next_word_id(const Xapian::WritableDatabase &db, WordId &word_id) {
 bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
                         const Word &candidate, WordId &word_id) {
 	KLAPPT_PROFILE_SCOPE_N("word_store.find_existing_word");
-	const auto hash = content_hash(scratch, candidate);
-	const auto term = content_hash_term(hash);
+	const auto hash = word_hash(scratch, candidate);
+	const auto term = content_hash_term(scratch, hash);
 
 	for (auto it = db.postlist_begin(term); it != db.postlist_end(term); ++it) {
 		const auto doc = db.get_document(*it);
@@ -301,7 +293,7 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 		                             static_cast<Size>(data.size()), stored)) {
 			continue;
 		}
-		if (!same_lexeme(stored, candidate)) {
+		if (!word_has_same_lexeme(stored, candidate)) {
 			continue;
 		}
 
@@ -321,6 +313,10 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 			        "word_id=%llu |" StrView_Fmt "|",
 			        static_cast<unsigned long long>(word_id.value),
 			        StrView_Arg(word_most_meaningfull_lemma(stored)));
+			SDL_Log("tr "
+			        "|" StrView_Fmt "| -> |" StrView_Fmt "|",
+			        StrView_Arg(stored.translations_raw),
+			        StrView_Arg(merged_translations));
 			merged.translations_raw = merged_translations;
 			changed = true;
 		}
@@ -336,7 +332,7 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 			merged.word_id = word_id;
 			Xapian::Document merged_doc;
 			if (build_document(scratch, merged, merged_doc)) {
-				db.replace_document(word_id_term(word_id), merged_doc);
+				db.replace_document(word_id_term(scratch, word_id), merged_doc);
 			}
 		}
 		return word_id.value != 0;
@@ -347,17 +343,19 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 
 } // namespace
 
-WordStore::~WordStore() = default;
+WordStore::~WordStore() {
+	if (db)
+		delete db;
+};
 
-bool WordStore::open(std::string requested_path) {
+bool WordStore::open(StrView requested_path_) {
+	;
 	KLAPPT_PROFILE_SCOPE_N("WordStore::open");
 	close();
 	has_cached_word_count = false;
 	cached_word_count = 0;
 
-	path = !requested_path.empty()
-	             ? requested_path
-	             : default_word_store_path();
+	path = {requested_path_.data, static_cast<size_t>(requested_path_.size)};
 	if (path.empty()) {
 		return false;
 	}
@@ -373,13 +371,18 @@ bool WordStore::open(std::string requested_path) {
 	}
 
 	try {
-		db = std::make_unique<Xapian::WritableDatabase>(
-			  path, Xapian::DB_CREATE_OR_OPEN);
+		db = new Xapian::WritableDatabase(
+			  path, Xapian::DB_CREATE_OR_OPEN
+			  // |
+		      //                                             Xapian::DB_DANGEROUS
+		);
 		return true;
 	} catch (const Xapian::Error &e) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening Xapian DB failed: %s",
 		             e.get_description().c_str());
-		db.reset();
+		// NOTE: we do not care
+		// delete db;
+		// db = nullptr;
 		return false;
 	}
 }
@@ -400,7 +403,8 @@ void WordStore::close() {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Closing Xapian DB failed: %s",
 		             e.get_description().c_str());
 	}
-	db.reset();
+	// delete db;
+	// db = nullptr;
 	has_cached_word_count = false;
 	cached_word_count = 0;
 }
@@ -465,6 +469,7 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 	if (count < 0) {
 		count = 0;
 	}
+	count = 1000;
 
 	try {
 		Xapian::QueryParser parser;
@@ -476,8 +481,10 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 					Xapian::QueryParser::FLAG_PARTIAL);
 		Xapian::Enquire enquire(*db);
 		enquire.set_query(parsed);
+		constexpr auto CHECK_AT_LEAST = 30;
 		mset = enquire.get_mset(static_cast<Xapian::doccount>(start),
-		                        static_cast<Xapian::doccount>(count));
+		                        static_cast<Xapian::doccount>(count),
+		                        CHECK_AT_LEAST);
 		return true;
 	} catch (const Xapian::Error &e) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Xapian search failed: %s",
@@ -509,6 +516,8 @@ bool WordStore::ensure_word(Arena &scratch, Word &word, bool *was_new) {
 			return true;
 		}
 
+		// not found, going to insert
+
 		WordId next_word_id;
 		if (!get_next_word_id(*db, next_word_id)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
@@ -526,7 +535,7 @@ bool WordStore::ensure_word(Arena &scratch, Word &word, bool *was_new) {
 		}
 
 		db->begin_transaction();
-		db->replace_document(word_id_term(word.word_id), doc);
+		db->replace_document(word_id_term(scratch, word.word_id), doc);
 		db->set_metadata(NEXT_WORD_ID_KEY,
 		                 std::to_string(word.word_id.value + 1));
 		db->commit_transaction();
@@ -556,7 +565,7 @@ bool WordStore::ensure_word(Arena &scratch, Word &word, bool *was_new) {
 bool WordStore::get_by_id(Arena &scratch, WordId word_id, Word &word) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::get_by_id");
 	try {
-		auto term = word_id_term(word_id);
+		auto term = word_id_term(scratch, word_id);
 
 		if (!db->term_exists(term)) {
 			return false;
@@ -600,7 +609,7 @@ void WordStore::save(Arena &scratch, Word &word) {
 		}
 		{
 			KLAPPT_PROFILE_SCOPE_N("replace_document");
-			db->replace_document(word_id_term(word.word_id), doc);
+			db->replace_document(word_id_term(scratch, word.word_id), doc);
 		}
 		{
 			KLAPPT_PROFILE_SCOPE_N("commit_transaction");
@@ -635,7 +644,7 @@ void WordStore::set_was_learned(Arena &scratch, Word &word) {
 		}
 		{
 			KLAPPT_PROFILE_SCOPE_N("replace_document");
-			db->replace_document(word_id_term(word.word_id), doc);
+			db->replace_document(word_id_term(scratch, word.word_id), doc);
 		}
 		{
 			KLAPPT_PROFILE_SCOPE_N("commit_transaction");

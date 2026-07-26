@@ -2,6 +2,7 @@
 
 #include "SDL3/SDL_log.h"
 #include "base/profiler.h"
+#include "base/str_view.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -9,7 +10,6 @@
 
 #ifndef __EMSCRIPTEN__
 #include "lmdb.h"
-#include "platform/files.h"
 #include <filesystem>
 #include <string>
 #include <system_error>
@@ -326,10 +326,6 @@ constexpr size_t LMDB_MAP_SIZE = 64ull << 20;
 constexpr char STATE_DB_NAME[] = "state";
 constexpr char DUE_DB_NAME[] = "due";
 
-std::string default_lmdb_path(StrView leaf = "states.lmdb"_v) {
-	return FileLoader::path_for(leaf);
-}
-
 void encode_be64(uint64_t value, unsigned char *out) {
 	for (int i = 7; i >= 0; --i) {
 		out[7 - i] = static_cast<unsigned char>((value >> (i * 8)) & 0xffu);
@@ -384,11 +380,10 @@ bool read_state_value(StrView key, const MDB_val &value, State &out) {
 } // namespace
 
 #ifndef __EMSCRIPTEN__
-bool States::open(std::string requested_path) {
+bool States::open(StrView requested_path) {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::open");
 	close();
-	const auto dir =
-		  !requested_path.empty() ? requested_path : default_lmdb_path();
+	const std::string dir = {requested_path.data, (size_t)requested_path.size};
 	if (dir.empty()) {
 		return false;
 	}

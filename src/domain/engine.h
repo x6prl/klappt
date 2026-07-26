@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ctime>
-#include <string>
 #ifdef __EMSCRIPTEN__
 #include <unordered_map>
 #include <utility>
@@ -230,7 +229,7 @@ struct States {
 	MDB_dbi due_dbi{}; // secondary index
 #endif
 
-	bool open(std::string path);
+	bool open(StrView path);
 	void close();
 
 	// [is_success, is_found]

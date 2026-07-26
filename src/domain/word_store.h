@@ -1,11 +1,10 @@
 #pragma once
 
-#include <memory>
-#include <string>
+#include <xapian.h>
 
-#include "SDL3/SDL_log.h"
-#include "xapian.h"
+#include <SDL3/SDL_log.h>
 
+#include "base/str_view.h"
 #include "base/arena.h"
 #include "base/profiler.h"
 #include "words_codec.h"
@@ -15,13 +14,13 @@ struct Arena;
 // TODO: rewrite
 struct WordStore {
 	std::string path{};
-	std::unique_ptr<Xapian::WritableDatabase> db{};
+	Xapian::WritableDatabase *db{};
 	mutable Size cached_word_count{};
 	mutable bool has_cached_word_count{};
 
 	~WordStore();
 
-	bool open(std::string path);
+	bool open(StrView path);
 	void close();
 	Size word_count() const;
 	Size matching_word_count(StrView query) const;

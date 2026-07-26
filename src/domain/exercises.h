@@ -58,7 +58,7 @@ struct ExerciseState {
 	StrView response = EMPTY_ANSWER;
 	// sub prompts are common for all the stages
 	StrView source_sub0{};
-	StrView source_sub1{};
+	// StrView source_sub1{};
 	DynArr<Stage> stages{};
 	Size current_stage{0};
 	Size points_max{0};
@@ -151,9 +151,9 @@ struct Exercises {
 	const StrView source_sub0() const {
 		return exercises[exercise_current_idx].source_sub0;
 	}
-	const StrView source_sub1() const {
-		return exercises[exercise_current_idx].source_sub1;
-	}
+	// const StrView source_sub1() const {
+	// 	return exercises[exercise_current_idx].source_sub1;
+	// }
 	const StrView response() const {
 		const auto &exercise = exercises[exercise_current_idx];
 		if (exercise.mode == Mode::Gaps &&
@@ -168,12 +168,6 @@ struct Exercises {
 	}
 
 	void submit_result(Size res) { pending_selection_index = res; }
-	bool asr_probe_user_voice_input(StrView input) {
-		const auto &exercise = exercises[exercise_current_idx];
-		// exercise.
-		// TODO: !!!!!!!!!!!!!!!
-
-	}
 	void next_result() { pending_selection_index = 0; }
 	void build_result_reviews(Arena &tmpa, bool is_only_failed);
 

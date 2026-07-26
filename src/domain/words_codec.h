@@ -29,6 +29,7 @@ struct Entry {
 	int8_t aux{};
 	int8_t in_learning_list{};
 	int8_t was_learned{};
+	int8_t is_separable_prefix{};
 };
 
 struct Header {
@@ -46,6 +47,7 @@ struct SingleWordHeader {
 	int8_t aux{};
 	int8_t in_learning_list{};
 	int8_t was_learned{};
+	int8_t is_separable_prefix{};
 	uint8_t reserved{};
 };
 
@@ -96,8 +98,7 @@ inline bool read_str_view(const uint8_t *&cursor, const uint8_t *end,
 }
 
 inline bool for_each_str_view(auto &word, auto &&f) {
-	if (!f(word.translations_raw) || !f(word.grammar) ||
-	    !f(word.json_payload)) {
+	if (!f(word.translations_raw) || !f(word.json_payload)) {
 		return false;
 	}
 	switch (word.type) {
@@ -164,7 +165,6 @@ inline void log_invalid_word_for_encode(uint16_t ref, const Word &word) {
 	};
 
 	log_field("translations_raw", word.translations_raw);
-	log_field("grammar", word.grammar);
 	log_field("json_payload", word.json_payload);
 	switch (word.type) {
 	case WordType::Nil:
@@ -211,6 +211,7 @@ inline bool encode_entry(uint8_t *&cursor, const uint8_t *end, uint16_t ref,
 		entry.aux = static_cast<int8_t>(word.n.gender);
 		break;
 	case WordType::Verb:
+		entry.is_separable_prefix = word.v.is_separable_prefix ? 1 : 0;
 		break;
 	case WordType::Adj:
 		entry.aux = word.a.is_indeclinable ? 1 : 0;
@@ -278,8 +279,8 @@ inline StrView encode(Arena &a, const Words &words) {
 
 inline bool decode_entry(uint8_t type, int8_t aux, uint64_t word_id,
                          int8_t in_learning_list, int8_t was_learned,
-                         const uint8_t *&cursor, const uint8_t *end,
-                         Word &word) {
+                         int8_t is_separable_prefix, const uint8_t *&cursor,
+                         const uint8_t *end, Word &word) {
 	KLAPPT_PROFILE_SCOPE_N("decode_entry");
 	word = {};
 	word.word_id = WordId{word_id};
@@ -294,6 +295,7 @@ inline bool decode_entry(uint8_t type, int8_t aux, uint64_t word_id,
 		word.n.gender = static_cast<Gender>(aux);
 		break;
 	case WordType::Verb:
+		word.v.is_separable_prefix = !!is_separable_prefix;
 		break;
 	case WordType::Adj:
 		word.a.is_indeclinable = aux != 0;
@@ -330,6 +332,7 @@ inline StrView encode_word(Arena &a, const Word &word) {
 		header->aux = static_cast<int8_t>(word.n.gender);
 		break;
 	case WordType::Verb:
+		header->is_separable_prefix = word.v.is_separable_prefix ? 1 : 0;
 		break;
 	case WordType::Adj:
 		header->aux = word.a.is_indeclinable ? 1 : 0;
@@ -373,8 +376,8 @@ inline bool decode_word(Arena &a, const void *data, Size size, Word &word) {
 	const uint8_t *cursor = blob + sizeof(SingleWordHeader);
 	const uint8_t *end = blob + size;
 	if (!decode_entry(header.type, header.aux, header.word_id,
-	                  header.in_learning_list, header.was_learned, cursor, end,
-	                  word) ||
+	                  header.in_learning_list, header.was_learned,
+	                  header.is_separable_prefix, cursor, end, word) ||
 	    cursor != end) {
 		a.offset = offset_before;
 		return false;
@@ -422,7 +425,8 @@ inline bool decode(Arena &a, const void *data, Size size, Words &words) {
 
 		if (ref <= 0 || ref >= Words::MAX_WORDS || decoded.used[ref] ||
 		    !decode_entry(type, aux, word_id, entry.in_learning_list,
-		                  entry.was_learned, cursor, end, decoded.words[ref])) {
+		                  entry.was_learned, entry.is_separable_prefix, cursor,
+		                  end, decoded.words[ref])) {
 			a.offset = offset_before;
 			return false;
 		}
