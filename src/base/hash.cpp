@@ -1,6 +1,8 @@
 #include "hash.h"
 
-#include "../../xxHash/xxh3.h"
+#define XXH_NO_INLINE_HINTS 1 // NOTE: got troubles inlining
+
+#include <xxh3.h>
 
 Hash hash_str_view(StrView str) {
 	constexpr Hash seed = 1337u;

@@ -1,11 +1,32 @@
 #include "str_view.h"
+#include "SDL3/SDL_log.h"
 
 #include <cctype>
 #include <charconv>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 namespace {
-StrView from_numberf_real(Arena &a, auto val, int precision) {
+
+// Stolen from https://github.com/tsoding/nob.h/blob/main/nob.h
+// which is
+// Stolen from Jai's Unicode module
+static const int8_t bytes_for_utf8[] = {
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+	  2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	  4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6,
+};
+
+StrView from_numberf_impl(Arena &a, auto val, int precision) {
 	static_assert(std::is_floating_point_v<decltype(val)>,
 	              "from_numberf is only for floating point types");
 	constexpr Size BUF_SIZE = 32;
@@ -16,7 +37,7 @@ StrView from_numberf_real(Arena &a, auto val, int precision) {
 	return {strbuf, static_cast<Size>(res.ptr - strbuf)};
 }
 
-StrView from_number_real(Arena &a, auto val) {
+StrView from_number_impl(Arena &a, auto val) {
 	static_assert(std::is_arithmetic_v<decltype(val)>,
 	              "from_number is only for arithmetic types");
 	constexpr Size BUF_SIZE = 32;
@@ -26,7 +47,7 @@ StrView from_number_real(Arena &a, auto val) {
 		res = std::to_chars(strbuf, strbuf + BUF_SIZE, val);
 		return {strbuf, static_cast<Size>(res.ptr - strbuf)};
 	} else {
-		return from_numberf_real(a, val, 2);
+		return from_numberf_impl(a, val, 2);
 	}
 }
 } // namespace
@@ -74,10 +95,178 @@ char StrView::first() const { return data[0]; }
 
 char StrView::last() const { return data[size - 1]; }
 
+Size StrView::utf8_length() const {
+	Size length{0};
+	for (Size i{0}; i < size;) {
+		auto index = (uint8_t)data[i];
+		Size s = bytes_for_utf8[index];
+		++length;
+		i += s;
+	}
+	return length;
+}
+
+StrView StrView::utf8_to_lowercase_german(Arena &a) const {
+	if (!size) {
+		return {};
+	}
+	auto copy = a.pushN<char>(size);
+	StrView ret{copy, size};
+
+	for (Size i{0}; i < size;) {
+		uint8_t ch0 = static_cast<uint8_t>(data[i]);
+		if (ch0 < 0x80) {
+			// NOTE: we do not support Turkish 'I' (0x49) -> 'ı' (0xC4 0xB1)
+			copy[i] = tolower(ch0);
+			i += 1;
+			continue;
+		}
+
+		// NOTE: then it should contain only an umlaut
+		uint8_t ch1 = static_cast<unsigned char>(data[i + 1]);
+
+		auto is_german_upper_second = [](uint8_t b) {
+			return b == 0x84 || b == 0x96 || b == 0x9C;
+		};
+		constexpr uint8_t DE_MARK = 0xC3;
+
+		copy[i] = ch0;
+		copy[i + 1] = ch1;
+
+		if (ch0 == DE_MARK && is_german_upper_second(ch1)) {
+			copy[i + 1] += 0x20;
+		}
+
+		i += 2;
+		continue;
+	}
+	return ret;
+}
+
+StrView StrView::utf8_to_lowercase(Arena &a) const {
+	if (!size) {
+		return {};
+	}
+	auto copy = a.pushN<char>(size);
+	StrView ret{copy, size};
+
+	for (Size i{0}; i < size;) {
+		uint8_t ch0 = static_cast<uint8_t>(data[i]);
+		if (ch0 < 0x80) {
+			// NOTE: we do not support Turkish 'I' (0x49) -> 'ı' (0xC4 0xB1)
+			copy[i] = tolower(ch0);
+			i += 1;
+			continue;
+		}
+		int char_len = bytes_for_utf8[ch0];
+		if (char_len == 2) {
+			uint8_t ch1 = static_cast<unsigned char>(
+				  data[i + 1]); // hope it is a correct utf8...
+
+			auto is_german_upper_second = [](uint8_t b) {
+				return b == 0x84 || b == 0x96 || b == 0x9C;
+			};
+
+			// de+tr
+			constexpr uint8_t DE_AND_TR_MARK = 0xC3;
+			constexpr uint8_t TR_MARK0 = 0xC4;
+			constexpr uint8_t TR_MARK1 = 0xC5;
+			constexpr uint8_t RU_MARK = 0xD0;
+			switch (ch0) {
+			case DE_AND_TR_MARK: {
+				if (is_german_upper_second(ch1)) {
+					copy[i] = static_cast<char>(DE_AND_TR_MARK);
+					copy[i + 1] = static_cast<char>(ch1 + 0x20);
+				} else {
+					copy[i] = ch0;
+					copy[i + 1] = ch1;
+				}
+			} break;
+			case TR_MARK0: {
+				copy[i] = static_cast<char>(TR_MARK0);
+				switch (ch1) {
+				case 0x9E: // Ğ -> ğ
+					copy[i + 1] = 0x9F;
+					break;
+				case 0xB0: // İ -> i
+				           // NOTE: string become 1 byte shorter than allocated
+					copy[i] = 'i';
+					ret.size -= 1;
+					copy -= 1;
+					break;
+				default:
+					copy[i + 1] = ch1;
+				}
+			} break;
+			case TR_MARK1: {
+				copy[i] = static_cast<char>(TR_MARK1);
+				if (ch1 == 0x9E) { // Ş -> ş
+					copy[i + 1] = 0x9F;
+				} else {
+					copy[i + 1] = ch1;
+				}
+			} break;
+			case RU_MARK: {
+				if (ch1 >= 0x90 && ch1 <= 0x9F) {
+					copy[i] = RU_MARK;
+					copy[i + 1] = ch1 + 0x20;
+				} else if (ch1 >= 0xA0 && ch1 <= 0xAF) {
+					copy[i] = 0xD1;
+					copy[i + 1] = ch1 - 0x20;
+				} else if (ch1 == 0x81) {
+					copy[i] = 0xD1;
+					copy[i + 1] = 0x91;
+				} else {
+					copy[i] = static_cast<char>(RU_MARK);
+					copy[i + 1] = ch1;
+				}
+			} break;
+			default:
+				copy[i] = ch0;
+				copy[i + 1] = ch1;
+			} // switch
+
+			i += 2;
+			continue;
+		}
+		for (int j = 0; j < char_len && i + j < size; ++j)
+			copy[i + j] = data[i + j];
+		i += char_len;
+	}
+	return ret;
+}
+
 StrView StrView::copy(Arena &a) const {
+	if (!size) {
+		return {};
+	}
 	auto copy = a.pushN<char>(size);
 	memcpy(copy, data, size);
 	return {copy, size};
+}
+
+bool StrView::is_contains_substr(StrView substr) const {
+	if (!substr) {
+		return true;
+	}
+	if (substr.size > size) {
+		return false;
+	}
+	if (substr.size == 1) {
+		return is_contains(substr.first());
+	}
+	const char first = substr.data[0];
+
+	Size end = size - substr.size;
+
+	for (Size i = 0; i <= end; ++i) {
+		if (data[i] == first &&
+		    memcmp(data + i, substr.data, substr.size) == 0) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 StrView StrView::concat(Arena &arena, const StrView left, const StrView right) {
@@ -116,6 +305,15 @@ StrView &StrView::mut_trimr() {
 }
 
 StrView &StrView::mut_trim() { return mut_triml().mut_trimr(); }
+
+StrView &StrView::mut_chopl() {
+	data += 1;
+	return *this;
+}
+StrView &StrView::mut_chopr() {
+	size -= 1;
+	return *this;
+}
 
 StrView StrView::triml() const {
 	auto copy = *this;
@@ -213,20 +411,16 @@ Clay_String StrView::to_clay_string() const {
 	return {false, static_cast<int32_t>(size), data};
 }
 
+const char* StrView::to_cstr(Arena&a) const {
+	auto buff = a.pushN<char>(size+1);
+	memcpy(buff, data, size);
+	buff[size] = '\0';
+	return buff;
+}
+
 const char *StrView::begin() const { return data; }
 
 const char *StrView::end() const { return data + size; }
-
-Size utf8_codepoint_count(StrView str) {
-	Size count{};
-	for (Size i{}; i < str.size; ++i) {
-		const auto ch = static_cast<unsigned char>(str[i]);
-		if ((ch & 0xC0u) != 0x80u) {
-			++count;
-		}
-	}
-	return count;
-}
 
 StrView StrView::from_chars(Arena &a, const char *data, int size) {
 	auto allocated = static_cast<char *>(a.push(size + 1));
@@ -240,34 +434,45 @@ StrView StrView::from_chars(Arena &a, const char *data) {
 }
 
 StrView StrView::from_number(Arena &a, uint64_t val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, uint32_t val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, uint16_t val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, int64_t val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, int32_t val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, int16_t val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, float val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, double val) {
-	return from_number_real(a, val);
+	return from_number_impl(a, val);
 }
 StrView StrView::from_number(Arena &a, float val, int precision) {
 
-	return from_numberf_real(a, val, precision);
+	return from_numberf_impl(a, val, precision);
 }
 StrView StrView::from_number(Arena &a, double val, int precision) {
 
-	return from_numberf_real(a, val, precision);
+	return from_numberf_impl(a, val, precision);
+}
+
+StrView StrView::from_number_hex(Arena &a, uint64_t val) {
+	static constexpr char HEX[] = "0123456789abcdef";
+
+	auto data = a.pushN<char>(16);
+	for (int i = 15; i >= 0; --i) {
+		data[i] = HEX[val & 0x0f];
+		val >>= 4;
+	}
+	return {data, 16};
 }

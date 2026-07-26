@@ -30,12 +30,24 @@ struct StrView {
 	bool operator==(const StrView &other) const;
 	bool operator!=(const StrView &other) const;
 
+	[[nodiscard]]
 	char first() const;
+	[[nodiscard]]
 	char last() const;
 
+	Size utf8_length() const;
+	[[nodiscard]]
+	StrView utf8_to_lowercase_german(Arena &a) const;
+	[[nodiscard]]
+	StrView utf8_to_lowercase(Arena &a) const;
+
+	[[nodiscard]]
 	StrView copy(Arena &a) const;
+
+	[[nodiscard]]
 	static StrView concat(Arena &arena, const StrView left,
 	                      const StrView right);
+	[[nodiscard]]
 	static StrView concat_with(Arena &arena, const StrView left,
 	                           const StrView right, char delimiter);
 
@@ -44,9 +56,15 @@ struct StrView {
 	StrView &mut_trimr();
 	StrView &mut_trim();
 
+	StrView &mut_chopl();
+	StrView &mut_chopr();
+
 	// Non-mutating trim variants. Return a trimmed copy of this view.
+	[[nodiscard]]
 	StrView triml() const;
+	[[nodiscard]]
 	StrView trimr() const;
+	[[nodiscard]]
 	StrView trim() const;
 
 	// Return the head before the delimiter and advance this view to the tail.
@@ -57,16 +75,23 @@ struct StrView {
 
 	// Non-mutating split variants. Return {head, tail}, where tail is what
 	// the corresponding mut_split* call would leave in this view.
+	[[nodiscard]]
 	Pair<StrView, StrView> split_by(char delimiter) const;
+	[[nodiscard]]
 	Pair<StrView, StrView> split_by(int (*handler)(int ch)) const;
+	[[nodiscard]]
 	Pair<StrView, StrView> split() const;
 
+	[[nodiscard]]
 	StrView slice(Size from = 0, Size to = -1) const;
 
 	bool is_contains(char ch) const;
+	bool is_contains_substr(StrView substr) const;
 	const char *find(char ch) const;
 
 	Clay_String to_clay_string() const;
+	// allocates size+1
+	const char *to_cstr(Arena &a) const;
 
 	static StrView from_number(Arena &a, uint64_t val);
 	static StrView from_number(Arena &a, uint32_t val);
@@ -79,14 +104,14 @@ struct StrView {
 	static StrView from_number(Arena &a, float val, int precision);
 	static StrView from_number(Arena &a, double val, int precision);
 
+	static StrView from_number_hex(Arena &a, uint64_t val);
+
 	static StrView from_chars(Arena &a, const char *data, int size);
 	static StrView from_chars(Arena &a, const char *data);
 
 	const char *begin() const;
 	const char *end() const;
 };
-
-Size utf8_codepoint_count(StrView str);
 
 constexpr StrView operator""_v(const char *str, std::size_t size) noexcept {
 	return {str, static_cast<Size>(size)};

@@ -45,56 +45,55 @@ struct StrBuilder {
 	}
 
 	StrView join(Arena &a) {
+		if (data.is_empty()) {
+			return {};
+		}
 		auto dst = a.pushN<char>(total_lenght);
-		StrView ret = {dst, total_lenght};
+		StrView ret{dst, total_lenght};
 
 		for (auto &str : data) {
-			if (str.size > 0) {
-				memcpy(dst, str.data, str.size);
-				dst += str.size;
-			}
+			memcpy(dst, str.data, str.size);
+			dst += str.size;
 		}
 		return ret;
 	}
 	StrView join(Arena &a, char delim) {
+		if (data.is_empty()) {
+			return {};
+		}
 		auto delim_count = (data.size - 1);
 		auto result_lenght = total_lenght + delim_count;
 		auto dst = a.pushN<char>(result_lenght);
-		StrView ret = {dst, result_lenght};
+		StrView ret{dst, result_lenght};
 
 		for (Size i{0}; i < data.size; ++i) {
 			if (i) {
-				dst[-1] = delim;
+				*dst = delim;
+				++dst;
 			}
 			auto &str = data[i];
-			if (str.size > 0) {
-				memcpy(dst, str.data, str.size);
-				// if (i != data.size - 1) {
-				// 	dst[str.size] = delim;
-				// }
-				dst += str.size + 1;
-			}
+			memcpy(dst, str.data, str.size);
+			dst += str.size;
 		}
 		return ret;
 	}
 	StrView join(Arena &a, StrView insert) {
+		if (data.is_empty()) {
+			return {};
+		}
 		auto delim_count = (data.size - 1);
 		auto result_lenght = total_lenght + delim_count * insert.size;
 		auto dst = a.pushN<char>(result_lenght);
-		StrView ret = {dst, result_lenght};
+		StrView ret{dst, result_lenght};
 
 		for (Size i{0}; i < data.size; ++i) {
 			if (i) {
-				memcpy(dst - data.size, insert.data, insert.size);
+				memcpy(dst, insert.data, insert.size);
+				dst += insert.size;
 			}
 			auto &str = data[i];
-			if (str.size > 0) {
-				memcpy(dst, str.data, str.size);
-				// if (i != data.size - 1) {
-				// 	dst[str.size] = delim;
-				// }
-				dst += str.size + data.size;
-			}
+			memcpy(dst, str.data, str.size);
+			dst += str.size;
 		}
 		return ret;
 	}

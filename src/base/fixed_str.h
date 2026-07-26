@@ -11,6 +11,7 @@ template <Size N> struct FixedStr {
 	bool is_empty() const { return !size; }
 
 	StrView view() { return {buffer.data, size}; };
+
 	const char *mutable_to_cstr() {
 		buffer[buffer.size() == size ? buffer.size() - 1 : size] = '\0';
 		return buffer.data;
@@ -21,3 +22,4 @@ template <Size N> struct FixedStr {
 		memcpy(buffer.data, str.data, size);
 	}
 };
+

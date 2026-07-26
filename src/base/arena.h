@@ -3,8 +3,8 @@
 #include <SDL3/SDL_log.h>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 
 #include <sys/mman.h>
 
@@ -34,9 +34,14 @@ struct Arena {
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
 		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		printf("Created arena of size %d KiB\n", arena_size/1024);
+		printf("Created arena of size %d KiB\n", arena_size / 1024);
 	}
-	Arena *ptr() { return this; }
+	~Arena() {
+		munmap(data, allocated_size);
+		printf("Destroyed arena of size %d KiB\n", allocated_size / 1024);
+	}
+	Arena(Arena const &) = delete;
+	void operator=(Arena const &) = delete;
 
 	void *push(Size size, Size allign = 32) {
 		size_objects += size;
