@@ -112,14 +112,22 @@ out = open(out_path, "w", encoding="utf-8")
 
 wl("#pragma once\n")
 wl('#include "base/str_view.h"\n')
-wl("typedef enum {")
+wl("enum Lang {")
 for lang in languages:
     wl(f"\tlang_{lang},")
-wl(f"\tlang_COUNT")
-wl("} Lang;\n")
-wl("typedef struct {")
+wl("\tlang_COUNT")
+wl("};\n")
+
+wl(f"struct {translation_type} {{")
 i = 0
 for key in entries:
     i += 1
     wl(f"\t{str_type} {key};")
-wl(f"}} {translation_type};\n")
+wl("};\n")
+
+wl(f"inline {str_type} lang_code(Lang lang){{")
+wl("\tswitch(lang) {")
+for lang in languages:
+    wl(f'\t case lang_{lang}:\n\t\treturn "{lang}"_v;')
+wl('\t default:\n\t\treturn "UNKNOWN"_v;')
+wl("}\n}\n")
