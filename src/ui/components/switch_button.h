@@ -1,9 +1,10 @@
 #pragma once
 
 #include "button.h"
+#include "ui/themes.h"
 
 // TODO: implement
-inline bool switch_button(AppContext *ctx, Clay_ElementId id, bool turned_on,
+inline bool switch_button(AppContext *ctx, Clay_ElementId id, bool is_turned_on,
                           float height = 24.f) {
 	constexpr auto ICON_TOGGLE_OFF = ""_v;
 	constexpr auto ICON_TOGGLE_ON = ""_v;
@@ -12,16 +13,18 @@ inline bool switch_button(AppContext *ctx, Clay_ElementId id, bool turned_on,
 		  .height = height,
 		  .padding_x = 0.f,
 		  .padding_y = 0.f,
-		  .corner_radius = 0.f,
+		  .corner_radius = height*0.25f,
 		  .font_size = height,
 		  .font_id = FontID::ICONS,
 		  .border_width = 0.f,
 		  // .background = theme()->wrongContainer,
+		  .background_pressed = theme()->wrongContainer,
 		  .text = theme()->onSurface,
+		  .text_pressed = theme()->onSurface,
 	};
 
 	auto res = mobile_button(
-		  ctx, id, turned_on ? ICON_TOGGLE_ON : ICON_TOGGLE_OFF, style);
+		  ctx, id, is_turned_on ? ICON_TOGGLE_ON : ICON_TOGGLE_OFF, style);
 
 	return res.activated();
 }

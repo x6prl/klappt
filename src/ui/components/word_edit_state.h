@@ -4,6 +4,7 @@
 #include "domain/word.h"
 #include "ui/components/text_input_state.h"
 
+// TODO: add is_separable_prefix property
 struct WordEditState {
 	WordId word_id{};
 	WordType type{WordType::Nil};
@@ -23,7 +24,6 @@ struct WordEditState {
 	MobileTextInputBuffer comparative{};
 	MobileTextInputBuffer superlative{};
 	MobileTextInputBuffer translations_raw{};
-	MobileTextInputBuffer grammar{};
 
 	bool valid{};
 	StrView validation_error{};

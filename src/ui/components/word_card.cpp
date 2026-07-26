@@ -5,6 +5,7 @@
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
+#include "ui/translations/langs.h"
 #include "ui/tslt.h"
 #include <SDL3/SDL_log.h>
 #include <charconv>
@@ -54,7 +55,7 @@ void word_main(Clay_ElementId id, StrView pre, StrView main, StrView post,
 }
 
 uint16_t translation_font_id(const AppContext *ctx) {
-	return ctx->settings.tr_language == Settings::TranslationLanguage::Arabic
+	return ctx->settings.tr_language == lang_ar
 	             ? FontID::ARABIC_MAIN
 	             : FontID::MAIN;
 }

@@ -6,6 +6,7 @@
 #include "ui/components/button.h"
 #include "ui/dpi.h"
 #include "ui/textcache.h"
+#include "ui/translations/langs.h"
 #include <SDL3/SDL_log.h>
 
 #ifdef __EMSCRIPTEN__
@@ -720,7 +721,7 @@ inline MobileTextInputResult mobile_text_input(
 	const float height = dpi(style.height);
 	const float corner_radius = dpi(style.corner_radius);
 	const bool rtl = style.rtl || ctx->settings.tr_language ==
-	                                    Settings::TranslationLanguage::Arabic;
+	                                    lang_ar;
 	MobileTextInputStyle effective_style = style;
 	effective_style.rtl = rtl;
 	if (rtl && effective_style.font_id == FontID::MAIN) {

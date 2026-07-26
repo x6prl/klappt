@@ -1,7 +1,8 @@
 #pragma once
 
-#include "app/app_context.h"
 #include <clay/clay.h>
+
+#include "app/app_context.h"
 
 // TODO: rewrite
 
@@ -26,8 +27,8 @@ inline FastListWindow fast_list_window(Clay_ElementId id, Size item_count,
 
 	const auto scroll = Clay_GetScrollContainerData(id);
 	const float viewport_height =
-	      scroll.found ? scroll.scrollContainerDimensions.height
-	                   : item_height * 8.f;
+		  scroll.found ? scroll.scrollContainerDimensions.height
+					   : item_height * 30.f;
 	float scroll_y = 0.f;
 	if (scroll.found && scroll.scrollPosition) {
 		scroll_y = -scroll.scrollPosition->y;
@@ -36,13 +37,21 @@ inline FastListWindow fast_list_window(Clay_ElementId id, Size item_count,
 		}
 	}
 
-	Size first = static_cast<Size>(scroll_y / item_height) - overscan;
-	if (first < 0) {
+	Size first = static_cast<Size>(scroll_y / item_height);
+	if (first > overscan) {
+		first -= overscan;
+	} else {
 		first = 0;
 	}
+
 	Size visible =
-	      static_cast<Size>(viewport_height / item_height) + 1 + overscan * 2;
-	if (visible < 1) {
+		  static_cast<Size>(viewport_height / item_height) + 1 + overscan * 2;
+	if (visible > 150) {
+		SDL_LogWarn(
+			  SDL_LOG_CATEGORY_APPLICATION,
+			  "fast_list: viewport is extremely large, clamping items to 150.");
+		visible = 150;
+	} else if (visible < 1) {
 		visible = 1;
 	}
 	Size last = first + visible;
@@ -64,13 +73,12 @@ inline FastListWindow fast_list_window(Clay_ElementId id, Size item_count,
 
 template <class F>
 inline void fast_list(AppContext *ctx, Clay_ElementId id, Size item_count,
-                      float item_height, F &&render_items,
-                      Size overscan = 2) {
+                      float item_height, F &&render_items, Size overscan = 2) {
 	(void)ctx;
 	const auto window = fast_list_window(id, item_count, item_height, overscan);
 	const float top_spacer = item_height * static_cast<float>(window.first);
 	const float bottom_spacer =
-	      item_height * static_cast<float>(item_count - window.last);
+		  item_height * static_cast<float>(item_count - window.last);
 
 	CLAY(id,
 	     {.layout =
@@ -79,8 +87,9 @@ inline void fast_list(AppContext *ctx, Clay_ElementId id, Size item_count,
 					  .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				},
 	      .clip = {.vertical = true, .childOffset = Clay_GetScrollOffset()}}) {
-		fast_list_spacer(CLAY_ID("FastListTopSpacer"), top_spacer);
+		fast_list_spacer(CLAY_IDI("FastListTopSpacer", id.id), top_spacer);
 		render_items(window);
-		fast_list_spacer(CLAY_ID("FastListBottomSpacer"), bottom_spacer);
+		fast_list_spacer(CLAY_IDI("FastListBottomSpacer", id.id),
+		                 bottom_spacer);
 	}
 }
