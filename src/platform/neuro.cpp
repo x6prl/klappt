@@ -534,11 +534,13 @@ void run_asr(AppContext *ctx) {
 							  }
 							  Measure awo{"ONNX: AcceptWaveformOffline"};
 							  auto samples_count = size_bytes / sizeof(float);
+							  auto samples = static_cast<float *>(
+									actx->rec_audio_buffer
+										  .data); // NOTE: buffer filled
+						                          // by audio thread
 							  SherpaOnnxAcceptWaveformOffline(
 									s.offline_stream, AudioContext::FREQUENCY,
-									static_cast<float *>(
-										  actx->rec_audio_buffer.data),
-									samples_count);
+									samples, samples_count);
 							  awo.lap().printus();
 						  }
 						  // NOTE: !!! Touching another thread data!!!

@@ -2,6 +2,7 @@
 
 #include "base/str_view.h"
 #include <clay/clay.h>
+#include <cstring>
 
 struct MobileTextInputBuffer {
 	static constexpr Size max_size{256};
@@ -10,8 +11,12 @@ struct MobileTextInputBuffer {
 	Size size{0};
 
 	void clear() {
-		size = 0;
-		data[0] = '\0';
+		if (true) {
+			memset(data, 0, max_size); // TODO: quick bugfix
+		} else {
+			size = 0;
+			data[0] = '\0';
+		}
 	}
 
 	const char *c_str() {
@@ -35,7 +40,8 @@ struct MobileTextInputState {
 	bool focused_bounds_valid{false};
 	bool focused_drawn_this_frame{false};
 	bool rtl{false};
-	bool activate_text_input{false}; // used to activate text input when going to a screen
+	bool activate_text_input{
+		  false}; // used to activate text input when going to a screen
 	uint16_t padding_left{};
 	uint16_t padding_right{};
 	uint16_t padding_top{};

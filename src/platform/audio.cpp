@@ -5,8 +5,9 @@
 #include "app/audio_context.h"
 #include "app/worker.h"
 #include "base/measure.h"
-
+#if NEURO
 #include "platform/neuro.h"
+#endif
 
 namespace {
 
@@ -65,7 +66,6 @@ void playback_play_(AudioContext *actx, SDL_AudioSpec spec,
 }
 
 template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
-	// worker_job_push(ctx, {.type = Job::Type::ASR_RECORD_STOP});
 	Worker::audio_job_push(
 		  ctx,
 		  AudioJob{.func = [](AudioContext *actx, AudioJob::Payload *payload) {
@@ -78,8 +78,6 @@ template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
 			  SDL_PauseAudioStreamDevice(actx->recording_stream);
 
 			  { // notify UI
-			    // SDL_SetAtomicInt(&ctx.is_recording, SoundContext::FALSE);
-			    // push_event(ASR_NOTIFY_UI_RECORDING_STOP_CODE, nullptr);
 				  MT::run([](AppContext *ctx) {
 					  ctx->audio_asr_tts_status.is_recording = false;
 				  });
@@ -138,9 +136,11 @@ template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
 			  } else {
 				  SDL_Log("Recorded %f seconds",
 			              AudioContext::bytes_to_seconds(bytes_recorded));
+#if NEURO
 				  if constexpr (RUN_ASR_ON_FINISH) {
 					  run_asr(tctx()->app_ctx);
 				  }
+#endif
 			  }
 			  m.lap().printms();
 		  }});
@@ -223,11 +223,12 @@ void record_start(AppContext *ctx) {
 void record_stop_then_do_nothing(AppContext *ctx) {
 	return push_rec_stop_job<false>(ctx);
 }
-
+#if NEURO
 void record_stop_then_run_asr(AppContext *ctx) {
 	// worker_job_push(ctx, {.type = Job::Type::ASR_RECORD_STOP});
 	return push_rec_stop_job<true>(ctx);
 }
+#endif
 
 void record_deinit(AppContext *ctx) {
 	// worker_job_push(ctx, {.type = Job::Type::ASR_RECORD_DEINIT});

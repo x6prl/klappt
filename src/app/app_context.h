@@ -1,22 +1,24 @@
 #pragma once
 
-#include "SDL3/SDL_timer.h"
+#include <SDL3/SDL_timer.h>
+#include <SDL3/SDL.h>
+// #include <SDL3_mixer/SDL_mixer.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
+#include <clay/clay.h>
+
+#include "base/dyn_arr.h"
+#include "base/str_view.h"
+#include "base/arena.h"
+#include "base/profiler.h"
 #include "app/app_status.h"
 #include "app/audio_context.h"
 #include "app/worker.h"
-#include "base/dyn_arr.h"
-#include "base/str_view.h"
 #include "domain/engine.h"
 #include "domain/exercises.h"
 #include "domain/settings.h"
 #include "domain/word_store.h"
 #include "domain/words.h"
-#include <SDL3/SDL.h>
-// #include <SDL3_mixer/SDL_mixer.h>
-#include <SDL3_ttf/SDL_ttf.h>
-
-#include "base/arena.h"
-#include "base/profiler.h"
 #include "platform/audio.h"
 #include "ui/components/download_data.h"
 #include "ui/components/text_input_state.h"
@@ -24,7 +26,6 @@
 #include "ui/components/word_view_state.h"
 #include "ui/textcache.h"
 #include "ui/tslt.h"
-#include <clay/clay.h>
 
 enum class Screen {
 	Start = 0,
@@ -119,14 +120,18 @@ struct AppContext {
 	Settings settings{};
 
 	JobQueue<Job> worker_job_queue{};
-	JobQueue<Size> net_worker_job_queue{};
-	JobQueue<AudioJob> audio_worker_job_queue{};
-	JobQueue<NeuroJob> neuro_worker_job_queue{};
 
-	NetContext *net{nullptr};     // NOTE: created by NetThread
-	AudioContext *audio{nullptr}; //       created by AudioThread
-	NeuroContext *neuro{nullptr}; //       created by Neuro
 	DynArr<DownloadData> downloads{};
+	NetContext *net{nullptr};     // NOTE: created by NetThread
+	JobQueue<Size> net_worker_job_queue{};
+
+	AudioContext *audio{nullptr}; //       created by AudioThread
+	JobQueue<AudioJob> audio_worker_job_queue{};
+
+#if NEURO
+	NeuroContext *neuro{nullptr}; //       created by NeuroThread
+	JobQueue<NeuroJob> neuro_worker_job_queue{};
+#endif
 
 	// uint64_t last_ticks[10]{};
 	// uint64_t last_ticksef[10]{};

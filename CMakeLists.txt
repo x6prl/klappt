@@ -395,7 +395,7 @@ set(APP_PLATFORM_FILES
     src/platform/audio.cpp
     src/platform/zip.cpp
     src/platform/fs.cpp
-    $<$<BOOL:$ENABLE_NEURO>:src/platform/neuro.cpp>
+    $<$<BOOL:${ENABLE_NEURO}>:src/platform/neuro.cpp>
 )
 set(APP_BASE_FILES
     src/base/str_view.cpp
@@ -483,6 +483,7 @@ if(USE_HOTRELOAD)
     target_compile_features(app_hotreload PUBLIC cxx_std_23)
     target_compile_definitions(app_hotreload PRIVATE
         $<$<CONFIG:Debug>:HOTRELOAD=1>
+        $<$<BOOL:${ENABLE_NEURO}>:NEURO=1>
     )
     target_include_directories(app_hotreload PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_include_directories(app_hotreload SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor")

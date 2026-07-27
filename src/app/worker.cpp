@@ -1,17 +1,18 @@
 #include "worker.h"
 
-#include "SDL3/SDL_events.h"
-#include "app/app_context.h"
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_filesystem.h>
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_timer.h>
 
+#include "app/app_context.h"
 #include "app/audio_context.h"
 #include "app/event_codes.h"
-#include "app/neuro_context.h"
 #include "base/atomic.h"
 #include "base/dyn_arr.h"
+#if NEURO
+#include "app/neuro_context.h"
+#endif
 
 thread_local ThreadContext *_tctx{};
 ThreadContext *tctx() { return _tctx; }
@@ -231,6 +232,7 @@ void Worker::audio_job_push(AppContext *ctx, AudioJob job) {
 		  });
 	SDL_Log("Main Thread: Pushing Audio Job %d to the worker queue.", id);
 }
+#if NEURO
 void Worker::neuro_job_push(AppContext *ctx, NeuroJob job) {
 	int id = worker_job_push_generic(
 		  ctx, job,
@@ -239,6 +241,7 @@ void Worker::neuro_job_push(AppContext *ctx, NeuroJob job) {
 		  });
 	SDL_Log("Main Thread: Pushing Neuro Job %d to the worker queue.", id);
 }
+#endif // NEURO
 void Worker::job_push(AppContext *ctx, Job job) {
 	int id = worker_job_push_generic(
 		  ctx, job, [](AppContext *ctx) -> decltype(ctx->worker_job_queue) * {
@@ -289,7 +292,7 @@ int SDLCALL AudioWorkerThread(void *userdata) {
 	SDL_Log("Audio Worker Thread: Exiting");
 	return 0;
 }
-
+#if NEURO
 int SDLCALL NeuroWorkerThread(void *userdata) {
 	KLAPPT_PROFILE_THREAD("neuro");
 	worker_thread_generic<NeuroJob>(
@@ -306,12 +309,14 @@ int SDLCALL NeuroWorkerThread(void *userdata) {
 			  for (Size i{0}; i < pp_pool_size; ++i) {
 				  pp_pool[i].pp_index = i;
 			  }
-			  MT::run_with_payload(tctx()->neuro, [](AppContext *ctx, void *ptr) {
-				  ctx->neuro = static_cast<NeuroContext *>(ptr);
-			  });
+			  MT::run_with_payload(
+					tctx()->neuro, [](AppContext *ctx, void *ptr) {
+						ctx->neuro = static_cast<NeuroContext *>(ptr);
+					});
 			  return &ctx->neuro_worker_job_queue;
 		  },
 		  [](NeuroJob &job) { job.func(tctx()->neuro, &job.payload); });
 	SDL_Log("Neuro Worker Thread: Exiting");
 	return 0;
 }
+#endif // NEURO

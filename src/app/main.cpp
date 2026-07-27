@@ -27,8 +27,11 @@
 #include "platform/files.h"
 #include "platform/fs.h"
 #include "platform/net_worker.h"
-#include "platform/neuro.h"
 #include "ui/textcache.h"
+
+#if NEURO
+#include "platform/neuro.h"
+#endif
 
 constexpr uint32_t windowStartWidth = 1200 / 3;
 constexpr uint32_t windowStartHeight = 2670 / 3;
@@ -363,7 +366,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 			SDL_Log("settings.dat found and loaded");
 		}
 	} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot load settings.dat");
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot load settings.dat");
 	}
 	m.lap().printus("load settings");
 
@@ -386,8 +389,10 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
 		auto init_workers_job = []() {
 			auto ctx = tctx()->app_ctx;
-			SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
+#if NEURO
 			SDL_CreateThread(NeuroWorkerThread, "NeuroWorkerThread", ctx);
+#endif
+			SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
 			SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
 		};
 		Worker::job_push(ctx, Job{.id = -2, .func = init_workers_job});

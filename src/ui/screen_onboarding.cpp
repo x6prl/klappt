@@ -78,7 +78,7 @@ bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 			             pool_index);
 			if (pool_index == -2) {
 				return false;
-			} else if (pool_index == -1){
+			} else if (pool_index == -1) {
 				SDL_Log("Was already downloaded, will run unpack...");
 			}
 		}
@@ -98,6 +98,7 @@ bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	      check_and_run_download_and_unpack(
 				ctx, "German Wiktionary"_v, AssetsDL::Type::OPTIONAL_XAPIAN_DE,
 				[](AppContext *ctx) { return ctx->settings.is_using_also_de; });
+#if NEURO
 	ret = ret && check_and_run_download_and_unpack(
 					   ctx, "Text-to-speech"_v, AssetsDL::Type::OPTIONAL_TTS,
 					   [](AppContext *ctx) {
@@ -111,6 +112,7 @@ bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	      check_and_run_download_and_unpack(
 				ctx, "Voice recognition"_v, AssetsDL::Type::OPTIONAL_ASR,
 				[](AppContext *ctx) { return ctx->settings.is_using_asr; });
+#endif
 	return ret;
 }
 
@@ -233,6 +235,7 @@ void screen_onboarding_draw(AppContext *const ctx) {
 							  ctx->settings.is_using_also_de = new_val;
 							  ctx->settings.save(ctx->arena_frame);
 						  });
+#if NEURO
 					draw_option_row(
 						  ctx, CLAY_ID("TTS"), "Text-to-speech"_v,
 						  "Allows you to hear the pronounciation of a word or a phrase, even when there is no audio in Wiktionary. Used for offline audio generation. May be very slow on old devices. ~80MB"_v,
@@ -247,6 +250,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 							  ctx->settings.is_using_asr = new_val;
 							  ctx->settings.save(ctx->arena_frame);
 						  });
+#endif
+
 					auto next_btn =
 						  mobile_button(ctx, CLAY_ID("NextButton"), "Next"_v,
 					                    mobile_button_style_primary());
@@ -271,16 +276,9 @@ void screen_onboarding_draw(AppContext *const ctx) {
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
-				// bool is_assets_ready =
-				// 	  is_resources_were_downloaded_and_unpacked(ctx);
-				// // NOTE: case 0 — everything is ready now, doing init
-				// if (is_assets_ready) {
-				// 	next_stage(false);
-				// 	continue;
-				// }
-				// // NOTE: so assests are NOT ready
+				// NOTE: assests are NOT ready
 
-				// NOTE: case 1: no downloads were registered (app
+				// NOTE: case 0: no downloads were registered (app
 				// restarted)
 				if (ctx->downloads.is_empty()) {
 					if (ctx->net) { // if net subsystem ready
@@ -292,7 +290,7 @@ void screen_onboarding_draw(AppContext *const ctx) {
 						ctx->anim();
 					}
 				}
-				// NOTE: case 2: downloads are registered
+				// NOTE: case 1: downloads are registered
 				else {
 					// NOTE: waking up NetThread, because it will go to
 					// sleep due empty job queue :c
@@ -383,15 +381,15 @@ void screen_onboarding_draw(AppContext *const ctx) {
 					settings.assets.for_each_optional(
 						  [&is_unpacking_in_progress](
 								AssetsDL::RemoteAsset &asset, auto t) {
-						  auto g = tctx()->a.guard();
+							  auto g = tctx()->a.guard();
 							  auto es = StrView::from_number(
 									tctx()->a, asset.expected_size);
 							  // SDL_Log("TYPE (%d) %d %d %d " StrView_Fmt,
-							  //            std::to_underlying(t),
-							  //            (int)asset.is_zip_ready_to_unpack,
-							  //            (int)asset.is_unpacked,
-							  //            (int)asset.is_zip_removed,
-							  //            StrView_Arg(es));
+						      //            std::to_underlying(t),
+						      //            (int)asset.is_zip_ready_to_unpack,
+						      //            (int)asset.is_unpacked,
+						      //            (int)asset.is_zip_removed,
+						      //            StrView_Arg(es));
 							  is_unpacking_in_progress =
 									is_unpacking_in_progress ||
 									asset.is_zip_ready_to_unpack &&

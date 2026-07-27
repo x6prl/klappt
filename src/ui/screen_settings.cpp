@@ -1,3 +1,4 @@
+#include "base/str_view.h"
 #include "screen_helpers.h"
 #include "ui/components/switch_button.h"
 #include "ui/dpi.h"
@@ -147,18 +148,19 @@ void screen_settings_draw(AppContext *ctx) {
 		CLAY(CLAY_ID("About"),
 		     {.layout =
 		            {
-						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
 						  .padding = CLAY_PADDING_ALL(udpi(4.0f)),
 						  .childGap = udpi(14.0f),
 						  .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                     CLAY_ALIGN_Y_CENTER},
+		                                     CLAY_ALIGN_Y_BOTTOM},
 						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					},
-		      .border = {
-					.color = theme()->outline,
-					.width = {.bottom = udpi(1.f)},
-			  }}) {
-			auto notes_text_size = udpi(18);
+					//    .border = {
+					// .color = theme()->outline,
+					// .width = {.bottom = udpi(1.f)},
+					// }
+			  }) {
+			auto notes_text_size = udpi(12);
 			draw_text(
 				  "This product includes data from Wiktionary (https://www.wiktionary.org/)"_v,
 				  theme()->onSurface, notes_text_size,
@@ -171,7 +173,7 @@ void screen_settings_draw(AppContext *ctx) {
 			          theme()->onSurface, notes_text_size,
 			          translation_font_id(ctx));
 			draw_text(
-				  "The data has been extracted and transformed using Wiktextract and then selfmade scripts."_v,
+				  "The data has been extracted and transformed using Wiktextract and then using selfmade scripts."_v,
 				  theme()->onSurface, notes_text_size,
 				  translation_font_id(ctx));
 		}

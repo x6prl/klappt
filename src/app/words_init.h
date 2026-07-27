@@ -307,12 +307,14 @@ inline bool txt_to_xapian(AppContext &ctx,
 inline bool init_runtime_data(AppContext &ctx) {
 	KLAPPT_PROFILE_SCOPE_N("init_runtime_data");
 
+#if NEURO
 	if (ctx.settings.is_using_tts) {
 		init_tts(&ctx);
 	}
 	if (ctx.settings.is_using_asr) {
 		init_asr(&ctx);
 	}
+#endif
 
 	Measure m{__FUNCTION__};
 

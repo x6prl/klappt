@@ -18,23 +18,27 @@ void screen_words_list_go(AppContext *ctx) {
 void screen_words_list_draw(AppContext *ctx) {
 	auto floating_button_clear_id = CLAY_ID("FloatingButtonClear");
 	{ // floating buttons
-		CLAY(floating_button_clear_id,
-		     {.floating = {
-					.offset = {dpi(8.f), 0.f},
-					.attachPoints = {.element = CLAY_ATTACH_POINT_LEFT_TOP,
-		                             .parent = CLAY_ATTACH_POINT_LEFT_CENTER},
-					.attachTo = CLAY_ATTACH_TO_PARENT,
-			  }}) {
-			auto b = mobile_icon_button<false>(ctx, CLAY_ID("FLOATING"),
-			                                   Icons::CROSSHAIRS);
-			if (Clay_Hovered() && b.activated()) {
-				ctx->words_search.clear();
-				// screen_words_list_go(ctx);
-				ctx->mobile_text_input.activate_text_input = true;
-				// ctx->mobile_text_input.focused_value = &ctx->words_search;
-				// ctx->mobile_text_input.focused_id =
-				// CLAY_ID("WordsSearch").id; ctx->mobile_text_input.changed_id
-				// = CLAY_ID("WordsSearch").id;
+		if (ctx->words_search.size > 0) {
+			CLAY(floating_button_clear_id,
+			     {.floating = {
+						.offset = {dpi(8.f), 0.f},
+						.attachPoints = {.element = CLAY_ATTACH_POINT_LEFT_TOP,
+			                             .parent =
+			                                   CLAY_ATTACH_POINT_LEFT_CENTER},
+						.attachTo = CLAY_ATTACH_TO_PARENT,
+				  }}) {
+				auto b = mobile_icon_button<false>(ctx, CLAY_ID("FLOATING"),
+				                                   Icons::CROSSHAIRS);
+				if (Clay_Hovered() && b.activated()) {
+					ctx->words_search.clear();
+					// screen_words_list_go(ctx);
+					ctx->mobile_text_input.activate_text_input = true;
+					// ctx->mobile_text_input.focused_value =
+					// &ctx->words_search; ctx->mobile_text_input.focused_id =
+					// CLAY_ID("WordsSearch").id;
+					// ctx->mobile_text_input.changed_id =
+					// CLAY_ID("WordsSearch").id;
+				}
 			}
 		}
 	}

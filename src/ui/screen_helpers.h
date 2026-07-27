@@ -43,8 +43,10 @@ void screen_word_edit_draw(AppContext *ctx);
 void screen_onboarding_go(AppContext *ctx);
 void screen_onboarding_draw(AppContext *ctx);
 
+#if NEURO
 void screen_tts_asr_go(AppContext *ctx);
 void screen_tts_asr_draw(AppContext *ctx);
+#endif // NEURO
 
 inline void
 draw_text(StrView text, Clay_Color color, uint16_t font_size = 16,

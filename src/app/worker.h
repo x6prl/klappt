@@ -117,9 +117,13 @@ void touch_ui();
 namespace Worker {
 void job_push(AppContext *ctx, Job job);
 void audio_job_push(AppContext *ctx, AudioJob job);
+#if NEURO
 void neuro_job_push(AppContext *ctx, NeuroJob job);
+#endif
 } // namespace Worker
 
 int SDLCALL WorkerThread(void *userdata);
 int SDLCALL AudioWorkerThread(void *userdata);
+#if NEURO
 int SDLCALL NeuroWorkerThread(void *userdata);
+#endif

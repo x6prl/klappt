@@ -15,7 +15,6 @@
 #include "base/atomic.h"
 #include "base/dyn_arr.h"
 #include "base/fixed_set.h"
-#include "base/measure.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "curl/multi.h"
@@ -24,6 +23,8 @@
 #include "platform/zip.h"
 
 namespace {
+
+constexpr auto CACERT_PEM = "https://curl.se/ca/cacert.pem"_v;
 
 size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
                              void *userp) {
@@ -88,7 +89,6 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	uint64_t queue_touched_last_time_ticks_ms = 0;
 
 	MT::run_with_payload(&netctx, [](AppContext *ctx, void *ptr) {
-		SDL_Log("  SETTING NET CTX ");
 		ctx->net = static_cast<NetContext *>(ptr);
 	});
 
@@ -272,7 +272,8 @@ int SDLCALL NetWorkerThread(void *userdata) {
 
 				{ // checking cancellation
 					if (Atomic::is_true(&slot.req.is_cancelled)) {
-						SDL_Log("%d GOING TO CANCEL!!!", slot.req.request_id);
+						SDL_Log("%d GOING TO BE CANCELLED!!!",
+						        slot.req.request_id);
 						slot.int_data.is_cancelled = true;
 						to_cancel.push(tctx()->a, slot.index_in_the_pool);
 					}

@@ -1,17 +1,21 @@
+#if NEURO
+
+#include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_stdinc.h>
+#include <cstring>
+
+#include "screen_helpers.h"
+
 #include "app/app_context.h"
 #include "app/audio_context.h"
 #include "app/worker.h"
 #include "base/str_view.h"
 #include "platform/neuro.h"
-#include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/components/text_input.h"
 #include "ui/dpi.h"
 #include "ui/themes.h"
-#include <SDL3/SDL_audio.h>
-#include <SDL3/SDL_log.h>
-#include <SDL3/SDL_stdinc.h>
-#include <cstring>
 
 void screen_tts_asr_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
@@ -212,3 +216,4 @@ void screen_tts_asr_draw(AppContext *ctx) {
 		}
 	}
 }
+#endif // NEURO

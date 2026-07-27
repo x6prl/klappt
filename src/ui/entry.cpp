@@ -1,24 +1,28 @@
 #include "entry.h"
-#include "app/app_context.h"
-#include "platform/audio.h"
-#include "platform/neuro.h"
-#include "screen_helpers.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
 
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL_log.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_timer.h"
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_timer.h>
 
+#include "clay_support.h"
+#include "screen_helpers.h"
+
+#include "app/app_context.h"
 #include "app/event_codes.h"
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
-#include "clay_support.h"
+#include "platform/audio.h"
+#if NEURO
+#include "platform/neuro.h"
+#endif
+
 #include "components/button.h"
 #include "components/keypad_island.h"
 #include "components/list_island.h"
@@ -213,8 +217,13 @@ void bottom_bar_layout(AppContext *ctx) {
 
 		for (Size i = 0; i < menu.size(); ++i) {
 			// NOTE: skipping tts/asr screen
-			if (1 == i && !ctx->settings.is_using_tts &&
-			    !ctx->settings.is_using_asr) {
+			if (Screen::TTS_ASR == menu[i].second &&
+#if NEURO
+			    !ctx->settings.is_using_tts && !ctx->settings.is_using_asr
+#else
+			    true
+#endif
+			) {
 				continue;
 			}
 			CLAY(CLAY_IDI("ButtonParent", i), buttonParent) {
@@ -226,7 +235,9 @@ void bottom_bar_layout(AppContext *ctx) {
 					} else if (menu[i].second == Screen::LearningList) {
 						screen_learning_list_go(ctx);
 					} else if (menu[i].second == Screen::TTS_ASR) {
+#if NEURO
 						screen_tts_asr_go(ctx);
+#endif
 					} else {
 						screen_start_go(ctx);
 					}
@@ -308,17 +319,18 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 		case SDL_EVENT_FINGER_CANCELED:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
 		case SDL_EVENT_FINGER_UP:
-			SDL_Log("FINGER UP EVENT");
-			if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
-			    ctx->audio_asr_tts_status.is_recording
-			    // AudioContext::TRUE ==
-			    //       SDL_GetAtomicInt(&ctx->sound_ctx->is_recording)
+#if NEURO
+			if (ctx->audio_asr_tts_status
+			          .is_recording_button_pressed        // trying to record
+			    && ctx->audio_asr_tts_status.is_recording // really recording
 			) {
-				SDL_Log("FINGER UP EVENT");
+				SDL_Log("FINGER UP EVENT: stopping record and running asr");
+				// TODO: check cases where a button was pressed and record is
+				// just about to start
 				ctx->audio_asr_tts_status.is_recording_button_pressed = false;
 				record_stop_then_run_asr(ctx);
-				// run_asr(ctx);
 			}
+#endif
 		default:;
 		}
 	}
@@ -545,9 +557,14 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::TTS_ASR: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.TTSAsr");
+#if NEURO
 				app_bar_layout(ctx, "TTS/ASR"_v);
 				screen_tts_asr_draw(ctx);
 				bottom_bar_layout(ctx);
+#else
+				ctx->app_status.push_error("TTS/ASR features are disabled"_v);
+				screen_start_go(ctx);
+#endif
 				break;
 			}
 			}

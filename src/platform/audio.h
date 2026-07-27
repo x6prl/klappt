@@ -8,7 +8,9 @@ struct SherpaOnnxGeneratedAudio;
 void record_init(AppContext *ctx);
 void record_start(AppContext *ctx);
 void record_stop_then_do_nothing(AppContext *ctx);
+#if NEURO
 void record_stop_then_run_asr(AppContext *ctx);
+#endif
 void record_deinit(AppContext *ctx);
 void record_play(AppContext *ctx);
 
