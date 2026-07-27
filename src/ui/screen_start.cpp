@@ -1,15 +1,10 @@
 #include "app/worker.h"
-#include "base/measure.h"
 #include "base/str_view.h"
-#include "platform/net_worker.h"
-#include "platform/zip.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/components/net_download_row.h"
 #include "ui/dpi.h"
 #include <SDL3/SDL_log.h>
-#include <filesystem>
-#include <string_view>
 
 void screen_start_go(AppContext *ctx) { ctx->go(Screen::Start); }
 
@@ -40,24 +35,28 @@ void screen_start_draw(AppContext *ctx) {
 			// };
 			// auto on_f_mem = [](Size slot_index, int32_t request_id, int
 			// status,
+			//                    StrView file_name,
 			//                    DynArr<uint8_t> memory_buffer) {
 			// 	SDL_Log("mem loaded %d, status %d", request_id, status);
+			// 	StrView v{(char*)memory_buffer.data, memory_buffer.size};
+			// 	SDL_Log(StrView_Fmt, StrView_Arg(v));
 			// };
 			// req_pool_index_1 = Worker::net_download_file(
 			// 	  ctx,
 			// 	  "http://0.0.0.0:8000/sherpa-onnx-whisper-base/base-decoder.onnx"_v,
 			// 	  "/tmp/get.html"_v, on_zip_downloaded);
 			// download_track(ctx, req_pool_index_1, "onnx"_v);
-			// r2 = Worker::net_download_memory(
-			// 	  ctx,
-			// 	  "https://www.openthesaurus.de/synonyme/search?q=test&format=application/json"_v,
-			// 	  {
-			// 			.data = ctx->arena_screen().pushN<uint8_t>(2048),
-			// 			.size = 0,
-			// 			.reserved = 2048,
-			// 	  },
-			// 	  on_f_mem);
-			// track_download(ctx, r2, "very long api call"_v);
+			// 			auto r2 = Worker::net_download_memory(
+			// 				  ctx,
+			// "https://curl.se/ca/cacert.pem"_v,
+			// 				  //
+			// "https://www.openthesaurus.de/synonyme/search?q=test&format=application/json"_v,
+			// 				  {
+			// 						.data =
+			// ctx->arena_screen().pushN<uint8_t>(190000), 						.size = 0, 						.reserved
+			// = 190000,
+			// 				  },
+			// 				  on_f_mem);
 
 			screen_exercise_go(ctx, false);
 
@@ -74,7 +73,7 @@ void screen_start_draw(AppContext *ctx) {
 			//              "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"_v});
 		}
 		// for (auto&dl: ctx->downloads) {
-		// 	net_download_row(ctx, dl);
+		// 	download_row(ctx, dl);
 		// }
 	}
 }

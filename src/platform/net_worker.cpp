@@ -1,11 +1,14 @@
 #include "net_worker.h"
 
+#include <filesystem>
+#include <utility>
+
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+
 #include <curl/curl.h>
-#include <filesystem>
-#include <utility>
+#include <openssl/ssl.h>
 
 #include "SDL3/SDL_log.h"
 #include "SDL3/SDL_timer.h"
@@ -15,16 +18,20 @@
 #include "base/atomic.h"
 #include "base/dyn_arr.h"
 #include "base/fixed_set.h"
+#include "base/fixed_str.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "curl/multi.h"
 #include "curl/system.h"
 #include "domain/settings.h"
+#include "platform/files.h"
+#include "platform/fs.h"
 #include "platform/zip.h"
 
 namespace {
 
-constexpr auto CACERT_PEM = "https://curl.se/ca/cacert.pem"_v;
+constexpr auto CACERT_PEM_FILENAME = "cacert.pem"_v;
+constexpr auto CACERT_PEM_URL = "https://curl.se/ca/cacert.pem"_v;
 
 size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
                              void *userp) {
@@ -76,10 +83,14 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	for (Size i{0}; i < netctx.requests_pool.size; ++i) {
 		netctx.requests_pool[i].index_in_the_pool = i;
 	}
-
-	// DynArr<DynArr<uint8_t>> opt_result_list{nullptr};
-
-	{ // CURL global init
+#ifdef OPENSSL_IS_BORINGSSL
+	SDL_Log("using BoringSSL");
+#elif OPENSSL_VERSION_NUMBER
+	SDL_Log("using OpenSSL");
+#else
+#error SLL is not availiable
+#endif
+	{ // CURL init
 		curl_global_init(CURL_GLOBAL_DEFAULT);
 		netctx.multi_handle = curl_multi_init();
 	}
@@ -91,6 +102,8 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	MT::run_with_payload(&netctx, [](AppContext *ctx, void *ptr) {
 		ctx->net = static_cast<NetContext *>(ptr);
 	});
+
+	FixedStr<256> cacert_pem_path{};
 
 	constexpr auto TOUCH_QUEUE_NOT_FASTER_THAN_MS = 16;
 	for (;;) {
@@ -168,6 +181,73 @@ int SDLCALL NetWorkerThread(void *userdata) {
 			{ // adding the request
 				CURL *easy_handle = curl_easy_init();
 				bool is_error_occured{false};
+
+				{ // setting TLS
+					if (!cacert_pem_path.size) {
+						auto &a = tctx()->a;
+						auto g = a.guard();
+						auto external_path = get_writable_file_path_for(
+							  a, CACERT_PEM_FILENAME);
+						cacert_pem_path.copy_from(external_path);
+						constexpr auto CA_CERT_MINFILESIZE = 100 * 1024;
+						if (std::filesystem::exists(
+								  cacert_pem_path.mutable_to_cstr()) &&
+						    std::filesystem::is_regular_file(
+								  cacert_pem_path.mutable_to_cstr()) &&
+						    std::filesystem::file_size(
+								  cacert_pem_path.mutable_to_cstr()) >=
+						          CA_CERT_MINFILESIZE) {
+							SDL_Log("cacert.pem found");
+							// TODO: add updating mechanism
+							// auto on_f_mem = [](Size slot_index,
+							//                    int32_t request_id, int status,
+							//                    StrView file_name,
+							//                    DynArr<uint8_t> memory_buffer) {
+							// 	SDL_Log("mem loaded %d, status %d", request_id,
+							// 	        status);
+							// 	StrView v{(char *)memory_buffer.data,
+							// 	          memory_buffer.size};
+							// 	SDL_Log(StrView_Fmt, StrView_Arg(v));
+							// };
+							// Worker::net_download_memory(
+							// 	  tctx()->app_ctx,
+							// 	  "https://curl.se/ca/cacert.pem"_v,
+							// 	  {
+							// 			.data = tctx()->app_ctx->arena_screen()
+							//                           .pushN<uint8_t>(190000),
+							// 			.size = 0,
+							// 			.reserved = 190000,
+							// 	  },
+							// 	  on_f_mem);
+						} else {
+							auto internal_path = StrView::concat(
+								  a, get_app_base_path(), CACERT_PEM_FILENAME);
+							FileLoader cacert_in{};
+							if (!cacert_in.load_from_path(a, internal_path)) {
+								SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+								             "Asset %s not found",
+								             internal_path.to_cstr(a));
+							} else {
+								if (cacert_in.size <= 0 ||
+								    !file_save_relative(a, CACERT_PEM_FILENAME,
+								                        cacert_in.data,
+								                        cacert_in.size)) {
+
+									SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+									             "Cannot save %s",
+									             external_path.to_cstr(a));
+								} else {
+									SDL_Log(
+										  "cacert.pem copied to external path");
+								}
+							}
+						}
+					}
+					SDL_Log("Setting CAINFO to %s",
+					        cacert_pem_path.mutable_to_cstr());
+					curl_easy_setopt(easy_handle, CURLOPT_CAINFO,
+					                 cacert_pem_path.mutable_to_cstr());
+				}
 
 				curl_easy_setopt(easy_handle, CURLOPT_URL,
 				                 req.url.mutable_to_cstr());

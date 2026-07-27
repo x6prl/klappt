@@ -51,7 +51,7 @@ struct Settings {
 	}
 	void save(Arena &scratch) const {
 		auto settingsdat = Settings::encode(scratch, *this);
-		file_save(scratch, "settings.dat"_v, settingsdat.data,
+		file_save_relative(scratch, "settings.dat"_v, settingsdat.data,
 		settingsdat.size);
 		SDL_Log("Settings saved!");
 	}

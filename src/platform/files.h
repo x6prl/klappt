@@ -22,7 +22,7 @@ inline StrView get_writable_file_path_for(Arena &a, StrView file_name,
 	}
 }
 
-inline bool file_save(Arena &scratch, StrView file_name, const void *data,
+inline bool file_save_relative(Arena &scratch, StrView file_name, const void *data,
                       Size size) {
 	auto g = scratch.guard();
 	auto path = get_writable_file_path_for(scratch, file_name).to_cstr(scratch);
@@ -39,20 +39,24 @@ struct FileLoader {
 	void *data{nullptr};
 	Size size{0};
 
-	bool load(Arena &scratch, StrView file_name) {
+	bool load_from_path(Arena &scratch, StrView path_to_file) {
 		auto g = scratch.guard();
-		auto path = get_writable_file_path_for(scratch, file_name);
-		if (!path) {
+		if (!path_to_file) {
 			return false;
 		}
 
 		size_t _size{};
-		data = SDL_LoadFile(path.to_cstr(scratch), &_size);
+		data = SDL_LoadFile(path_to_file.to_cstr(scratch), &_size);
 		size = static_cast<Size>(_size);
 		if (!data) {
 			return false;
 		}
 		return true;
+	}
+	bool load_from_writable(Arena &scratch, StrView file_name) {
+		auto g = scratch.guard();
+		auto path = get_writable_file_path_for(scratch, file_name);
+		return load_from_path(scratch, path);
 	}
 
 	~FileLoader() {

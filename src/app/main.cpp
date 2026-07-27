@@ -356,7 +356,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	FileLoader settings_file{};
 	auto g = ctx->arena_frame.guard();
-	if (settings_file.load(ctx->arena_frame, "settings.dat"_v)) {
+	if (settings_file.load_from_writable(ctx->arena_frame, "settings.dat"_v)) {
 		if (!Settings::decode(settings_file.data, settings_file.size,
 		                      &ctx->settings)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot decode settings.dat");

@@ -31,7 +31,7 @@ inline void save_words_dat(Arena &scratch, const Settings &settings,
 		return;
 	}
 	const auto leaf = AssetsDL::words_snapshot_leaf(settings.tr_language);
-	if (!file_save(scratch, leaf, encoded.data, encoded.size)) {
+	if (!file_save_relative(scratch, leaf, encoded.data, encoded.size)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Saving " StrView_Fmt " failed",
 		             StrView_Arg(leaf));
 	}
@@ -349,7 +349,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 
 		ctx.words = new Words;
 		FileLoader fl{};
-		if (fl.load(scratch, words_leaf)) {
+		if (fl.load_from_writable(scratch, words_leaf)) {
 			SDL_Log(StrView_Fmt " loaded: %d bytes", StrView_Arg(words_leaf),
 			        fl.size);
 			if (!WordsCodec::decode(ctx.arena, fl.data, fl.size, *ctx.words)) {

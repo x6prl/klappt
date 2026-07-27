@@ -769,6 +769,7 @@ if (APPLE)
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Font-Awesome-7-Free-Solid-900.otf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Bold.ttf")
+    add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/cacert.pem")
     # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/ar.txt")
     # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/en.txt")
     # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/ru.txt")
@@ -782,6 +783,7 @@ elseif(EMSCRIPTEN)
         "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Font-Awesome-7-Free-Solid-900.otf@/\""
         "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf@/\""
         "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Bold.ttf@/\""
+        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/cacert.pem@/\""
         # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/ar.txt@/word_data/\""
         # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/en.txt@/word_data/\""
         # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/ru.txt@/word_data/\""
@@ -803,11 +805,7 @@ else()
         get_filename_component(outdir "${DEST_ROOT}/${filename}" DIRECTORY)
         get_filename_component(filename_dir "${filename}" DIRECTORY)
 
-        if (filename_dir STREQUAL "word_data")
-            set(input_name "${CMAKE_CURRENT_LIST_DIR}/${filename}")
-        else()
-            set(input_name "${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/${filename}")
-        endif()
+        set(input_name "${CMAKE_CURRENT_LIST_DIR}/src/assets/${filename}")
 
         add_custom_command(TARGET "${EXECUTABLE_NAME}" POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${outdir}"
@@ -815,11 +813,12 @@ else()
         )
     endmacro()
 
-    copy_helper("Inter-VariableFont.ttf")
-    copy_helper("ReadexPro-Regular.ttf")
-    copy_helper("Font-Awesome-7-Free-Solid-900.otf")
-    copy_helper("JetBrainsMono-Regular.ttf")
-    copy_helper("JetBrainsMono-Bold.ttf")
+    copy_helper("fonts/Inter-VariableFont.ttf")
+    copy_helper("fonts/ReadexPro-Regular.ttf")
+    copy_helper("fonts/Font-Awesome-7-Free-Solid-900.otf")
+    copy_helper("fonts/JetBrainsMono-Regular.ttf")
+    copy_helper("fonts/JetBrainsMono-Bold.ttf")
+    copy_helper("cacert.pem")
     # copy_helper("word_data/ar.txt")
     # copy_helper("word_data/en.txt")
     # copy_helper("word_data/ru.txt")
