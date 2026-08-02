@@ -1,6 +1,7 @@
 package org.viktorfilinkov.klappt;
 
 import android.content.*;
+import android.os.Build;
 import android.text.Editable;
 import android.view.*;
 import android.view.inputmethod.BaseInputConnection;
@@ -64,18 +65,15 @@ class SDLInputConnection extends BaseInputConnection
 
     @Override
     public boolean deleteSurroundingText(int beforeLength, int afterLength) {
-        // Some IMEs don't track prefilled native text, so deleting existing text may
-        // not produce a diff in updateText(). Emit explicit backspace key events.
-        // This also preserves the older SDL workaround for IMEs that don't surface
-        // backspace through the usual diff-based path.
+        // Workaround to capture backspace key. Ref: http://stackoverflow.com/questions>/14560344/android-backspace-in-webview-baseinputconnection
+        // and https://bugzilla.libsdl.org/show_bug.cgi?id=2265
         if (beforeLength > 0 && afterLength == 0) {
+            // backspace(s)
             while (beforeLength-- > 0) {
                 nativeGenerateScancodeForUnichar('\b');
             }
-            // Keep this path key-event only to avoid duplicate backspaces from
-            // updateText() when IME state does happen to be in sync.
             return true;
-        }
+       }
 
         if (!super.deleteSurroundingText(beforeLength, afterLength)) {
             return false;
@@ -135,3 +133,4 @@ class SDLInputConnection extends BaseInputConnection
 
     public static native void nativeGenerateScancodeForUnichar(char c);
 }
+
