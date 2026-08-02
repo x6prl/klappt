@@ -76,6 +76,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 									} else if (tap_state ==
 						                       TapSwipeLongTap::State::
 						                             LongTap) {
+#if NEURO
 										if (ctx->settings.is_using_tts) {
 											auto tts_string = word_tts_full(
 												  ctx->arena_screen(),
@@ -87,6 +88,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 								            //                         tts_string});
 											run_tts(ctx, tts_string);
 										}
+#endif // NEURO
 									}
 								}
 								return true;

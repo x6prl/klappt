@@ -200,9 +200,10 @@ int SDLCALL NetWorkerThread(void *userdata) {
 							SDL_Log("cacert.pem found");
 							// TODO: add updating mechanism
 							// auto on_f_mem = [](Size slot_index,
-							//                    int32_t request_id, int status,
-							//                    StrView file_name,
-							//                    DynArr<uint8_t> memory_buffer) {
+							//                    int32_t request_id, int
+							//                    status, StrView file_name,
+							//                    DynArr<uint8_t> memory_buffer)
+							//                    {
 							// 	SDL_Log("mem loaded %d, status %d", request_id,
 							// 	        status);
 							// 	StrView v{(char *)memory_buffer.data,
@@ -243,8 +244,6 @@ int SDLCALL NetWorkerThread(void *userdata) {
 							}
 						}
 					}
-					SDL_Log("Setting CAINFO to %s",
-					        cacert_pem_path.mutable_to_cstr());
 					curl_easy_setopt(easy_handle, CURLOPT_CAINFO,
 					                 cacert_pem_path.mutable_to_cstr());
 				}
@@ -301,6 +300,15 @@ int SDLCALL NetWorkerThread(void *userdata) {
 					curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, file);
 					curl_easy_setopt(easy_handle, CURLOPT_RESUME_FROM_LARGE,
 					                 foffset);
+					// NOTE: redirection support
+					{
+						curl_easy_setopt(easy_handle, CURLOPT_FOLLOWLOCATION,
+						                 1);
+						curl_easy_setopt(easy_handle, CURLOPT_MAXREDIRS, 2);
+					}
+					// curl_easy_setopt(easy_handle,
+					// CURLOPT_REDIR_PROTOCOLS_STR,
+					//                  "http,https");
 				}
 
 				auto mcode =

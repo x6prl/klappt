@@ -76,7 +76,7 @@ struct AppContext {
 
 	using Idx = int;
 	static constexpr Idx STACK_SIZE{16};
-	static constexpr Size MAIN_ARENA_SIZE = 64 << 20;
+	static constexpr Size MAIN_ARENA_SIZE = 32 << 20;
 	static constexpr Size TMP_ARENA_SIZE = 8 << 20;
 
 	SDL_Window *window{};

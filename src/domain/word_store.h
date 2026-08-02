@@ -4,9 +4,9 @@
 
 #include <SDL3/SDL_log.h>
 
-#include "base/str_view.h"
 #include "base/arena.h"
 #include "base/profiler.h"
+#include "base/str_view.h"
 #include "words_codec.h"
 
 struct Arena;
@@ -103,6 +103,7 @@ struct WordStore {
 			Size emitted = 0;
 			for (auto it = db->allterms_begin("Q"); it != db->allterms_end("Q");
 			     ++it) {
+				auto guard = scratch.guard();
 				if (index < start) {
 					++index;
 					continue;

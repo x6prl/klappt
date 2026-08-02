@@ -10,7 +10,9 @@
 
 struct AssetsDL {
 
-	static constexpr auto HOST = "http://0.0.0.0:8000/"_v;
+	// static constexpr auto HOST = "http://0.0.0.0:8000/"_v;
+	static constexpr auto HOST =
+		  "https://github.com/x6prl/klappt-resources/raw/refs/heads/main/"_v;
 	static constexpr auto TTS_ESPEAKNG_DATA_AND_PIPER_ZIP =
 		  "espeak-ng-data-and-piper.zip"_v;
 	static constexpr auto ASR_WHISPER_BASE_ZIP =
@@ -54,9 +56,10 @@ struct AssetsDL {
 			                                  ".zip"_v);
 			break;
 		case Type::OPTIONAL_ASR:
-			return get_writable_file_path_for(a,ASR_WHISPER_BASE_ZIP);
+			return get_writable_file_path_for(a, ASR_WHISPER_BASE_ZIP);
 		case Type::OPTIONAL_TTS:
-			return get_writable_file_path_for(a,TTS_ESPEAKNG_DATA_AND_PIPER_ZIP);
+			return get_writable_file_path_for(a,
+			                                  TTS_ESPEAKNG_DATA_AND_PIPER_ZIP);
 		case Type::_COUNT:
 			std::unreachable();
 		}
@@ -94,7 +97,7 @@ struct AssetsDL {
 		case Type::_COUNT:
 			std::unreachable();
 		}
-			std::unreachable();
+		std::unreachable();
 	}
 
 	static constexpr StrView words_snapshot_leaf(Lang lang) {

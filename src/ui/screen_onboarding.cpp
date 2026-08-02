@@ -145,7 +145,7 @@ void screen_onboarding_draw(AppContext *const ctx) {
 	auto next_stage = [&ctx](bool is_should_save) {
 		ctx->settings.onboarding_stage += 1;
 		if (is_should_save) {
-			ctx->settings.save(ctx->arena);
+			ctx->settings.save(ctx->arena_frame);
 		}
 	};
 
@@ -408,11 +408,20 @@ void screen_onboarding_draw(AppContext *const ctx) {
 			}
 			break;
 		default:
+
 			settings.onboarding_stage = -1;
 			settings.save(ctx->arena_frame);
 			if (!init_runtime_data(*ctx)) {
 				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 				             "failed to init runtime data");
+				ctx->app_status.push_error("Failed to init runtime data"_v);
+			}
+			if (ctx->words && ctx->words->size == 0 &&
+			    !seed_default_learning_list(*ctx)) {
+				ctx->app_status.push_error(
+					  "Seeding default learning list failed"_v);
+				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+				             "Seeding default learning list failed");
 			}
 			screen_start_go(ctx);
 		}

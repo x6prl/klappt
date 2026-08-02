@@ -2,8 +2,6 @@
 
 #include "SDL3/SDL_log.h"
 
-#include <filesystem>
-
 #include "app/app_context.h"
 #include "app/assets_dl.h"
 #include "base/arena.h"
@@ -190,9 +188,9 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 	}
 }
 
-inline bool seed_default_learning_list(const DynArr<Word> &parsed,
-                                       AppContext &ctx) {
+inline bool seed_default_learning_list(AppContext &ctx) {
 	static constexpr LearningListSeedSpec DEFAULT_SEEDS[] = {
+		  // TODO: review and update
 		  {WordType::Verb, "sein"_v},
 		  {WordType::Verb, "kommen"_v},
 		  {WordType::Verb, "sehen"_v},
@@ -211,10 +209,26 @@ inline bool seed_default_learning_list(const DynArr<Word> &parsed,
 		  {WordType::Phrase, "Los geht's!"_v},
 		  {WordType::Phrase, "Ich bin dafür!"_v},
 	};
-
+	DynArr<Word> parsed;
 	bool added_any = false;
 	for (const auto &spec : DEFAULT_SEEDS) {
+		auto g = ctx.arena_screen().guard();
+
+		ctx.word_store.for_each_matching_word_range(
+			  ctx.arena_frame, spec.key, 0, ctx.word_store.word_count(),
+			  [a = &ctx.arena_screen(), list = &parsed, spec](Size _,
+		                                                      const Word &w) {
+				  if (spec.type == w.type &&
+			          word_most_meaningfull_lemma(w).is_contains_substr(
+							spec.key)) {
+					  list->push(*a, word_clone(*a, w));
+					  // SDL_Log(" found word: " StrView_Fmt,
+					  //            StrView_Arg(word_tts_full(*a, *a, w)));
+				  }
+				  return true;
+			  });
 		const auto *parsed_word = find_learning_list_seed_word(parsed, spec);
+
 		if (!parsed_word) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Default learning-list seed not found: " StrView_Fmt,
@@ -243,11 +257,8 @@ inline bool seed_default_learning_list(const DynArr<Word> &parsed,
 	return true;
 }
 
-inline bool txt_to_xapian(AppContext &ctx,
-                          const std::filesystem::path &basePath) {
-	const auto source_leaf = "en.txt"_v; // NOTE: _____!!!!!!!!! HERE
+inline void txt_to_xapian(AppContext &ctx, StrView path) {
 	Measure m{__FUNCTION__};
-	const auto lang = ctx.settings.tr_language;
 	// const auto words_leaf = Settings::words_snapshot_leaf(lang);
 	// const auto word_store_leaf = Settings::word_store_leaf(lang);
 	// const auto states_leaf = Settings::states_store_leaf(lang);
@@ -258,14 +269,12 @@ inline bool txt_to_xapian(AppContext &ctx,
 	// .txt file parsing and xapian db update
 	DynArr<Word> parsed_words;
 
-	const auto source_path =
-		  basePath / "word_data" /
-		  std::string(source_leaf.data, static_cast<size_t>(source_leaf.size));
-	if (!wparse_file(a, source_path.c_str(), parsed_words, &ctx.app_status)) {
+	if (!wparse_file(a, path.to_cstr(ctx.arena_frame), parsed_words,
+	                 &ctx.app_status)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Loading source words from " StrView_Fmt " failed",
-		             StrView_Arg(source_leaf));
-		return false;
+		             StrView_Arg(path));
+		exit(-1);
 	}
 	m.point().printus("txt file parsed");
 	if (parsed_words.size > ctx.word_store.word_count()) {
@@ -277,23 +286,13 @@ inline bool txt_to_xapian(AppContext &ctx,
 		if (!import_new_parsed_words(a, ctx.word_store, parsed_words,
 		                             added_count)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Importing parsed words from " StrView_Fmt " failed",
-			             StrView_Arg(source_leaf));
-			return false;
+			             "Importing parsed words failed" );
+			exit(-1);
 		}
 		m.point().printus("new parsed words imported");
 		if (added_count > 0) {
-			SDL_Log("Imported %d new words from " StrView_Fmt,
-			        static_cast<int>(added_count), StrView_Arg(source_leaf));
+			SDL_Log("Imported %d new words", static_cast<int>(added_count));
 		}
-
-		if (ctx.words->size == 0 &&
-		    !seed_default_learning_list(parsed_words, ctx)) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Seeding default learning list failed");
-			return false;
-		}
-		m.point().printus("seeded if had been needed");
 	} else {
 		SDL_Log("parsed %d and we have %d", parsed_words.size,
 		        ctx.word_store.word_count());
@@ -301,7 +300,7 @@ inline bool txt_to_xapian(AppContext &ctx,
 	m.lap().printus("import active dictionary");
 	// ***************************************************
 
-	return true;
+	exit(0);
 }
 
 inline bool init_runtime_data(AppContext &ctx) {

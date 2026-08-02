@@ -115,6 +115,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			          source_font_id, CLAY_TEXT_WRAP_NEWLINES);
 			draw_text(diff.source_sub1, theme()->onSurface, udpi(20),
 			          source_font_id);
+#if NEURO
 			if (ctx->settings.is_using_tts) {
 				// play on pressed
 				if (ctx->tslt.is_tap() && Clay_Hovered()) {
@@ -125,6 +126,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					run_tts(ctx, tts_string);
 				}
 			}
+#endif // NEURO
 		}
 		CLAY(CLAY_ID("DiffBlock"),
 		     {.layout = {
@@ -270,6 +272,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				// auto play = mobile_icon_button<false>(ctx,
 				// CLAY_ID("PlayButton"), Icons::PLAY);
 
+#if NEURO
 				if (ctx->settings.is_using_tts) {
 					// play on pressed
 					if (ctx->tslt.is_tap() && Clay_Hovered()) {
@@ -282,6 +285,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						run_tts(ctx, tts_string);
 					}
 				}
+#endif // NEURO
 
 				draw_wrapped_parts("Correct answer"_v, false);
 				draw_wrapped_parts("Your answer"_v, true);

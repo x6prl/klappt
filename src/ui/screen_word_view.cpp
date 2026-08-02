@@ -429,7 +429,7 @@ void screen_word_view_draw(AppContext *ctx) {
 			if (edit.activated()) {
 				screen_word_edit_push(ctx);
 			}
-
+#if NEURO
 			if (ctx->settings.is_using_tts) {
 				auto play = mobile_icon_button<true>(ctx, CLAY_ID("PlayButton"),
 				                                     Icons::PLAY);
@@ -443,6 +443,7 @@ void screen_word_view_draw(AppContext *ctx) {
 					run_tts(ctx, tts_string);
 				}
 			}
+#endif // NEURO
 		}
 	}
 }

@@ -1,9 +1,10 @@
 #pragma once
 
+#include "SDL3/SDL_atomic.h"
 #include <SDL3/SDL_log.h>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
 
 #include <sys/mman.h>
@@ -34,11 +35,11 @@ struct Arena {
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
 		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		printf("Created arena of size %d KiB\n", arena_size / 1024);
+		SDL_Log("Created arena of size %d KiB", arena_size / 1024);
 	}
 	~Arena() {
 		munmap(data, allocated_size);
-		printf("Destroyed arena of size %d KiB\n", allocated_size / 1024);
+		SDL_Log("Destroyed arena of size %d KiB", allocated_size / 1024);
 	}
 	Arena(Arena const &) = delete;
 	void operator=(Arena const &) = delete;

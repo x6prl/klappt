@@ -1,6 +1,6 @@
-#include "ui/components/download_data.h"
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 
 #define SDL_MAIN_USE_CALLBACKS // This is necessary for the new callbacks API.
                                // To use the legacy API, don't define this.
@@ -13,6 +13,7 @@
 #include <SDL3/SDL_thread.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "app/assets_dl.h"
 #include "app/app_context.h"
 #include "app/event_codes.h"
 #include "app/hotreload.h"
@@ -375,6 +376,13 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		ui_settings_init(ctx);
 	}
 	m.lap().printus("ui settings init");
+
+	if (false) {
+		auto word_store_path =
+			  get_writable_file_path_for(ctx->arena_frame, AssetsDL::word_store_leaf(lang_ru));
+		ctx->word_store.open(word_store_path);
+		txt_to_xapian(*ctx, "/home/x/downloads/wiki/ru.txt"_v);
+	}
 
 	if (ctx->settings.onboarding_stage < 0) {
 		if (!init_runtime_data(*ctx)) {
