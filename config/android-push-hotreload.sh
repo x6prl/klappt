@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "${0%/*}/.."
 ROOT_DIR="$(pwd)"
-ANDROID_DIR="$ROOT_DIR/SDL/android-project"
+ANDROID_DIR="$ROOT_DIR/android"
 
 ABI="arm64-v8a"
 PKG="org.viktorfilinkov.klappt"

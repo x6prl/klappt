@@ -1,13 +1,35 @@
-.DS_Store
 build
 build-prof
-imgui.ini
-.vscode
-.cache
-.codex
+.DS_Store
 .moved-submodule-content/
-src/ui/translations
-word_data
+
+.cache
+
+###################################
+# python
+###################################
 __pycache__/
 *.py[cod]
+
+###################################
+# debug and profiling
+###################################
 perf.data*
+
+###################################
+# generated
+###################################
+src/ui/translations
+
+###################################
+# Android stuff
+###################################
+android/build
+android/app/build
+android/local.properties
+**/.gradle/
+**/.idea
+**/.cxx
+*.iml
+# copied on build
+android/app/src/main/assets/*
