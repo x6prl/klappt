@@ -16,7 +16,6 @@
 #include "app/assets_dl.h"
 #include "app/app_context.h"
 #include "app/event_codes.h"
-#include "app/hotreload.h"
 #include "app/net_context.h"
 #include "app/words_init.h"
 #include "app/worker.h"
@@ -29,14 +28,21 @@
 #include "platform/fs.h"
 #include "platform/net_worker.h"
 #include "ui/textcache.h"
+#include "ui/entry.h"
+
+#if HOTRELOAD
+#include "app/hotreload.h"
+#endif
 
 #if NEURO
 #include "platform/neuro.h"
 #endif
 
-constexpr uint32_t windowStartWidth = 1200 / 3;
-constexpr uint32_t windowStartHeight = 2670 / 3;
+constexpr uint32_t WINDOW_START_WIDTH = 1200 / 3;
+constexpr uint32_t WINDOW_START_HEIGHT = 2670 / 3;
+
 extern thread_local ThreadContext *_tctx;
+
 #if defined(TRACY_ENABLE)
 static const char *EventTypeName(Uint32 type) {
 	switch (type) {
@@ -112,15 +118,15 @@ static const char *FrameName(Screen screen) {
 }
 #endif
 
-static void WaitForProfilerConnection() {
 #if defined(TRACY_ENABLE)
+static void WaitForProfilerConnection() {
 	SDL_Log("Waiting for Tracy profiler connection on port 8086...");
 	while (!KLAPPT_PROFILE_CONNECTED()) {
 		SDL_Delay(100);
 	}
 	SDL_Log("Tracy profiler connected.");
-#endif
 }
+#endif
 
 static SDL_AppResult SDL_Fail() {
 	SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
@@ -155,11 +161,13 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		}
 	}
 	m.lap().printus("SDL_Init");
+#if defined(TRACY_ENABLE)
 	{
 		KLAPPT_PROFILE_SCOPE_N("WaitForProfilerConnection");
 		WaitForProfilerConnection();
 	}
-	m.lap().printus("Tracy connect");
+	m.lap().printus("Tracy connected");
+#endif
 
 	// init TTf
 	{
@@ -181,7 +189,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	{
 		KLAPPT_PROFILE_SCOPE_N("CreateWindow");
 		window = SDL_CreateWindow(
-			  "klappt", windowStartWidth, windowStartHeight,
+			  "klappt", WINDOW_START_WIDTH, WINDOW_START_HEIGHT,
 			  SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY
 			  // Well, using fullscreen implies dancing
 		      // around safe area during text input //

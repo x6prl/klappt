@@ -469,7 +469,6 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 	if (count < 0) {
 		count = 0;
 	}
-	count = 1000;
 
 	try {
 		Xapian::QueryParser parser;

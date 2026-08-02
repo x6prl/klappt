@@ -55,9 +55,8 @@ void word_main(Clay_ElementId id, StrView pre, StrView main, StrView post,
 }
 
 uint16_t translation_font_id(const AppContext *ctx) {
-	return ctx->settings.tr_language == lang_ar
-	             ? FontID::ARABIC_MAIN
-	             : FontID::MAIN;
+	return ctx->settings.tr_language == lang_ar ? FontID::ARABIC_MAIN
+	                                            : FontID::MAIN;
 }
 
 void word_second_col(Clay_ElementId id, StrView text, Clay_Color color,
@@ -86,9 +85,9 @@ void word_second_col(Clay_ElementId id, StrView text, Clay_Color color,
 
 } // namespace
 
-TapSwipeLongTap::State word_card_words_list(AppContext *ctx, Clay_ElementId id,
-                                            const Word &w) {
-	KLAPPT_PROFILE_SCOPE_N("word_card_longtap");
+TapSwipeLongTap::State
+word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
+	KLAPPT_PROFILE_SCOPE_N("word_card_for_words_list");
 	const auto padding = udpi(6.f);
 	const auto height = dpi(WORD_CARD_HEIGHT);
 	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
@@ -216,8 +215,8 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 }
 
 // tapped, longtapped
-TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id, const Word &w,
-                        int due_mark) {
+TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
+                                          const Word &w, int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
 	const auto padding = udpi(6.f);
 	const auto height = dpi(WORD_CARD_HEIGHT);
@@ -342,7 +341,6 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id, co
 							.wrapMode = CLAY_TEXT_WRAP_NONE,
 					  }));
 		}
-
 
 		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
 		                          ctx->tslt.state == TapSwipeLongTap::LongTap);

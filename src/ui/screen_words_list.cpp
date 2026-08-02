@@ -1,4 +1,5 @@
 #include "app/words_init.h"
+#include "base/profiler.h"
 #include "base/str_view.h"
 #include "screen_helpers.h"
 #include "ui/components/button.h"
@@ -16,6 +17,7 @@ void screen_words_list_go(AppContext *ctx) {
 }
 
 void screen_words_list_draw(AppContext *ctx) {
+	KLAPPT_PROFILE_SCOPE();
 	auto floating_button_clear_id = CLAY_ID("FloatingButtonClear");
 	{ // floating buttons
 		if (ctx->words_search.size > 0) {
@@ -68,6 +70,7 @@ void screen_words_list_draw(AppContext *ctx) {
 		}
 		// NOTE: at least 2 chars to start searching
 		if (ctx->words_search.size >= 2) {
+			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
 			const auto query = ctx->words_search.view();
 			const auto total_words = ctx->word_store.matching_word_count(query);
 			CLAY(CLAY_ID("WordsListSlot"),
@@ -86,8 +89,10 @@ void screen_words_list_draw(AppContext *ctx) {
 													  CLAY_SIZING_GROW(0),
 													  CLAY_SIZING_FIXED(dpi(
 															WORD_CARD_ROW_HEIGHT))}}}) {
-										auto tap_state = word_card_words_list(
-											  ctx, CLAY_IDI("Word", index), w);
+										auto tap_state =
+											  word_card_for_words_list(
+													ctx,
+													CLAY_IDI("Word", index), w);
 										if (tap_state ==
 							                TapSwipeLongTap::LongTap) {
 											SDL_Log(StrView_Fmt,
