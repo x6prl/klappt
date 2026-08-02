@@ -11,8 +11,9 @@ struct MobileTextInputBuffer {
 	Size size{0};
 
 	void clear() {
-		if (true) {
-			memset(data, 0, max_size); // TODO: quick bugfix
+		if (true) { // TODO: quick bugfix
+			memset(data, 0, max_size);
+			size = 0;
 		} else {
 			size = 0;
 			data[0] = '\0';

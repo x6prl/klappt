@@ -1,14 +1,15 @@
-#include "app/words_init.h"
+#include <SDL3/SDL_log.h>
+
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "screen_helpers.h"
+#include "app/words_init.h"
 #include "ui/components/button.h"
 #include "ui/components/fast_list.h"
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 #include "ui/dpi.h"
 #include "ui/tslt.h"
-#include <SDL3/SDL_log.h>
+#include "screen_helpers.h"
 
 void screen_words_list_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
