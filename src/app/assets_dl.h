@@ -63,6 +63,7 @@ struct AssetsDL {
 		case Type::_COUNT:
 			std::unreachable();
 		}
+		std::unreachable();
 	}
 
 	StrView zip_url(Arena &a, AssetsDL::Type type, Lang tr_language) {
@@ -82,6 +83,7 @@ struct AssetsDL {
 		case Type::_COUNT:
 			std::unreachable();
 		}
+		std::unreachable();
 	}
 
 	RemoteAsset &get(AssetsDL::Type type, Lang tr_language) {
@@ -113,6 +115,7 @@ struct AssetsDL {
 		default:
 			std::unreachable();
 		}
+		std::unreachable();
 	}
 
 	static constexpr StrView word_store_leaf_de() {
@@ -132,6 +135,7 @@ struct AssetsDL {
 		default:
 			std::unreachable();
 		}
+		std::unreachable();
 	}
 
 	static constexpr StrView states_store_leaf(Lang lang) {
@@ -147,6 +151,7 @@ struct AssetsDL {
 		default:
 			std::unreachable();
 		}
+		std::unreachable();
 	}
 
 	static StrView get_url_for(Arena &a, StrView name, StrView suffix) {

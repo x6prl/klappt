@@ -30,17 +30,17 @@ void screen_word_suggestions_go(AppContext *ctx) {
 
 	auto word_count = ctx->word_store.word_count();
 	// TODO: make uniform
-	auto range_start = random_num(0,
-	                              WORDS_CHECK_MAX < word_count
-	                                    ? word_count - WORDS_CHECK_MAX
-	                                    : word_count,
-	                              &rng_state);
+	auto range_start =
+		  random_num(0,
+	                 WORDS_CHECK_MAX < word_count ? word_count - WORDS_CHECK_MAX
+	                                              : word_count,
+	                 &rng_state);
 	auto range_count = WORDS_CHECK_MAX;
 	SDL_Log("st=%d, c=%d", range_start, range_count);
 
 	ctx->word_store.for_each_word_range(
 		  ctx->arena_frame, range_start, range_count,
-		  [a = &suggestions_arena, list = &candidates](Size i, const Word &w) {
+		  [a = &suggestions_arena, list = &candidates](Size, const Word &w) {
 			  if (0 == w.in_learning_list && 0 == w.was_learned &&
 		          WordType::Phrase != w.type) {
 				  list->push(*a, w.word_id);

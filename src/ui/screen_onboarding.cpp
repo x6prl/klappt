@@ -35,7 +35,6 @@ void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
 			   // .border = {.color = theme()->outline,
 	           //                  .width = {.bottom = udpi(1.f)}},
 		 }) {
-		const bool is_dark = theme()->theme == Theme::Dark;
 		CLAY(CLAY_IDI("Label", id.id),
 		     {
 				   .layout =
@@ -87,9 +86,10 @@ bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 };
 
 bool run_download_and_unpack_tr_asset(AppContext *ctx) {
-	return check_and_run_download_and_unpack(
-		  ctx, "Main dictionary"_v, AssetsDL::Type::XAPIAN_TR,
-		  [](AppContext *_) { return true; });
+	return check_and_run_download_and_unpack(                  //
+		  ctx, "Main dictionary"_v, AssetsDL::Type::XAPIAN_TR, //
+		  [](AppContext *_) { return true; }                   //
+	);
 }
 
 bool run_download_and_unpack_optional_assets(AppContext *ctx) {
@@ -340,7 +340,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 					if (dl.status == DownloadData::Status::FINISHED_OK) {
 						++finished_count;
 					}
-					bool should_retry = download_row(ctx, dl);
+					// bool should_retry =
+					download_row(ctx, dl);
 					// if (should_retry) {
 					// 	Worker::net_request_retry(ctx,
 					// 	                          dl.tracking_req_pool_index);
@@ -380,11 +381,11 @@ void screen_onboarding_draw(AppContext *const ctx) {
 						  !settings.asset(AType::XAPIAN_TR).is_unpacked;
 					settings.assets.for_each_optional(
 						  [&is_unpacking_in_progress](
-								AssetsDL::RemoteAsset &asset, auto t) {
+								AssetsDL::RemoteAsset &asset, auto) {
 							  auto g = tctx()->a.guard();
-							  auto es = StrView::from_number(
-									tctx()->a, asset.expected_size);
-							  // SDL_Log("TYPE (%d) %d %d %d " StrView_Fmt,
+							  // auto es = StrView::from_number(
+						      // tctx()->a, asset.expected_size);
+						      // SDL_Log("TYPE (%d) %d %d %d " StrView_Fmt,
 						      //            std::to_underlying(t),
 						      //            (int)asset.is_zip_ready_to_unpack,
 						      //            (int)asset.is_unpacked,
@@ -392,8 +393,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 						      //            StrView_Arg(es));
 							  is_unpacking_in_progress =
 									is_unpacking_in_progress ||
-									asset.is_zip_ready_to_unpack &&
-										  !asset.is_unpacked;
+									(asset.is_zip_ready_to_unpack &&
+						             !asset.is_unpacked);
 						  });
 				}
 

@@ -216,14 +216,14 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 
 		ctx.word_store.for_each_matching_word_range(
 			  ctx.arena_frame, spec.key, 0, ctx.word_store.word_count(),
-			  [a = &ctx.arena_screen(), list = &parsed, spec](Size _,
+			  [a = &ctx.arena_screen(), list = &parsed, spec](Size,
 		                                                      const Word &w) {
 				  if (spec.type == w.type &&
 			          word_most_meaningfull_lemma(w).is_contains_substr(
 							spec.key)) {
 					  list->push(*a, word_clone(*a, w));
 					  // SDL_Log(" found word: " StrView_Fmt,
-					  //            StrView_Arg(word_tts_full(*a, *a, w)));
+				      //            StrView_Arg(word_tts_full(*a, *a, w)));
 				  }
 				  return true;
 			  });
@@ -286,7 +286,7 @@ inline void txt_to_xapian(AppContext &ctx, StrView path) {
 		if (!import_new_parsed_words(a, ctx.word_store, parsed_words,
 		                             added_count)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Importing parsed words failed" );
+			             "Importing parsed words failed");
 			exit(-1);
 		}
 		m.point().printus("new parsed words imported");

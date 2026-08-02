@@ -22,9 +22,7 @@ struct Settings {
 	bool is_using_asr{false};
 
 	static void for_every_lang(auto f) {
-		for (int32_t i{0};
-		     i < std::to_underlying(lang_COUNT);
-		     ++i) {
+		for (int32_t i{0}; i < (int)std::to_underlying(lang_COUNT); ++i) {
 			auto lang = static_cast<Lang>(i);
 			f(i, lang);
 		}
@@ -52,7 +50,7 @@ struct Settings {
 	void save(Arena &scratch) const {
 		auto settingsdat = Settings::encode(scratch, *this);
 		file_save_relative(scratch, "settings.dat"_v, settingsdat.data,
-		settingsdat.size);
+		                   settingsdat.size);
 		SDL_Log("Settings saved!");
 	}
 };
