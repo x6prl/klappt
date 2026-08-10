@@ -10,8 +10,9 @@
 #include <curl/curl.h>
 #include <openssl/ssl.h>
 
-#include "SDL3/SDL_log.h"
-#include "SDL3/SDL_timer.h"
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_timer.h>
+
 #include "app/app_context.h"
 #include "app/net_context.h"
 #include "app/worker.h"

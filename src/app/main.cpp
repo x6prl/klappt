@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 
 #define SDL_MAIN_USE_CALLBACKS // This is necessary for the new callbacks API.
@@ -13,8 +14,8 @@
 #include <SDL3/SDL_thread.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-#include "app/assets_dl.h"
 #include "app/app_context.h"
+#include "app/assets_dl.h"
 #include "app/event_codes.h"
 #include "app/net_context.h"
 #include "app/words_init.h"
@@ -27,8 +28,8 @@
 #include "platform/files.h"
 #include "platform/fs.h"
 #include "platform/net_worker.h"
-#include "ui/textcache.h"
 #include "ui/entry.h"
+#include "ui/textcache.h"
 
 #if HOTRELOAD
 #include "app/hotreload.h"
@@ -385,11 +386,34 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 	m.lap().printus("ui settings init");
 
-	if (false) {
-		auto word_store_path =
-			  get_writable_file_path_for(ctx->arena_frame, AssetsDL::word_store_leaf(lang_ru));
-		ctx->word_store.open(word_store_path);
-		txt_to_xapian(*ctx, "/home/x/downloads/wiki/ru.txt"_v);
+	if (argc > 1 && 0 == strncmp(argv[1], "xapian", 7)) {
+		auto rs_path = "/home/x/src/klappt-resources/"_v;
+		{
+			SDL_Log("en");
+			auto word_store_path =
+				  StrView::concat(ctx->arena_frame, rs_path,
+			                      AssetsDL::word_store_leaf(lang_en));
+			ctx->word_store.open(word_store_path);
+			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/en.txt"_v);
+		}
+		{
+			SDL_Log("ru");
+			auto word_store_path =
+				  StrView::concat(ctx->arena_frame, rs_path,
+			                      AssetsDL::word_store_leaf(lang_ru));
+			ctx->word_store.open(word_store_path);
+			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/ru.txt"_v);
+		}
+		if (false) {
+			SDL_Log("tr");
+			auto word_store_path =
+				  StrView::concat(ctx->arena_frame, rs_path,
+			                      AssetsDL::word_store_leaf(lang_tr));
+			ctx->word_store.open(word_store_path);
+			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/tr.txt"_v);
+		}
+		SDL_Log("finished");
+		exit(0);
 	}
 
 	if (ctx->settings.onboarding_stage < 0) {

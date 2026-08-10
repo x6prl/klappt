@@ -1,12 +1,14 @@
 #pragma once
 
-#include "SDL3/SDL_log.h"
+#include <cstdint>
+
+#include <SDL3/SDL_log.h>
+
 #include "base/atomic.h"
 #include "base/dyn_arr.h"
 #include "base/fixed_set.h"
 #include "platform/net_worker.h"
 #include "worker.h"
-#include <cstdint>
 
 struct NetPlatformContext;
 
