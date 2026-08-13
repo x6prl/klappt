@@ -1,16 +1,20 @@
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_stdinc.h>
+
+#include "app/app_context.h"
+#include "base/dyn_arr.h"
+#include "base/pair.h"
+#include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/word.h"
 #include "platform/neuro.h"
-#include "screen_helpers.h"
 #include "ui/components/button.h"
 #include "ui/dpi.h"
 #include "ui/textcache.h"
-#include <SDL3/SDL_log.h>
-#include <SDL3/SDL_stdinc.h>
-#include <algorithm>
+#include "ui/themes.h"
 
-// TODO: rewrite
+#include "screen_helpers.h"
 
 namespace {
 static StrView format_due_delta(Arena &a, Engine::Timestamp now,
@@ -51,6 +55,7 @@ static StrView mode_name(Engine::Mode mode) {
 
 static StrView successful_reviews_to_next_mode(Arena &a,
                                                const Engine::State &state) {
+	KLAPPT_PROFILE_SCOPE();
 	if (state.mode >= Engine::Mode::Compose) {
 		return "Max level"_v;
 	}
@@ -151,8 +156,160 @@ static inline StrView word_to_lexemme_str(Arena &scratch, Arena &a,
 	return strs.join(a, ' ');
 }
 
-static void draw_word_container(AppContext *ctx, const Word &w) {
+void draw_form_row(AppContext *ctx, StrView id, StrView label, StrView val,
+                   float form_font_size, float label_width) {
+	CLAY(CLAY_SID_LOCAL(id.to_clay_string()),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						   .childGap = udpi(6.f),
+						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+					 },
+		 }) {
+		CLAY(CLAY_ID_LOCAL("LabelCol"),
+		     {
+				   .layout = {.sizing = {val ? CLAY_SIZING_FIXED(label_width)
+		                                     : CLAY_SIZING_FIT(0),
+		                                 CLAY_SIZING_FIT(0)}},
+			 }) {
+			draw_text(label, theme()->onSurfaceContainer, form_font_size);
+		}
+		if (val) {
+			draw_text(val, theme()->onSurface, form_font_size);
+		}
+	}
+}
+
+[[nodiscard]]
+DynArr<StrView> get_plain_translations(Arena &a, StrView trs_raw) {
+	DynArr<StrView> ret = trs_raw.split_all_by(a, ';');
+	for (auto &tr : ret) {
+		tr.mut_trim();
+	}
+	return ret;
+}
+
+static void draw_noun_title(AppContext *ctx, const Noun &n) {
+	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
+	const uint16_t form_font_size = static_cast<uint16_t>(udpi(20.f));
+	const float label_width = udpi(60.f);
+
+	CLAY(CLAY_ID("NounTitleRow"),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						   .childGap = udpi(8.f),
+						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+					 },
+		 }) {
+		auto article = gender_to_article_nominative_strview(n.gender);
+		if (article && article != " "_v && article != " — "_v) {
+			draw_text(article, theme()->secondary, title_font_size);
+		}
+		// bool has_plural_suffix = w.n.plural_suffix;
+		// if (has_plural_suffix) {
+		// 	draw_text(StrView::concat(ctx->arena_frame, w.n.lemma, ","_v),
+		// 	          theme()->onSurface, title_font_size);
+		// 	draw_text(w.n.plural_suffix, theme()->secondary, title_font_size);
+		// } else {
+		draw_text(n.lemma, theme()->onSurface, title_font_size);
+		// }
+	}
+}
+
+static void draw_adj_title(AppContext *ctx, const Word &w) {
+	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
+	const uint16_t form_font_size = static_cast<uint16_t>(udpi(20.f));
+	const float label_width = udpi(105.f);
+
+	draw_text(w.a.lemma, theme()->onSurface, title_font_size, FontID::MAIN,
+	          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+}
+
+static void draw_verb_title(AppContext *ctx, const Word &w) {
+	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
+	const uint16_t form_font_size = static_cast<uint16_t>(udpi(20.f));
+	const float label_width = udpi(100.f);
+
+	draw_text(w.v.infinitive, theme()->onSurface, title_font_size, FontID::MAIN,
+	          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+}
+
+static void draw_phrase_title(AppContext *ctx, const Word &w) {
+	const bool is_long_phrase = w.p.text.utf8_length() > 50;
+	const Clay_TextAlignment text_align =
+		  is_long_phrase ? CLAY_TEXT_ALIGN_LEFT : CLAY_TEXT_ALIGN_CENTER;
+	const Clay_LayoutAlignmentX child_align_x =
+		  is_long_phrase ? CLAY_ALIGN_X_LEFT : CLAY_ALIGN_X_CENTER;
+
+	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
+
+	draw_text(w.p.text, theme()->onSurface, title_font_size, FontID::MAIN,
+	          CLAY_TEXT_WRAP_WORDS, text_align);
+}
+
+static void draw_word_card(AppContext *ctx, const Word &w) {
 	const auto row_gap = udpi(4.f);
+	const uint16_t form_font_size = static_cast<uint16_t>(udpi(20.f));
+	const float label_width = udpi(100.f);
+	const uint16_t translation_font_size = static_cast<uint16_t>(udpi(20.f));
+
+	DynArr<Pair<StrView, StrView>> forms{};
+	DynArr<StrView> badges{};
+	StrView type{};
+
+	DynArr<StrView> translations =
+		  get_plain_translations(ctx->arena_frame, w.translations_raw);
+
+	switch (w.type) {
+	case WordType::Noun: {
+		type = "Noun"_v;
+		if (is_singular_only(w.n)) {
+			badges.push(ctx->arena_frame, "Singular only"_v);
+		} else if (is_plural_only(w.n)) {
+			badges.push(ctx->arena_frame, "Plural only"_v);
+		} else {
+			auto plural = word_noun_get_plural_with_artikel(
+				  ctx->arena_frame, ctx->arena_frame, w.n);
+			forms.push(ctx->arena_frame, {"Plural:"_v, plural});
+		}
+	} break;
+	case WordType::Verb: {
+		type = "Verb"_v;
+		forms.push(ctx->arena_frame,
+		           {"er/sie/es:"_v,
+		            word_verb_get_third_person_full(ctx->arena_frame,
+		                                            ctx->arena_frame, w.v)});
+		forms.push(ctx->arena_frame,
+		           {"Präteritum:"_v,
+		            word_verb_get_praeteritum_full(ctx->arena_frame,
+		                                           ctx->arena_frame, w.v)});
+		forms.push(ctx->arena_frame,
+		           {"Perfekt:"_v,
+		            word_verb_get_perfect_full(ctx->arena_frame,
+		                                       ctx->arena_frame, w.v)});
+	} break;
+	case WordType::Adj: {
+		type = "Adjective"_v;
+		if (w.a.is_indeclinable) {
+			badges.push(ctx->arena_frame, "Indeclinable"_v);
+		} else if ((w.a.comparative || w.a.superlative)) {
+			if (w.a.comparative) {
+				forms.push(ctx->arena_frame, {"Kompar.:"_v, w.a.comparative});
+			}
+			if (w.a.superlative) {
+				forms.push(ctx->arena_frame, {"Superl.:"_v, w.a.superlative});
+			}
+		}
+	} break;
+	case WordType::Phrase: {
+		type = "Phrase"_v;
+	} break;
+	default:
+		break;
+	}
 	CLAY(CLAY_ID("WordContainer"),
 	     {.layout = {
 				.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
@@ -161,52 +318,237 @@ static void draw_word_container(AppContext *ctx, const Word &w) {
 				.childAlignment = {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
 				.layoutDirection = CLAY_TOP_TO_BOTTOM,
 		  }}) {
-		CLAY(CLAY_ID("WordRows"),
-		     {.layout = {
-					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-					.childGap = row_gap,
-					.childAlignment = {CLAY_ALIGN_X_CENTER,
-		                               CLAY_ALIGN_Y_CENTER},
-					.layoutDirection = CLAY_TOP_TO_BOTTOM,
-			  }}) {
-			draw_text(
-				  word_to_lexemme_str(ctx->arena_frame, ctx->arena_frame, w),
-				  theme()->onSurface, udpi(16), FontID::MONOSPACE_REGULAR);
-			// draw_text(w.grammar, theme()->onSurface, udpi(16),
-			//           FontID::MONOSPACE_REGULAR);
-			// if (w.was_learned) {
-			// 	draw_text("wl"_v, theme()->onSurface, udpi(16),
-			// 	          FontID::MONOSPACE_REGULAR);
-			// }
-			// if (w.in_learning_list) {
-			// 	draw_text("ill"_v, theme()->onSurface, udpi(16),
-			// 	          FontID::MONOSPACE_REGULAR);
-			// }
-		}
+		CLAY(CLAY_ID("WordCard"),
+		     {
+				   .layout =
+						 {
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_FIT(0)},
+							   .padding =
+									 {
+										   .left = udpi(20.f),
+										   .right = udpi(20.f),
+										   .top = udpi(16.f),
+										   .bottom = udpi(20.f),
+									 },
+							   .childGap = udpi(12.f),
+							   .childAlignment = {CLAY_ALIGN_X_LEFT,
+		                                          CLAY_ALIGN_Y_TOP},
+							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+						 },
+				   .backgroundColor = theme()->surfaceContainerLow,
+				   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+				   .border =
+						 {
+							   .color = theme()->outline,
+							   .width = {udpi(1.f), udpi(1.f), udpi(1.f),
+		                                 udpi(1.f)},
+						 },
+			 }) {
 
-		CLAY(CLAY_ID("WordTranslations"),
-		     {.layout = {
-					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-					.childGap = row_gap,
-					.childAlignment = {CLAY_ALIGN_X_CENTER,
-		                               CLAY_ALIGN_Y_CENTER},
-					.layoutDirection = CLAY_TOP_TO_BOTTOM,
-			  }}) {
-			auto trs =
-				  translations_from_raw(ctx->arena_frame, w.translations_raw);
-			// draw_text(w.translations_raw, theme()->onSurface, udpi(16),
-			// FontID::MONOSPACE_REGULAR);
-			// SDL_Log("%d", trs.size);
-			StrBuilder strs{};
-			for (auto &tr : trs) {
-				StrBuilder v{};
-				v.push(ctx->arena_frame, tr.grammar);
-				v.push(ctx->arena_frame, tr.text);
-				strs.push(ctx->arena_frame, v.join(ctx->arena_frame, ' '));
+			CLAY(CLAY_ID("WordHeader"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIT(0)},
+								   .childGap = udpi(8.f),
+								   .childAlignment = {CLAY_ALIGN_X_LEFT,
+			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+							 },
+				 }) {
+				// CLAY(CLAY_ID_LOCAL("Spacer"),
+				//      {
+				// 		   .layout =
+				// 				 {
+				// 					   .sizing = {CLAY_SIZING_GROW(0),
+				//                                   CLAY_SIZING_FIT(0)},
+				// 				 },
+				// 	 }) {}
+				CLAY(CLAY_ID("WordTypeBadge"),
+				     {
+						   .layout =
+								 {
+									   .padding = {udpi(8.f), udpi(8.f),
+				                                   udpi(4.f), udpi(4.f)},
+								 },
+						   .backgroundColor = theme()->secondary,
+						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
+					 }) {
+					draw_text(type, theme()->onSecondary,
+					          static_cast<uint16_t>(udpi(12.f)));
+				}
+
+				for (Size i{0}; i < badges.size; ++i) {
+					CLAY(CLAY_IDI("Badge", i),
+					     {
+							   .layout = {.padding = {udpi(8.f), udpi(8.f),
+					                                  udpi(4.f), udpi(4.f)}},
+							   .backgroundColor = theme()->surfaceContainerHigh,
+							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
+						 }) {
+						draw_text(badges[i], theme()->onSurfaceContainerHigh,
+						          static_cast<uint16_t>(udpi(12.f)));
+					}
+				}
+				if (w.in_learning_list > 0) {
+					CLAY(CLAY_ID("StatusBadge"),
+					     {
+							   .layout =
+									 {
+										   .padding = {udpi(8.f), udpi(8.f),
+					                                   udpi(4.f), udpi(4.f)},
+										   .childGap = udpi(8.f),
+										   .childAlignment =
+												 {CLAY_ALIGN_X_LEFT,
+					                              CLAY_ALIGN_Y_CENTER},
+									 },
+							   .backgroundColor = theme()->surfaceContainer,
+							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
+						 }) {
+						auto badge_font_size =
+							  static_cast<uint16_t>(udpi(12.f));
+						draw_text("In learning list"_v,
+						          theme()->onSurfaceContainer, badge_font_size);
+
+						// auto button_style = mobile_button_style_app_bar();
+						// button_style.border_width = button_style.padding_x =
+						// 	  button_style.corner_radius = 0;
+						// // button_style.padding_x = udpi(4);
+						// button_style.font_size = badge_font_size;
+						// button_style.height = button_style.min_width =
+						// 	  badge_font_size;
+						// mobile_button(ctx,
+						// CLAY_ID_LOCAL("statusSwitchButton"),
+						//               Icons::REMOVE, button_style);
+					}
+				}
 			}
-			draw_text(strs.join(ctx->arena_frame, "\n"_v), theme()->onSurface,
-			          udpi(16), FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_WORDS,
-			          CLAY_TEXT_ALIGN_LEFT);
+
+			switch (w.type) {
+			case WordType::Noun: {
+				draw_noun_title(ctx, w.n);
+			} break;
+			case WordType::Verb: {
+				draw_verb_title(ctx, w);
+			} break;
+			case WordType::Adj: {
+				draw_adj_title(ctx, w);
+			} break;
+			case WordType::Phrase: {
+				draw_phrase_title(ctx, w);
+			} break;
+			default:
+				break;
+			}
+			if (!forms.is_empty()) {
+				CLAY(CLAY_ID("WordFormsBlock"),
+				     {
+						   .layout =
+								 {
+									   .sizing = {CLAY_SIZING_GROW(0),
+				                                  CLAY_SIZING_FIT(0)},
+									   .padding =
+											 {
+												   .left = udpi(12.f),
+												   .right = udpi(12.f),
+												   .top = udpi(10.f),
+												   .bottom = udpi(10.f),
+											 },
+									   .childGap = udpi(6.f),
+									   .childAlignment = {CLAY_ALIGN_X_LEFT,
+				                                          CLAY_ALIGN_Y_TOP},
+									   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+								 },
+						   .backgroundColor = theme()->surfaceContainer,
+						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(10.f)),
+					 }) {
+					int counter = 0;
+					for (auto [label, value] : forms) {
+						CLAY(CLAY_IDI("FormRow", counter++),
+						     {
+								   .layout =
+										 {
+											   .sizing = {CLAY_SIZING_GROW(0),
+						                                  CLAY_SIZING_FIT(0)},
+											   .childGap = udpi(6.f),
+											   .layoutDirection =
+													 CLAY_LEFT_TO_RIGHT,
+										 },
+							 }) {
+							CLAY(CLAY_IDI("FormLabelCol", counter),
+							     {
+									   .layout =
+											 {.sizing =
+							                        {value ? CLAY_SIZING_FIXED(
+																   label_width)
+							                               : CLAY_SIZING_FIT(0),
+							                         CLAY_SIZING_FIT(0)}},
+								 }) {
+								draw_text(label, theme()->onSurfaceContainer,
+								          form_font_size);
+							}
+							if (value) {
+								draw_text(value, theme()->onSurface,
+								          form_font_size);
+							}
+						}
+					}
+				}
+			}
+			CLAY(CLAY_ID("WordCardDivider"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIXED(dpi(1.f))},
+							 },
+					   .backgroundColor = theme()->outline,
+				 }) {}
+
+			if (translations.size > 1) {
+				CLAY(CLAY_ID("WordTranslationsList"),
+				     {
+						   .layout =
+								 {
+									   .sizing = {CLAY_SIZING_GROW(0),
+				                                  CLAY_SIZING_FIT(0)},
+									   .childGap = udpi(4.f),
+									   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+								 },
+					 }) {
+					int item_idx = 0;
+					for (Size i{0}; i < translations.size; ++i) {
+						if (translations[i]) {
+							CLAY(CLAY_IDI_LOCAL("TransItem", item_idx),
+							     {
+									   .layout =
+											 {
+												   .sizing =
+														 {CLAY_SIZING_GROW(0),
+							                              CLAY_SIZING_FIT(0)},
+												   .childGap = udpi(6.f),
+												   .layoutDirection =
+														 CLAY_LEFT_TO_RIGHT,
+											 },
+								 }) {
+								draw_text("•"_v, theme()->secondary,
+								          translation_font_size);
+								draw_text(translations[i],
+								          theme()->onSurfaceContainer,
+								          translation_font_size, FontID::MAIN,
+								          CLAY_TEXT_WRAP_WORDS,
+								          CLAY_TEXT_ALIGN_LEFT);
+							}
+						}
+					}
+				}
+			} else if (!translations.is_empty()) {
+				draw_text(translations.first(), theme()->onSurfaceContainer,
+				          translation_font_size, FontID::MAIN,
+				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+			}
 		}
 	}
 }
@@ -314,6 +656,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 		}
 	}
 }
+
 } // namespace
 
 // // NOTE: unused
@@ -357,8 +700,8 @@ void screen_word_view_push(AppContext *ctx, WordId word_id) {
 	if (!is_word_copied) {
 		KLAPPT_PROFILE_SCOPE_N("copy Word store");
 		// get it from xapian
-		// TODO: use a separate arena
-		ctx->word_store.get_by_id(ctx->arena, word_id, state.word_copy);
+		ctx->word_store.get_by_id(ctx->arena_screen(), word_id,
+		                          state.word_copy);
 		is_word_copied = true;
 	}
 	{
@@ -388,7 +731,7 @@ void screen_word_view_draw(AppContext *ctx) {
 				.layoutDirection = CLAY_TOP_TO_BOTTOM,
 		  }}) {
 		auto &state = *ctx->word_view_state;
-		draw_word_container(ctx, state.word_copy);
+		draw_word_card(ctx, state.word_copy);
 		// draw_text(word_to_lexemme_str(ctx->tmparena, ctx->tmparena,
 		//                               state.word_copy),
 		//           theme()->onSurface, udpi(20), FontID::MONOSPACE_REGULAR);

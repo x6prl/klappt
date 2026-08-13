@@ -3,7 +3,6 @@
 #include "screen_helpers.h"
 
 #include "base/str_view.h"
-#include "app/words_init.h"
 #include "app/worker.h"
 #include "ui/components/button.h"
 #include "ui/dpi.h"

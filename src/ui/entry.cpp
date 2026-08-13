@@ -177,12 +177,28 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 
 void bottom_bar_layout(AppContext *ctx) {
 	constexpr auto bottom_bar_size{60.f};
-	constexpr Arr<Pair<StrView, Screen>, 4> menu{{
+	constexpr Arr<Triple<StrView, Screen, StrView>, 4> menu{{
 		  {""_v, Screen::Start},
 		  {"T"_v, Screen::TTS_ASR},
 		  {""_v, Screen::WordsList},
 		  {""_v, Screen::LearningList},
 	}};
+
+	auto screen_to_screen_name = [](Screen s) -> StrView {
+		switch (s) {
+		case Screen::Start:
+			return "Trainer"_v;
+		case Screen::TTS_ASR:
+			return "Neuro"_v;
+		case Screen::WordsList:
+			return "Wortschatz"_v;
+		case Screen::LearningList:
+			return "My Words"_v;
+		default:
+			break;
+		}
+		return {};
+	};
 
 	CLAY(CLAY_ID("BottomBar"),
 	     {.layout =
@@ -195,23 +211,11 @@ void bottom_bar_layout(AppContext *ctx) {
 				},
 	      .backgroundColor = theme()->surfaceContainerLow}) {
 
-		const Clay_ElementDeclaration buttonParent{
-			  .layout =
-					{
-						  .sizing = {.width = CLAY_SIZING_GROW(0),
-		                             .height = CLAY_SIZING_FIXED(
-										   dpi(bottom_bar_size))},
-						  .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                     CLAY_ALIGN_Y_CENTER},
-					},
-			  .backgroundColor = {}};
-
 		auto style = mobile_button_style_surface_container_high();
-		style.background = style.border = {};
+		style.background = style.border = style.background_pressed = {};
 		style.font_id = FontID::ICONS;
-		style.font_size = bottom_bar_size / 1.8;
-		style.height = bottom_bar_size;
-		style.fill_width = true;
+		style.font_size = (bottom_bar_size / 1.8) * 0.5;
+		style.height = style.font_size * 1.2f;
 		style.corner_radius = 0.f;
 		style.border_width = 0.f;
 
@@ -226,21 +230,43 @@ void bottom_bar_layout(AppContext *ctx) {
 			) {
 				continue;
 			}
-			CLAY(CLAY_IDI("ButtonParent", i), buttonParent) {
-				auto b = mobile_button(ctx, CLAY_IDI("Button", i),
-				                       menu[i].first, style);
-				if (b.activated()) {
-					if (menu[i].second == Screen::WordsList) {
-						screen_words_list_go(ctx);
-					} else if (menu[i].second == Screen::LearningList) {
-						screen_learning_list_go(ctx);
-					} else if (menu[i].second == Screen::TTS_ASR) {
+			CLAY(CLAY_IDI("ButtonParent", i),
+			     {.layout = {
+						.sizing = {.width = CLAY_SIZING_GROW(0),
+			                       .height = CLAY_SIZING_FIXED(
+										 dpi(bottom_bar_size))},
+				  }}) {
+				bool activated = Clay_Hovered() && ctx->tslt.is_tap();
+				CLAY(CLAY_IDI("Background", i),
+				     {.layout =
+				            {
+								  .sizing = {.width = CLAY_SIZING_GROW(0),
+				                             .height = CLAY_SIZING_GROW(0)},
+								  .childAlignment = {CLAY_ALIGN_X_CENTER,
+				                                     CLAY_ALIGN_Y_CENTER},
+								  .layoutDirection = CLAY_TOP_TO_BOTTOM,
+							},
+				      .backgroundColor =
+				            activated ? theme()->primary : Clay_Color{}}) {
+
+					(void)mobile_button(ctx, CLAY_IDI("Button", i),
+					                    menu[i].first, style);
+
+					if (activated) {
+						if (menu[i].second == Screen::WordsList) {
+							screen_words_list_go(ctx);
+						} else if (menu[i].second == Screen::LearningList) {
+							screen_learning_list_go(ctx);
+						} else if (menu[i].second == Screen::TTS_ASR) {
 #if NEURO
-						screen_tts_asr_go(ctx);
+							screen_tts_asr_go(ctx);
 #endif
-					} else {
-						screen_start_go(ctx);
+						} else {
+							screen_start_go(ctx);
+						}
 					}
+					draw_text(screen_to_screen_name(menu[i].second), style.text,
+					          udpi(16.f));
 				}
 			}
 		}
@@ -538,7 +564,9 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::WordView: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordView");
-				app_bar_layout(ctx, ctx->word_view_state->title);
+				app_bar_layout(ctx, ""_v
+				               // ctx->word_view_state->title
+				);
 				screen_word_view_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;

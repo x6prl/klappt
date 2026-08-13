@@ -198,16 +198,20 @@ struct Word {
 	StrView json_payload{};
 };
 
-inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
-                                                 const Noun &n) {
-	constexpr auto DIE_ = "die "_v;
+inline bool is_plural_only(const Noun &n) { return n.plural_suffix == "(pl.)"; }
+inline bool is_singular_only(const Noun &n) {
+	return n.plural_suffix == "(sg.)";
+}
+
+inline StrView word_noun_get_plural_without_artikel(Arena &tmp, Arena &a,
+                                                    const Noun &n) {
 	auto suf = n.plural_suffix;
 	{ // NOTE: case — unchangable nouns
-		if (suf == "(sg.)"_v) {
+		if (is_singular_only(n)) {
 			return {};
 		}
-		if (suf == "(pl.)" || suf == "-") {
-			return StrView::concat(a, DIE_, n.lemma);
+		if (is_plural_only(n) || suf == "-") {
+			return n.lemma;
 		}
 	}
 	StrView lemma{};
@@ -272,7 +276,17 @@ inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
 		lemma = StrView::concat(tmp, lemma, suf);
 	}
 
-	return StrView::concat(a, DIE_, lemma);
+	return lemma;
+}
+
+inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
+                                                 const Noun &n) {
+	constexpr auto DIE_ = "die "_v;
+	auto ret = word_noun_get_plural_without_artikel(tmp, a, n);
+	if (ret) {
+		return StrView::concat(a, DIE_, ret);
+	}
+	return {};
 }
 
 inline StrView word_verb_get_perfect_full(Arena &tmp, Arena &a, const Verb &v) {
@@ -379,7 +393,7 @@ inline StrView word_most_meaningfull_lemma(const Word &word) {
 }
 
 inline bool word_store_matches_query(Arena &a, const Word &word,
-                                        StrView query) {
+                                     StrView query) {
 	query = query.mut_trim().utf8_to_lowercase(a);
 	if (!query) {
 		return true;
