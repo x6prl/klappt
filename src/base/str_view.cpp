@@ -380,6 +380,22 @@ Pair<StrView, StrView> StrView::split() const {
 	return {copy.mut_split(), copy};
 }
 
+[[nodiscard]]
+DynArr<StrView> StrView::split_all_by(Arena &a, char delimiter) const {
+	DynArr<StrView> ret{};
+
+	auto [head, tail] = split_by(delimiter);
+	ret.push(a, head);
+
+	for (; tail;) {
+		auto p = tail.split_by(delimiter);
+		ret.push(a, p.first);
+		tail = p.second;
+	}
+
+	return ret;
+}
+
 StrView StrView::slice(Size from, Size to) const {
 	auto start = from < 0 ? 0 : from;
 	auto end = (to < 0 || to > size) ? size : to;
@@ -411,8 +427,8 @@ Clay_String StrView::to_clay_string() const {
 	return {false, static_cast<int32_t>(size), data};
 }
 
-const char* StrView::to_cstr(Arena&a) const {
-	auto buff = a.pushN<char>(size+1);
+const char *StrView::to_cstr(Arena &a) const {
+	auto buff = a.pushN<char>(size + 1);
 	memcpy(buff, data, size);
 	buff[size] = '\0';
 	return buff;

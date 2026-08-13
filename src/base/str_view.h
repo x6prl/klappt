@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arena.h"
+#include "base/dyn_arr.h"
 #include "base/pair.h"
 #include <clay/clay.h>
 
@@ -81,6 +82,9 @@ struct StrView {
 	Pair<StrView, StrView> split_by(int (*handler)(int ch)) const;
 	[[nodiscard]]
 	Pair<StrView, StrView> split() const;
+
+	[[nodiscard]]
+	DynArr<StrView> split_all_by(Arena &a, char delimiter) const;
 
 	[[nodiscard]]
 	StrView slice(Size from = 0, Size to = -1) const;
