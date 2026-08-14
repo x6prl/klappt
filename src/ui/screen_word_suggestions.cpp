@@ -44,7 +44,7 @@ void screen_word_suggestions_go(AppContext *ctx) {
 			  if (0 == w.in_learning_list && 0 == w.was_learned &&
 		          WordType::Phrase != w.type) {
 				  list->push(*a, w.word_id);
-				  SDL_Log(StrView_Fmt, StrView_Arg(word_tts_full(*a, *a, w)));
+				  SDL_Log(StrView_Fmt, StrView_Arg(word_tts_full(*a, w)));
 			  }
 			  return true;
 		  });
@@ -73,8 +73,7 @@ void screen_word_suggestions_go(AppContext *ctx) {
 		Word tmpword;
 		store.get_by_id(ctx->arena_frame, c, tmpword);
 		SDL_Log(StrView_Fmt,
-		        StrView_Arg(word_tts_full(ctx->arena_frame, ctx->arena_frame,
-		                                  tmpword)));
+		        StrView_Arg(word_tts_full(ctx->arena_frame, tmpword)));
 	}
 	SDL_Log("found %d candidates", candidates.size);
 	ctx->go(Screen::WordSuggestions);
