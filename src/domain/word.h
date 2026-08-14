@@ -300,6 +300,14 @@ inline StrView word_noun_get_plural_without_artikel(Arena &scratch,
 			// Museen)
 			lemma[lemma.size - 2] = 'e';
 			lemma[lemma.size - 1] = 'n';
+		} else if (suf == "-ien"_v) {
+			// NOTE: -ium takes -ien (Außenministerium -> Außenministerien)
+			if (lemma.size >= 3 && lemma.slice(lemma.size - 3) == "ium"_v) {
+				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 3),
+				                        "ien"_v);
+			} else {
+				lemma = StrView::concat(scratch, lemma, "ien"_v);
+			}
 		} else if (suf == "-a"_v) {
 			// NOTE: classic latin nouns (e.g., Faktum -> Fakta)
 			lemma[lemma.size - 2] = 'a';
