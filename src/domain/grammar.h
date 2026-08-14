@@ -1,7 +1,7 @@
 #pragma once
 #include "base/arr.h"
-#include "base/str_view.h"
 #include "base/str_builder.h"
+#include "base/str_view.h"
 #include <cctype>
 
 namespace grammar {
@@ -75,9 +75,9 @@ template <Size N> StrView ends_with_one_of(StrView str, Arr<StrView, N> arr) {
 
 /*
  * is_separable to treat dual suffixes as separable
+ *  NOTE: result may be in scratch arena
  */
-inline StrView verb_form_pp(Arena &tmp, Arena &a, StrView inf,
-                            bool is_separable) {
+inline StrView verb_form_pp(Arena &scratch, StrView inf, bool is_separable) {
 	auto is_consonant = [](char ch) {
 		char lower_ch = std::tolower(static_cast<unsigned char>(ch));
 
@@ -102,17 +102,17 @@ inline StrView verb_form_pp(Arena &tmp, Arena &a, StrView inf,
 	StrBuilder builder{};
 
 	if (pref) {
-		builder.push(tmp, pref);
+		builder.push(scratch, pref);
 	}
 
 	auto inseparable_prefix = starts_with_one_of(inf, inseparable_prefixes);
 	bool do_not_add_ge = ends_with_one_of(inf, no_ge_suffixes) ||
 	                     (inf.size > 6 && inseparable_prefix);
 	if (!do_not_add_ge) {
-		builder.push(tmp, "ge"_v);
+		builder.push(scratch, "ge"_v);
 	}
 
-	builder.push(tmp, base);
+	builder.push(scratch, base);
 
 	bool is_d_or_t = base.last() == 'd' || base.last() == 't';
 	bool is_m_or_n_and_cons_before_them =
@@ -125,16 +125,17 @@ inline StrView verb_form_pp(Arena &tmp, Arena &a, StrView inf,
 		  false                             //
 	) {
 		// should add _e_
-		builder.push(tmp, "e"_v);
+		builder.push(scratch, "e"_v);
 	}
-	builder.push(tmp, "t"_v);
-	return builder.join(a);
+	builder.push(scratch, "t"_v);
+	return builder.join(scratch);
 }
 
 /*
  * is_separable to treat dual suffixes as separable
+ *  NOTE: result may be in scratch arena
  */
-inline StrView verb_form_with_ending(Arena &tmp, Arena &a, StrView inf,
+inline StrView verb_form_with_ending(Arena &scratch, StrView inf,
                                      StrView ending, bool is_separable) {
 	auto is_consonant = [](char ch) {
 		char lower_ch = std::tolower(static_cast<unsigned char>(ch));
@@ -158,7 +159,7 @@ inline StrView verb_form_with_ending(Arena &tmp, Arena &a, StrView inf,
 	bool is_ending_en = (inf[inf.size - 2] == 'e');
 	auto base = inf.slice(0, is_ending_en ? inf.size - 2 : inf.size - 1);
 	StrBuilder builder{};
-	builder.push(tmp, base);
+	builder.push(scratch, base);
 
 	bool is_d_or_t = base.last() == 'd' || base.last() == 't';
 	bool is_m_or_n_and_cons_before_them =
@@ -171,14 +172,14 @@ inline StrView verb_form_with_ending(Arena &tmp, Arena &a, StrView inf,
 		  false                             //
 	) {
 		// should add _e_
-		builder.push(tmp, "e"_v);
+		builder.push(scratch, "e"_v);
 	}
-	builder.push(tmp, ending);
+	builder.push(scratch, ending);
 	if (pref) {
-		builder.push(tmp, " "_v);
-		builder.push(tmp, pref);
+		builder.push(scratch, " "_v);
+		builder.push(scratch, pref);
 	}
-	return builder.join(a);
+	return builder.join(scratch);
 }
 
 } // namespace grammar

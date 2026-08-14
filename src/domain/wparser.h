@@ -115,16 +115,21 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 			{ // inf and 3rd person exception
 				auto present_tense = line.mut_split_by('/');
 				auto [inf, exception] = present_tense.split_by('-');
+
 				constexpr char STRESS_CHAR = '\'';
 				if (STRESS_CHAR == inf.mut_trimr().first()) {
 					inf.mut_chopl();
 					word.v.is_separable_prefix = true;
-					if (inf.is_contains('\'')) {
-						SDL_Log("___ " StrView_Fmt,
-						        StrView_Arg(word.v.infinitive));
+					word.v.infinitive = inf.copy(a);
+				} else {
+					if (inf.is_contains(STRESS_CHAR)) {
+						auto [h, t] = inf.split_by(STRESS_CHAR);
+						word.v.infinitive = StrView::concat(a, h, t);
+					} else {
+						word.v.infinitive = inf.copy(a);
 					}
 				}
-				word.v.infinitive = inf.copy(a);
+
 				word.v.third_person = exception.triml().copy(a);
 			}
 			if (line.mut_trim()) {

@@ -25,6 +25,7 @@ constexpr char LEMMA_PREFIX[] = "XL";
 constexpr char FORM_PREFIX[] = "XF";
 constexpr char TRANSLATION_PREFIX[] = "XT";
 
+constexpr int WEIGHT_HIGHEST = 6;
 constexpr int WEIGHT_HIGH = 5;
 constexpr int WEIGHT_NORM = 1;
 constexpr int WEIGHT_LOW = 1;
@@ -209,20 +210,30 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 		break;
 	case WordType::Noun:
 		doc.add_boolean_term("XYnoun");
-		index_field(generator, word.n.lemma, WEIGHT_HIGH, LEMMA_PREFIX);
-		index_field(generator, word.n.plural_suffix, WEIGHT_NORM, FORM_PREFIX);
+		index_field(generator, word.n.lemma, WEIGHT_HIGHEST, LEMMA_PREFIX);
+		index_field(generator,
+		            word_noun_get_plural_without_artikel(scratch, word.n),
+		            WEIGHT_NORM, FORM_PREFIX);
 		break;
 	case WordType::Verb:
 		doc.add_boolean_term("XYverb");
-		index_field(generator, word.v.infinitive, WEIGHT_HIGH, LEMMA_PREFIX);
-		index_field(generator, word.v.third_person, WEIGHT_NORM, FORM_PREFIX);
+		index_field(generator, word.v.infinitive, WEIGHT_HIGHEST, LEMMA_PREFIX);
+		if (word.v.third_person) {
+			auto third_p =
+				  word_verb_get_third_person_full(scratch, word.v);
+			index_field(generator, third_p, WEIGHT_NORM, FORM_PREFIX);
+		}
 		index_field(generator, word.v.praeteritum, WEIGHT_NORM, FORM_PREFIX);
-		index_field(generator, word.v.auxv_and_past_participle, WEIGHT_NORM,
-		            FORM_PREFIX);
+		if (word.v.auxv_and_past_participle) {
+			index_field(generator,
+			            word_verb_get_perfect_only_participle(scratch, 
+			                                                  word.v),
+			            WEIGHT_NORM, FORM_PREFIX);
+		}
 		break;
 	case WordType::Adj:
 		doc.add_boolean_term("XYadj");
-		index_field(generator, word.a.lemma, WEIGHT_HIGH, LEMMA_PREFIX);
+		index_field(generator, word.a.lemma, WEIGHT_HIGHEST, LEMMA_PREFIX);
 		index_field(generator, word.a.comparative, WEIGHT_NORM, FORM_PREFIX);
 		index_field(generator, word.a.superlative, WEIGHT_NORM, FORM_PREFIX);
 		break;
@@ -371,6 +382,9 @@ bool WordStore::open(StrView requested_path_) {
 	}
 
 	try {
+		if (db) {
+			delete db;
+		}
 		db = new Xapian::WritableDatabase(
 			  path, Xapian::DB_CREATE_OR_OPEN
 			  // |

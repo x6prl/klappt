@@ -6,7 +6,6 @@
 
 #include "base/arena.h"
 #include "base/dyn_arr.h"
-#include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/grammar.h"
@@ -203,7 +202,8 @@ inline bool is_singular_only(const Noun &n) {
 	return n.plural_suffix == "(sg.)";
 }
 
-inline StrView word_noun_get_plural_without_artikel(Arena &tmp, Arena &a,
+// NOTE: result may be in scratch arena
+inline StrView word_noun_get_plural_without_artikel(Arena &scratch,
                                                     const Noun &n) {
 	auto suf = n.plural_suffix;
 	{ // NOTE: case — unchangable nouns
@@ -214,57 +214,137 @@ inline StrView word_noun_get_plural_without_artikel(Arena &tmp, Arena &a,
 			return n.lemma;
 		}
 	}
+
 	StrView lemma{};
+
 	if ('"' == suf.first()) {
 		suf = suf.slice(1); // skip " for the next handling stage
 		// NOTE: should add umlaut
 		auto base = n.lemma;
-		Size i{base.size - 1};
 		StrView um = ">error:PLURAL_UMLAUT_ERROR<"_v;
-		for (; i > 0; --i) {
+		int umlaut_idx = -1;
+		bool is_digraph = false;
+
+		for (Size i = base.size - 1; i >= 0; --i) {
 			char ch = base[i];
-			if ('a' == ch) {
+
+			// 1. digraphs (au -> äu, aa -> ä)
+			if (ch == 'u' && i > 0 && base[i - 1] == 'a') {
+				um = "äu"_v;
+				umlaut_idx = i - 1;
+				is_digraph = true;
+				break;
+			} else if (ch == 'U' && i > 0 && base[i - 1] == 'A') {
+				um = "ÄU"_v;
+				umlaut_idx = i - 1;
+				is_digraph = true;
+				break;
+			} else if (ch == 'a' && i > 0 && base[i - 1] == 'a') {
 				um = "ä"_v;
+				umlaut_idx = i - 1;
+				is_digraph = true;
+				break;
+			} else if (ch == 'A' && i > 0 && base[i - 1] == 'A') {
+				um = "Ä"_v;
+				umlaut_idx = i - 1;
+				is_digraph = true;
+				break;
+			}
+
+			// 2. single vowels
+			else if ('a' == ch) {
+				um = "ä"_v;
+				umlaut_idx = i;
 				break;
 			} else if ('u' == ch) {
 				um = "ü"_v;
+				umlaut_idx = i;
 				break;
 			} else if ('o' == ch) {
 				um = "ö"_v;
+				umlaut_idx = i;
 				break;
 			} else if ('A' == ch) {
 				um = "Ä"_v;
+				umlaut_idx = i;
 				break;
 			} else if ('U' == ch) {
 				um = "Ü"_v;
+				umlaut_idx = i;
 				break;
 			} else if ('O' == ch) {
 				um = "Ö"_v;
+				umlaut_idx = i;
 				break;
 			}
 		}
-		i = i < 0 ? 0 : i;
-		StrBuilder builder{};
-		builder.push(tmp, base.slice(0, i));
-		builder.push(tmp, um);
-		builder.push(tmp, base.slice(i + 1));
-		lemma = builder.join(tmp);
+
+		if (umlaut_idx >= 0) {
+			StrBuilder builder{};
+			builder.push(scratch, base.slice(0, umlaut_idx));
+			builder.push(scratch, um);
+			int skip_chars = is_digraph ? 2 : 1;
+			builder.push(scratch, base.slice(umlaut_idx + skip_chars));
+			lemma = builder.join(scratch);
+		} else {
+			lemma = base.copy(scratch);
+		}
 	} else {
-		lemma = n.lemma.copy(tmp);
+		lemma = n.lemma.copy(scratch);
 	}
 
 	if (lemma.size > 2 && lemma.slice(lemma.size - 2) == "um"_v) {
 		// NOTE: case — ends with _um_
 		if (suf == "-en"_v) {
-			// NOTE: latin nouns with german plural suffix
+			// NOTE: latin nouns with german plural suffix (e.g., Museum ->
+			// Museen)
 			lemma[lemma.size - 2] = 'e';
 			lemma[lemma.size - 1] = 'n';
 		} else if (suf == "-a"_v) {
-			// NOTE: classic latin nouns
+			// NOTE: classic latin nouns (e.g., Faktum -> Fakta)
 			lemma[lemma.size - 2] = 'a';
 			lemma.size -= 1;
-
-		} else {
+		} else if (suf == "-s"_v) {
+			// NOTE: simple -s plural (Parfum -> Parfums, Warum -> Warums)
+			lemma = StrView::concat(scratch, lemma, "s"_v);
+		} else if (suf == "-e"_v) {
+			// NOTE: -aum takes umlaut (Müllraum -> Müllräume)
+			//       other -um words do not (Eigentum -> Eigentume)
+			if (lemma.size >= 3 && lemma.slice(lemma.size - 3) == "aum"_v) {
+				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 3),
+				                        "äume"_v);
+			} else {
+				lemma = StrView::concat(scratch, lemma, "e"_v);
+			}
+		} else if (suf == "-er"_v || suf == "-r"_v) {
+			// NOTE: -tum takes umlaut and -er (Königtum -> Königtümer)
+			//       (-r is treated as a common dictionary typo for -er)
+			if (lemma.size >= 3 && lemma.slice(lemma.size - 3) == "tum"_v) {
+				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 3),
+				                        "tümer"_v);
+			} else {
+				lemma = StrView::concat(scratch, lemma, "er"_v);
+			}
+		} else if (suf == "-n"_v) {
+			// NOTE: -ium takes -ien (Außenministerium -> Außenministerien)
+			if (lemma.size >= 3 && lemma.slice(lemma.size - 3) == "ium"_v) {
+				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 3),
+				                        "ien"_v);
+			} else {
+				lemma = StrView::concat(scratch, lemma, "n"_v);
+			}
+		} else if (suf == "-iatantum"_v) {
+			// NOTE: Pluraletantum -> Pluraliatantum
+			if (lemma.size >= 7 && lemma.slice(lemma.size - 7) == "etantum"_v) {
+				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 7),
+				                        "iatantum"_v);
+			} else {
+				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 2),
+				                        "iatantum"_v);
+			}
+		}
+		// -------------------------------------------
+		else {
 			// ????
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             StrView_Fmt ": unknown suffix " StrView_Fmt ". %s: %d",
@@ -273,105 +353,120 @@ inline StrView word_noun_get_plural_without_artikel(Arena &tmp, Arena &a,
 		}
 	} else {
 		suf.mut_split_by('-');
-		lemma = StrView::concat(tmp, lemma, suf);
+		lemma = StrView::concat(scratch, lemma, suf);
 	}
 
 	return lemma;
 }
 
-inline StrView word_noun_get_plural_with_artikel(Arena &tmp, Arena &a,
+// NOTE: result may be in scratch arena
+inline StrView word_noun_get_plural_with_artikel(Arena &scratch,
                                                  const Noun &n) {
 	constexpr auto DIE_ = "die "_v;
-	auto ret = word_noun_get_plural_without_artikel(tmp, a, n);
+	auto ret = word_noun_get_plural_without_artikel(scratch, n);
 	if (ret) {
-		return StrView::concat(a, DIE_, ret);
+		return StrView::concat(scratch, DIE_, ret);
 	}
 	return {};
 }
 
-inline StrView word_verb_get_perfect_full(Arena &tmp, Arena &a, const Verb &v) {
+// NOTE: result may be in scratch arena
+inline StrView word_verb_get_perfect_only_participle(Arena &scratch,
+                                                     const Verb &v) {
+	auto [aux, pp] = v.auxv_and_past_participle.split();
+	if (aux && pp) {
+		return pp;
+	}
+	return grammar::verb_form_pp(scratch, v.infinitive, true);
+}
+
+// NOTE: result may be in scratch arena
+inline StrView word_verb_get_perfect_full(Arena &scratch, const Verb &v) {
 	auto [aux, pp] = v.auxv_and_past_participle.split();
 	if (aux && pp) {
 		return v.auxv_and_past_participle;
 	}
 
 	StrBuilder builder{};
-	builder.push(tmp, aux ? aux : "hat"_v);
-	builder.push(tmp,
-	             pp ? pp : grammar::verb_form_pp(tmp, tmp, v.infinitive, true));
-	return builder.join(a, ' ');
+	builder.push(scratch, aux ? aux : "hat"_v);
+	builder.push(scratch,
+	             pp ? pp : grammar::verb_form_pp(scratch, v.infinitive, true));
+	return builder.join(scratch, ' ');
 }
 
-inline StrView word_verb_get_praeteritum_full(Arena &tmp, Arena &a,
-                                              const Verb &v) {
+// NOTE: result may be in scratch arena
+inline StrView word_verb_get_praeteritum_full(Arena &scratch, const Verb &v) {
 	if (v.praeteritum) {
 		return v.praeteritum;
 	} else {
-		return grammar::verb_form_with_ending(tmp, a, v.infinitive, "te"_v,
+		return grammar::verb_form_with_ending(scratch, v.infinitive, "te"_v,
 		                                      true);
 	}
 }
 
-inline StrView word_verb_get_third_person_full(Arena &tmp, Arena &a,
-                                               const Verb &v) {
+// NOTE: result may be in scratch arena
+inline StrView word_verb_get_third_person_full(Arena &scratch, const Verb &v) {
 	if (v.third_person) {
 		return v.third_person;
 	} else {
-		return grammar::verb_form_with_ending(tmp, a, v.infinitive, "t"_v,
+		return grammar::verb_form_with_ending(scratch, v.infinitive, "t"_v,
 		                                      true);
 	}
 }
 
-inline StrView word_tts_full(Arena &tmp, Arena &a, const Word &word) {
+// NOTE: result may be in scratch arena
+inline StrView word_tts_full(Arena &scratch, const Word &word) {
 	switch (word.type) {
 	case WordType::Noun: {
 		StrBuilder builder{};
-		builder.push(tmp, gender_to_article_nominative_strview(word.n.gender));
-		builder.push(tmp, word.n.lemma);
-		builder.push(tmp, ".\n"_v);
-		builder.push(tmp, word_noun_get_plural_with_artikel(tmp, tmp, word.n));
-		return builder.join(a, ' ');
+		builder.push(scratch,
+		             gender_to_article_nominative_strview(word.n.gender));
+		builder.push(scratch, word.n.lemma);
+		builder.push(scratch, ".\n"_v);
+		builder.push(scratch,
+		             word_noun_get_plural_with_artikel(scratch, word.n));
+		return builder.join(scratch, ' ');
 	}
 	case WordType::Verb: {
 		StrBuilder builder{};
 		{ // present form
-			builder.push(tmp, word.v.infinitive);
+			builder.push(scratch, word.v.infinitive);
 
 			// 3rd person
-			builder.push(tmp, ".\n er"_v);
-			builder.push(tmp,
-			             word_verb_get_third_person_full(tmp, tmp, word.v));
+			builder.push(scratch, ".\n er"_v);
+			builder.push(scratch,
+			             word_verb_get_third_person_full(scratch, word.v));
 		}
 
 		// past form
-		builder.push(tmp, ".\n"_v);
-		builder.push(tmp, word_verb_get_praeteritum_full(tmp, tmp, word.v));
+		builder.push(scratch, ".\n"_v);
+		builder.push(scratch, word_verb_get_praeteritum_full(scratch, word.v));
 
 		// perfect
-		builder.push(tmp, ".\n"_v);
-		builder.push(tmp, word_verb_get_perfect_full(tmp, tmp, word.v));
+		builder.push(scratch, ".\n"_v);
+		builder.push(scratch, word_verb_get_perfect_full(scratch, word.v));
 
-		return builder.join(a, ' ');
+		return builder.join(scratch, ' ');
 	}
 	case WordType::Adj: {
 		if (word.a.is_indeclinable) {
-			return word.a.lemma.copy(a);
+			return word.a.lemma;
 		} else {
 			StrBuilder builder{};
-			builder.push(tmp, word.a.lemma);
+			builder.push(scratch, word.a.lemma);
 			if (word.a.comparative) {
-				builder.push(tmp, ".\n"_v);
-				builder.push(tmp, word.a.comparative);
+				builder.push(scratch, ".\n"_v);
+				builder.push(scratch, word.a.comparative);
 			}
 			if (word.a.superlative) {
-				builder.push(tmp, ".\n"_v);
-				builder.push(tmp, word.a.superlative);
+				builder.push(scratch, ".\n"_v);
+				builder.push(scratch, word.a.superlative);
 			}
-			return builder.join(a, ' ');
+			return builder.join(scratch, ' ');
 		}
 	}
 	case WordType::Phrase:
-		return word.p.text.copy(a);
+		return word.p.text;
 	default:
 		return {};
 	}

@@ -271,8 +271,8 @@ static void draw_word_card(AppContext *ctx, const Word &w) {
 		} else if (is_plural_only(w.n)) {
 			badges.push(ctx->arena_frame, "Plural only"_v);
 		} else {
-			auto plural = word_noun_get_plural_with_artikel(
-				  ctx->arena_frame, ctx->arena_frame, w.n);
+			auto plural =
+				  word_noun_get_plural_with_artikel(ctx->arena_frame, w.n);
 			forms.push(ctx->arena_frame, {"Plural:"_v, plural});
 		}
 	} break;
@@ -280,16 +280,13 @@ static void draw_word_card(AppContext *ctx, const Word &w) {
 		type = "Verb"_v;
 		forms.push(ctx->arena_frame,
 		           {"er/sie/es:"_v,
-		            word_verb_get_third_person_full(ctx->arena_frame,
-		                                            ctx->arena_frame, w.v)});
+		            word_verb_get_third_person_full(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Präteritum:"_v,
-		            word_verb_get_praeteritum_full(ctx->arena_frame,
-		                                           ctx->arena_frame, w.v)});
+		            word_verb_get_praeteritum_full(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Perfekt:"_v,
-		            word_verb_get_perfect_full(ctx->arena_frame,
-		                                       ctx->arena_frame, w.v)});
+		            word_verb_get_perfect_full(ctx->arena_frame, w.v)});
 	} break;
 	case WordType::Adj: {
 		type = "Adjective"_v;
