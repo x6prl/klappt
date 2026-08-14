@@ -259,9 +259,6 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 
 inline void txt_to_xapian(AppContext &ctx, StrView path) {
 	Measure m{__FUNCTION__};
-	// const auto words_leaf = Settings::words_snapshot_leaf(lang);
-	// const auto word_store_leaf = Settings::word_store_leaf(lang);
-	// const auto states_leaf = Settings::states_store_leaf(lang);
 
 	Arena a(1 << 30); // TODO: think harder
 
@@ -299,8 +296,6 @@ inline void txt_to_xapian(AppContext &ctx, StrView path) {
 	}
 	m.lap().printus("import active dictionary");
 	// ***************************************************
-
-	exit(0);
 }
 
 inline bool init_runtime_data(AppContext &ctx) {

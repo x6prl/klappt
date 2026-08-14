@@ -1,20 +1,16 @@
 #pragma once
 
-#include "SDL3/SDL_atomic.h"
-#include <SDL3/SDL_log.h>
+#include <sys/mman.h>
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 
-#include <sys/mman.h>
+#include <SDL3/SDL_log.h>
 
 // NOTE: should be SIGNED
 using Size = int;
-
-// static void memzero(void *data, Size size) {
-// 	memset(data, 0, size); // 64MB
-// }
 
 struct Arena {
 	using Offset = ptrdiff_t;
