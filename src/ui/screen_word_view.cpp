@@ -776,8 +776,7 @@ void screen_word_view_draw(AppContext *ctx) {
 				// play on pressed
 				if (play.activated()) {
 					auto tts_string =
-						  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
-					                    state.word_copy);
+						  word_tts_full(ctx->arena_screen(), state.word_copy);
 					// worker_job_push(ctx, {.type = Job::Type::TTS, .tts_text =
 					// tts_string});
 					run_tts(ctx, tts_string);

@@ -120,9 +120,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				// play on pressed
 				if (ctx->tslt.is_tap() && Clay_Hovered()) {
 					auto &diff = ctx->exercises.current_result_review();
-					auto tts_string =
-						  word_tts_full(ctx->arena_screen(), ctx->arena_frame,
-					                    (*ctx->words)[diff.word_ref]);
+					auto tts_string = word_tts_full(
+						  ctx->arena_screen(), (*ctx->words)[diff.word_ref]);
 					run_tts(ctx, tts_string);
 				}
 			}
@@ -278,7 +277,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					if (ctx->tslt.is_tap() && Clay_Hovered()) {
 						auto &diff = ctx->exercises.current_result_review();
 						auto tts_string = word_tts_full(
-							  ctx->arena_screen(), ctx->arena_frame,
+							  ctx->arena_screen(), 
 							  (*ctx->words)[diff.word_ref]);
 						// worker_job_push(ctx, {.type = Job::Type::TTS,
 						// .tts_text = tts_string});

@@ -79,8 +79,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 #if NEURO
 										if (ctx->settings.is_using_tts) {
 											auto tts_string = word_tts_full(
-												  ctx->arena_screen(),
-												  ctx->arena_frame, w);
+												  ctx->arena_screen(), w);
 											// worker_job_push(ctx, {.type =
 								            // Job::Type::TTS,
 								            //                         .tts_text

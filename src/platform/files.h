@@ -8,6 +8,10 @@
 #include "base/str_view.h"
 #include "platform/fs.h"
 
+#ifdef __EMSCRIPTEN__
+#include "platform/web_persist.h"
+#endif
+
 inline StrView get_writable_file_path_for(Arena &a, StrView file_name,
                                           StrView suffix = {}) {
 	auto w = get_writable_path();
@@ -22,8 +26,8 @@ inline StrView get_writable_file_path_for(Arena &a, StrView file_name,
 	}
 }
 
-inline bool file_save_relative(Arena &scratch, StrView file_name, const void *data,
-                      Size size) {
+inline bool file_save_relative(Arena &scratch, StrView file_name,
+                               const void *data, Size size) {
 	auto g = scratch.guard();
 	auto path = get_writable_file_path_for(scratch, file_name).to_cstr(scratch);
 	const bool ok = SDL_SaveFile(path, data, size);
