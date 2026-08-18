@@ -1,4 +1,5 @@
 #include "entry.h"
+#include "app/worker.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -70,10 +71,7 @@ void frame_end(AppContext *ctx) {
 
 #ifdef __EMSCRIPTEN__
 extern "C" EMSCRIPTEN_KEEPALIVE void mobile_text_input_web_wakeup() {
-	SDL_Event event{};
-	event.type = SDL_EVENT_USER;
-	event.user.code = TEXT_INPUT_WAKE_EVENT_CODE;
-	SDL_PushEvent(&event);
+	MT::touch_ui();
 }
 #endif
 
@@ -180,7 +178,7 @@ void bottom_bar_layout(AppContext *ctx) {
 	constexpr Arr<Triple<StrView, Screen, StrView>, 4> menu{{
 		  {""_v, Screen::Start},
 		  {"T"_v, Screen::TTS_ASR},
-		  {""_v, Screen::WordsList},
+		  {""_v, Screen::WordsList},
 		  {""_v, Screen::LearningList},
 	}};
 
@@ -372,6 +370,23 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 		}
 	}
 
+	auto on_back_button_pressed = [](AppContext *ctx) {
+		if (ctx->screen() == Screen::Exercice) {
+			if (ctx->exercises.handler_back_pressed(ctx)) {
+				// NOTE: it wasn't the last substage of the current
+				// exercise
+				return;
+			} else {
+				// NOTE: it was, but we ignore it
+				// TODO: think more
+				return;
+			}
+		}
+		if (!ctx->pop()) {
+			// TODO: ask user whether should exit
+		}
+	};
+
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.dispatch");
 		switch (event->type) {
@@ -379,6 +394,19 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			ctx->app_status.set_exit_normal();
 			return SDL_APP_CONTINUE;
 
+		case SDL_EVENT_WINDOW_RESIZED:
+		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
+			int width = 0;
+			int height = 0;
+			SDL_GetWindowSizeInPixels(ctx->window, &width, &height);
+
+			Clay_SetLayoutDimensions(Clay_Dimensions{
+				  static_cast<float>(width), static_cast<float>(height)});
+			ctx->display_width = width;
+			ctx->scale = SDL_GetWindowDisplayScale(ctx->window),
+			SDL_Log("Resize: %d×%d", width, height);
+			ctx->push_one_frame();
+		} break;
 		case SDL_EVENT_FINGER_DOWN:
 		case SDL_EVENT_FINGER_MOTION:
 		case SDL_EVENT_MOUSE_WHEEL:
@@ -391,20 +419,7 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			if (event->key.scancode == SDL_SCANCODE_ESCAPE ||
 			    event->key.scancode == SDL_SCANCODE_AC_BACK ||
 			    event->key.key == SDLK_AC_BACK) {
-				if (ctx->screen() == Screen::Exercice) {
-					if (ctx->exercises.handler_back_pressed(ctx)) {
-						// NOTE: it wasn't the last substage of the current
-						// exercise
-						break;
-					} else {
-						// NOTE: it was, but we ignore it
-						// TODO: think more
-						break;
-					}
-				}
-				if (!ctx->pop()) {
-					// TODO: ask user whether should exit
-				}
+				on_back_button_pressed(ctx);
 			}
 			break;
 		default:;
@@ -417,6 +432,9 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			case HOTRELOAD_EVENT_CODE: {
 				// NOTE: nothing to do
 			} break;
+			case NOTIFY_UI_GENERAL_CODE: {
+				// NOTE: nothing to do
+			} break;
 			case ANIMATION_EVENT_CODE: {
 				// NOTE: nothing to do
 			} break;
@@ -426,6 +444,9 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			case MAIN_THREAD_RUN_FUNC_WITH_PAYLOAD_CODE: {
 				reinterpret_cast<MainThreadCallbackWithPayload>(
 					  event->user.data1)(ctx, event->user.data2);
+			} break;
+			case WEB_AC_BACK: {
+				on_back_button_pressed(ctx);
 			} break;
 			// case ASR_FINISHED_EVENT_CODE: {
 			// 	auto asr_text =

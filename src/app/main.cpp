@@ -27,7 +27,13 @@
 #include "domain/settings.h"
 #include "platform/files.h"
 #include "platform/fs.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+// NOTE: !__EMSCRIPTEN__
+
 #include "platform/net_worker.h"
+#endif // !__EMSCRIPTEN__
 #include "ui/entry.h"
 #include "ui/textcache.h"
 
@@ -119,6 +125,32 @@ static const char *FrameName(Screen screen) {
 }
 #endif
 
+#ifdef __EMSCRIPTEN__
+/*
+ * JavaScript bridge to trap browser navigation
+ */
+EM_JS(void, init_browser_back_handler, (), {
+	history.pushState({page : 'sdl_app'}, '', '');
+
+	window.addEventListener(
+		  'popstate', function(event) {
+			  history.pushState({page : 'sdl_app'}, '', '');
+			  _on_browser_back_pressed();
+		  });
+});
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE
+void on_browser_back_pressed() {
+	SDL_Event event;
+	SDL_zero(event);
+	event.type = SDL_EVENT_USER;
+	event.user.code = WEB_AC_BACK;
+	SDL_PushEvent(&event);
+}
+}
+#endif // __EMSCRIPTEN__
+
 #if defined(TRACY_ENABLE)
 static void WaitForProfilerConnection() {
 	SDL_Log("Waiting for Tracy profiler connection on port 8086...");
@@ -208,7 +240,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 #ifdef __EMSCRIPTEN__
 	SDL_SetWindowFillDocument(window, true);
-#endif
+#endif // __EMSCRIPTEN__
 
 	// create a renderer
 	SDL_Renderer *renderer{};
@@ -425,22 +457,42 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 
 	{ // setup workers
-	  // SDL_Thread *worker =
-		SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
-		auto init_workers_job = []() {
+		SDL_Thread *worker =
+			  SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
+		if (!worker) {
+			SDL_Log("SDL_CreateThread failed: %s", SDL_GetError());
+		}
+		auto init_other_workers_job = []() {
 			auto ctx = tctx()->app_ctx;
 #if NEURO
 			SDL_CreateThread(NeuroWorkerThread, "NeuroWorkerThread", ctx);
-#endif
+#endif // NEURO
 			SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
+#ifndef __EMSCRIPTEN__
 			SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
+#endif // !__EMSCRIPTEN__
 		};
-		Worker::job_push(ctx, Job{.id = -2, .func = init_workers_job});
+		Worker::job_push(ctx, Job{.id = -2, .func = init_other_workers_job});
 
 		thread_local ThreadContext tctx_var = {
 			  .app_ctx = ctx,
 		};
 		_tctx = &tctx_var;
+
+#ifdef __EMSCRIPTEN__
+		init_browser_back_handler();
+
+		EM_ASM_INT(FS.mkdir('/assets'); FS.mount(IDBFS, {}, '/assets'););
+		EM_ASM_INT(FS.syncfs(
+			  true, function(err) {
+				  if (err)
+					  console.error("IDBFS sync error:", err);
+			  }););
+		EM_ASM_INT(FS.syncfs(
+			  false, function(err) { console.log("Saved to IndexedDB"); }));
+		web_netctx_init(ctx); // TODO: refactor(
+
+#endif // __EMSCRIPTEN__
 
 		// worker_job_push(ctx, {.type = Job::Type::INIT});
 		// SDL_Thread *net_worker =

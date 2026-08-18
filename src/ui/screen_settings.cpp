@@ -95,71 +95,73 @@ void screen_settings_draw(AppContext *ctx) {
 				ctx->settings.save(ctx->arena_frame);
 			}
 		}
-		CLAY(CLAY_ID("LanguageRow"),
-		     {.layout =
-		            {
-						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						  .padding = CLAY_PADDING_ALL(udpi(4.0f)),
-						  .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                     CLAY_ALIGN_Y_CENTER},
-					},
-		      .border = {
-					.color = theme()->outline,
-					.width = {.bottom = udpi(1.f)},
-			  }}) {
-			CLAY(CLAY_ID("LabelLanguage"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIT(0)},
-							 },
-				 }) {
-				draw_text(tr()->screen_settings_language, theme()->onSurface,
-				          text_size, translation_font_id(ctx));
-			}
-			auto button_unchosen_style =
-				  mobile_button_style_surface_container_high();
-			button_unchosen_style.padding_x = button_unchosen_style.padding_y =
-				  dpi(4.f);
-			button_unchosen_style.font_id = FontID::ICONS;
-			button_unchosen_style.background = {};
-			button_unchosen_style.border_width = 0.f;
-			auto button_chosen_style = button_unchosen_style;
-			button_chosen_style.border_width = dpi(1.f);
-			button_chosen_style.border = theme()->outline;
-			auto current_lang = ctx->settings.tr_language;
-			Settings::for_every_lang(
-				  [&](int i, Lang lang) {
-					  auto style = lang == current_lang ? button_chosen_style
-				                                        : button_unchosen_style;
-					  auto btn = mobile_button(
-							ctx, CLAY_IDI("LangButton", i),
-							lang_code(lang), style);
-					  if (btn.activated()) {
-						  ctx->settings.tr_language = lang;
-						  ctx->settings.save(ctx->arena_frame);
-						  ctx->app_status.push_error(
-								tr()->screen_settings_language_changed_exit);
-						  ctx->app_status.set_exit_normal();
-					  }
-				  });
-		}
+		// CLAY(CLAY_ID("LanguageRow"),
+		//      {.layout =
+		//             {
+		// 				  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+		// 				  .padding = CLAY_PADDING_ALL(udpi(4.0f)),
+		// 				  .childAlignment = {CLAY_ALIGN_X_CENTER,
+		//                                      CLAY_ALIGN_Y_CENTER},
+		// 			},
+		//       .border = {
+		// 			.color = theme()->outline,
+		// 			.width = {.bottom = udpi(1.f)},
+		// 	  }}) {
+		// 	CLAY(CLAY_ID("LabelLanguage"),
+		// 	     {
+		// 			   .layout =
+		// 					 {
+		// 						   .sizing = {CLAY_SIZING_GROW(0),
+		// 	                                  CLAY_SIZING_FIT(0)},
+		// 					 },
+		// 		 }) {
+		// 		draw_text(tr()->screen_settings_language, theme()->onSurface,
+		// 		          text_size, translation_font_id(ctx));
+		// 	}
+		// 	auto button_unchosen_style =
+		// 		  mobile_button_style_surface_container_high();
+		// 	button_unchosen_style.padding_x = button_unchosen_style.padding_y =
+		// 		  dpi(4.f);
+		// 	button_unchosen_style.font_id = FontID::ICONS;
+		// 	button_unchosen_style.background = {};
+		// 	button_unchosen_style.border_width = 0.f;
+		// 	auto button_chosen_style = button_unchosen_style;
+		// 	button_chosen_style.border_width = dpi(1.f);
+		// 	button_chosen_style.border = theme()->outline;
+		// 	auto current_lang = ctx->settings.tr_language;
+		// 	Settings::for_every_lang(
+		// 		  [&](int i, Lang lang) {
+		// 			  auto style = lang == current_lang ? button_chosen_style
+		// 		                                        : button_unchosen_style;
+		// 			  auto btn = mobile_button(
+		// 					ctx, CLAY_IDI("LangButton", i),
+		// 					lang_code(lang), style);
+		// 			  if (btn.activated()) {
+		// 				  ctx->settings.tr_language = lang;
+		// 				  ctx->settings.save(ctx->arena_frame);
+		// 				  ctx->app_status.push_error(
+		// 						tr()->screen_settings_language_changed_exit);
+		// 				  ctx->app_status.set_exit_normal();
+		// 			  }
+		// 		  });
+		// }
 		CLAY(CLAY_ID("About"),
-		     {.layout =
-		            {
-						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-						  .padding = CLAY_PADDING_ALL(udpi(4.0f)),
-						  .childGap = udpi(14.0f),
-						  .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                     CLAY_ALIGN_Y_BOTTOM},
-						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
-					},
-					//    .border = {
-					// .color = theme()->outline,
-					// .width = {.bottom = udpi(1.f)},
-					// }
-			  }) {
+		     {
+				   .layout =
+						 {
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_GROW(0)},
+							   .padding = CLAY_PADDING_ALL(udpi(4.0f)),
+							   .childGap = udpi(14.0f),
+							   .childAlignment = {CLAY_ALIGN_X_CENTER,
+		                                          CLAY_ALIGN_Y_BOTTOM},
+							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+						 },
+				   //    .border = {
+		           // .color = theme()->outline,
+		           // .width = {.bottom = udpi(1.f)},
+		           // }
+			 }) {
 			auto notes_text_size = udpi(12);
 			draw_text(
 				  "This product includes data from Wiktionary (https://www.wiktionary.org/)"_v,

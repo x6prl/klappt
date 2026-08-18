@@ -55,7 +55,7 @@ inline bool is_valid_encoded_str_view(StrView view) {
 	return view.size >= 0 && view.size <= MAX_ENCODED_STRING_SIZE;
 }
 
-inline bool write_str_view(uint8_t *&cursor, const uint8_t *end, StrView src) {
+inline bool write_str_view(unsigned char *&cursor, const unsigned char *end, StrView src) {
 	if (!is_valid_encoded_str_view(src)) {
 		return false;
 	}
@@ -74,7 +74,7 @@ inline bool write_str_view(uint8_t *&cursor, const uint8_t *end, StrView src) {
 	return true;
 }
 
-inline bool read_str_view(const uint8_t *&cursor, const uint8_t *end,
+inline bool read_str_view(const unsigned char *&cursor, const unsigned char *end,
                           StrView &dst) {
 	dst = {};
 
@@ -191,7 +191,7 @@ inline void log_invalid_word_for_encode(uint16_t ref, const Word &word) {
 	}
 }
 
-inline bool encode_entry(uint8_t *&cursor, const uint8_t *end, uint16_t ref,
+inline bool encode_entry(unsigned char *&cursor, const unsigned char *end, uint16_t ref,
                          const Word &word) {
 	if (static_cast<size_t>(end - cursor) < sizeof(Entry)) {
 		return false;
@@ -199,7 +199,7 @@ inline bool encode_entry(uint8_t *&cursor, const uint8_t *end, uint16_t ref,
 
 	Entry entry{};
 	entry.ref = ref;
-	entry.type = static_cast<uint8_t>(word.type);
+	entry.type = static_cast<unsigned char>(word.type);
 	entry.word_id = word.word_id.value;
 	entry.in_learning_list = word.in_learning_list;
 	entry.was_learned = word.was_learned;
@@ -254,7 +254,7 @@ inline StrView encode(Arena &a, const Words &words) {
 		             "WordsCodec::encode rejected blob size %d", total_size);
 		return {};
 	}
-	auto *data = static_cast<uint8_t *>(a.push(total_size));
+	auto *data = static_cast<unsigned char *>(a.push(total_size));
 	std::memset(data, 0, static_cast<size_t>(total_size));
 
 	auto *header = reinterpret_cast<Header *>(data);
@@ -262,7 +262,7 @@ inline StrView encode(Arena &a, const Words &words) {
 	header->entry_count = count;
 	header->next_free = words.next_free;
 
-	auto *cursor = reinterpret_cast<uint8_t *>(header + 1);
+	auto *cursor = reinterpret_cast<unsigned char *>(header + 1);
 	auto *end = data + total_size;
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
 		if (!encode_entry(cursor, end, static_cast<uint16_t>(ref.value),
@@ -277,10 +277,10 @@ inline StrView encode(Arena &a, const Words &words) {
 	return {reinterpret_cast<const char *>(data), total_size};
 }
 
-inline bool decode_entry(uint8_t type, int8_t aux, uint64_t word_id,
+inline bool decode_entry(unsigned char type, int8_t aux, uint64_t word_id,
                          int8_t in_learning_list, int8_t was_learned,
-                         int8_t is_separable_prefix, const uint8_t *&cursor,
-                         const uint8_t *end, Word &word) {
+                         int8_t is_separable_prefix, const unsigned char *&cursor,
+                         const unsigned char *end, Word &word) {
 	KLAPPT_PROFILE_SCOPE_N("decode_entry");
 	word = {};
 	word.word_id = WordId{word_id};
@@ -316,13 +316,13 @@ inline StrView encode_word(Arena &a, const Word &word) {
 		return {};
 	}
 
-	auto *data = static_cast<uint8_t *>(a.push(total_size));
+	auto *data = static_cast<unsigned char *>(a.push(total_size));
 	std::memset(data, 0, static_cast<size_t>(total_size));
 
 	auto *header = reinterpret_cast<SingleWordHeader *>(data);
 	*header = SingleWordHeader{};
 	header->word_id = word.word_id.value;
-	header->type = static_cast<uint8_t>(word.type);
+	header->type = static_cast<unsigned char>(word.type);
 	header->in_learning_list = word.in_learning_list;
 	header->was_learned = word.was_learned;
 	switch (word.type) {
@@ -341,7 +341,7 @@ inline StrView encode_word(Arena &a, const Word &word) {
 		break;
 	}
 
-	auto *cursor = reinterpret_cast<uint8_t *>(header + 1);
+	auto *cursor = reinterpret_cast<unsigned char *>(header + 1);
 	auto *end = data + total_size;
 	if (!for_each_str_view(word, [&](StrView view) {
 			return write_str_view(cursor, end, view);
@@ -362,7 +362,7 @@ inline bool decode_word(Arena &a, const void *data, Size size, Word &word) {
 	}
 
 	const auto offset_before = a.offset;
-	auto *blob = static_cast<uint8_t *>(a.push(size, 1));
+	auto *blob = static_cast<unsigned char *>(a.push(size, 1));
 	std::memcpy(blob, data, static_cast<size_t>(size));
 
 	SingleWordHeader header{};
@@ -373,8 +373,8 @@ inline bool decode_word(Arena &a, const void *data, Size size, Word &word) {
 		return false;
 	}
 
-	const uint8_t *cursor = blob + sizeof(SingleWordHeader);
-	const uint8_t *end = blob + size;
+	const unsigned char *cursor = blob + sizeof(SingleWordHeader);
+	const unsigned char *end = blob + size;
 	if (!decode_entry(header.type, header.aux, header.word_id,
 	                  header.in_learning_list, header.was_learned,
 	                  header.is_separable_prefix, cursor, end, word) ||
@@ -400,10 +400,10 @@ inline bool decode(Arena &a, const void *data, Size size, Words &words) {
 	}
 
 	auto offset_before = a.offset;
-	auto *blob = static_cast<uint8_t *>(a.push(size, 1));
+	auto *blob = static_cast<unsigned char *>(a.push(size, 1));
 	std::memcpy(blob, data, static_cast<size_t>(size));
 
-	auto *cursor = reinterpret_cast<const uint8_t *>(blob + sizeof(Header));
+	auto *cursor = reinterpret_cast<const unsigned char *>(blob + sizeof(Header));
 	auto *end = blob + size;
 
 	auto decoded_ptr = std::make_unique<Words>();

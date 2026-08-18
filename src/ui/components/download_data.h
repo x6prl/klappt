@@ -29,7 +29,7 @@ struct DownloadData {
 	// used for retries
 	FixedStr<128> copy_url{};
 	FixedStr<128> copy_file_name{};
-	DynArr<uint8_t> copy_memory_buffer{};
+	DynArr<unsigned char> copy_memory_buffer{};
 	NetRequest::OnFinishedFunction copy_on_finished_func{};
 
 };

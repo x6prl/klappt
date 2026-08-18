@@ -4,7 +4,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
 #include <cstdlib>
 
 #include <SDL3/SDL_log.h>
@@ -14,7 +13,7 @@ using Size = int;
 
 struct Arena {
 	using Offset = ptrdiff_t;
-	uint8_t *data{};
+	unsigned char *data{};
 	Offset offset{0};
 	Offset size_objects{0};
 	const Size allocated_size{0};

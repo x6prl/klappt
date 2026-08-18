@@ -74,7 +74,7 @@ inline const char *screen_name(Screen s) {
 
 struct AppContext {
 
-	using Idx = int;
+	using Idx = Size;
 	static constexpr Idx STACK_SIZE{16};
 	static constexpr Size MAIN_ARENA_SIZE = 32 << 20;
 	static constexpr Size TMP_ARENA_SIZE = 8 << 20;

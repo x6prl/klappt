@@ -7,9 +7,6 @@
 #include <cstdint>
 #include <cstdio>
 
-#include <curl/curl.h>
-#include <openssl/ssl.h>
-
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_timer.h>
 
@@ -18,31 +15,287 @@
 #include "app/worker.h"
 #include "base/atomic.h"
 #include "base/dyn_arr.h"
+#ifndef __EMSCRIPTEN__
 #include "base/fixed_set.h"
-#include "base/fixed_str.h"
 #include "base/str_builder.h"
+#endif // !__EMSCRIPTEN__
+#include "base/fixed_str.h"
 #include "base/str_view.h"
-#include "curl/multi.h"
-#include "curl/system.h"
 #include "domain/settings.h"
+#include "platform/zip.h"
+#ifndef __EMSCRIPTEN__
 #include "platform/files.h"
 #include "platform/fs.h"
-#include "platform/zip.h"
+#endif // !__EMSCRIPTEN__
 
+extern thread_local ThreadContext *_tctx; // in worker.cpp
+
+#ifndef __EMSCRIPTEN__
+#include <curl/curl.h>
+#include <curl/multi.h>
+#include <curl/system.h>
+#include <openssl/ssl.h>
+#else
+// NOTE: __EMSCRIPTEN__
+
+#include <emscripten/emscripten.h>
+
+namespace {
+constexpr size_t FETCH_SCRATCH_BUF_SIZE = 64 * 1024; // 64 KiB static buffer
+alignas(
+	  16) static unsigned char global_fetch_scratch_buf[FETCH_SCRATCH_BUF_SIZE];
+} // namespace
+
+extern "C" EMSCRIPTEN_KEEPALIVE uint8_t *
+get_fetch_chunk_buffer(int slotIndex, size_t chunkSize) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+
+	if (slot.req.is_write_to_memory()) {
+		auto &out = slot.req.memory_buffer;
+		if (static_cast<size_t>(out.size) + chunkSize <=
+		    static_cast<size_t>(out.reserved)) {
+			return out.data + out.size;
+		}
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Callback memory buffer overflow! Buffer size: %d",
+		             out.reserved);
+		return nullptr;
+	}
+
+	if (chunkSize <= FETCH_SCRATCH_BUF_SIZE) {
+		return global_fetch_scratch_buf;
+	}
+
+	return nullptr;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+on_fetch_progress(int slotIndex, double downloaded, double total) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+	Atomic::set(&slot.req.bytes_downloaded, static_cast<int64_t>(downloaded));
+	if (total > 0)
+		Atomic::set(&slot.req.bytes_total, static_cast<int64_t>(total));
+	Atomic::set(&slot.req.status, NetRequest::STATUS_IN_PROGRESS);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+on_fetch_chunk(int slotIndex, uint8_t *chunkData, size_t chunkSize) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+
+	if (slot.int_data.file_handle) {
+		fwrite(chunkData, 1, chunkSize, slot.int_data.file_handle);
+	} else if (slot.req.is_write_to_memory()) {
+		auto &out = slot.req.memory_buffer;
+		if (chunkData == out.data + out.size) {
+			out.size += chunkSize;
+		} else {
+			bool is_enough_space = static_cast<size_t>(out.size) + chunkSize <=
+			                       static_cast<size_t>(out.reserved);
+			if (is_enough_space) {
+				memcpy(out.data + out.size, chunkData, chunkSize);
+				out.size += chunkSize;
+			}
+		}
+	}
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void on_fetch_restart_file(int slotIndex) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+	if (slot.int_data.file_handle) {
+		fclose(slot.int_data.file_handle);
+		slot.int_data.file_handle =
+			  fopen(slot.req.file_name.mutable_to_cstr(), "wb");
+	}
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void on_fetch_complete(int slotIndex,
+                                                       int httpStatus) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+	if (slot.int_data.file_handle) {
+		fclose(slot.int_data.file_handle);
+		slot.int_data.file_handle = nullptr;
+	}
+
+	bool is_success = (httpStatus == 200 || httpStatus == 206);
+	int req_status =
+		  is_success ? NetRequest::STATUS_FINISHED : NetRequest::STATUS_ERROR;
+	Atomic::set(&slot.req.status, req_status);
+
+	if (slot.req.on_finished_func) {
+		slot.req.on_finished_func(slotIndex, slot.req.request_id, req_status,
+		                          slot.req.file_name.view(),
+		                          slot.req.memory_buffer);
+	}
+	tctx()->net->thread_safe_release_slot(slotIndex);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void on_fetch_error(int slotIndex,
+                                                    int httpStatus) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+	if (slot.int_data.file_handle) {
+		fclose(slot.int_data.file_handle);
+		slot.int_data.file_handle = nullptr;
+	}
+	Atomic::set(&slot.req.status, NetRequest::STATUS_ERROR);
+	slot.req.error.copy_from("Network error"_v);
+	if (slot.req.on_finished_func) {
+		slot.req.on_finished_func(
+			  slotIndex, slot.req.request_id, NetRequest::STATUS_ERROR,
+			  slot.req.file_name.view(), slot.req.memory_buffer);
+	}
+	tctx()->net->thread_safe_release_slot(slotIndex);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void on_fetch_cancelled(int slotIndex) {
+	auto &slot = tctx()->net->requests_pool[slotIndex];
+	if (slot.int_data.file_handle) {
+		fclose(slot.int_data.file_handle);
+		slot.int_data.file_handle = nullptr;
+	}
+	Atomic::set(&slot.req.status, NetRequest::STATUS_CANCELLED);
+	if (slot.req.on_finished_func) {
+		slot.req.on_finished_func(
+			  slotIndex, slot.req.request_id, NetRequest::STATUS_CANCELLED,
+			  slot.req.file_name.view(), slot.req.memory_buffer);
+	}
+	tctx()->net->thread_safe_release_slot(slotIndex);
+}
+
+EM_JS(void, js_fetch_cancel, (int slotIndex, int requestId), {
+	var request = globalThis._wasmFetchRequests[slotIndex];
+
+	if (request && request.requestId == requestId) {
+		request.controller.abort();
+	}
+});
+
+EM_JS(void, js_fetch_start,
+      (const char *url, int slotIndex, int requestId, double resumeOffset), {
+		  resumeOffset = Number(resumeOffset);
+		  var urlStr = UTF8ToString(url);
+		  var controller = new AbortController();
+
+		  if (!globalThis._wasmFetchRequests) {
+			  globalThis._wasmFetchRequests = {};
+		  }
+
+		  globalThis._wasmFetchRequests[slotIndex] = {
+			  requestId : requestId,
+			  controller : controller
+		  };
+
+		  var headers = new Headers();
+
+		  if (resumeOffset > 0) {
+			  headers.append('Range', 'bytes=' + resumeOffset + '-');
+		  }
+
+		  var doFetch = async function() {
+			  try {
+				  var response = await fetch(
+						urlStr,
+						{headers : headers, signal : controller.signal});
+
+				  if (response.status != 200 && response.status != 206) {
+					  Module._on_fetch_error(slotIndex, response.status);
+					  return;
+				  }
+
+				  if (resumeOffset > 0 && response.status == 200) {
+					  Module._on_fetch_restart_file(slotIndex);
+					  resumeOffset = 0;
+				  }
+
+				  if (!response.body) {
+					  Module._on_fetch_error(slotIndex, -1);
+					  return;
+				  }
+
+				  var contentLength = response.headers.get('Content-Length');
+				  var total = 0;
+
+				  if (contentLength) {
+					  total = Number(contentLength) + resumeOffset;
+				  }
+
+				  var reader = response.body.getReader();
+				  var receivedLength = resumeOffset;
+				  var SCRATCH_SIZE = 65536; // 64 KiB
+
+				  while (true) {
+					  var result = await reader.read();
+
+					  if (result.done) {
+						  break;
+					  }
+
+					  var value = result.value;
+					  receivedLength += value.length;
+
+					  Module._on_fetch_progress(slotIndex, receivedLength,
+				                                total);
+
+					  var offset = 0;
+					  while (offset < value.length) {
+						  var chunkSize =
+								Math.min(value.length - offset, SCRATCH_SIZE);
+						  var ptr = Module._c_get_fetch_chunk_buffer(slotIndex,
+					                                                 chunkSize);
+
+						  if (!ptr) {
+							  console.error("Fetch buffer overflow!");
+							  Module._on_fetch_error(slotIndex, -1);
+							  return;
+						  }
+
+						  var chunkView =
+								value.subarray(offset, offset + chunkSize);
+						  Module.HEAPU8.set(chunkView, ptr);
+
+						  Module._on_fetch_chunk(slotIndex, ptr, chunkSize);
+
+						  offset += chunkSize;
+					  }
+				  }
+
+				  Module._on_fetch_complete(slotIndex, response.status);
+
+			  } catch (e) {
+				  if (e.name == 'AbortError') {
+					  Module._on_fetch_cancelled(slotIndex);
+				  } else {
+					  console.error('Fetch error: ' + e.message);
+					  Module._on_fetch_error(slotIndex, -1);
+				  }
+			  } finally {
+				  var request = globalThis._wasmFetchRequests[slotIndex];
+				  if (request && request.requestId == requestId) {
+					  delete globalThis._wasmFetchRequests[slotIndex];
+				  }
+			  }
+		  };
+
+		  doFetch();
+	  });
+
+#endif // __EMSCRIPTEN__
+
+#ifndef __EMSCRIPTEN__
 namespace {
 
 constexpr auto CACERT_PEM_FILENAME = "cacert.pem"_v;
-constexpr auto CACERT_PEM_URL = "https://curl.se/ca/cacert.pem"_v;
+constexpr auto CACERT_PEM_URL =
+	  "https://curl.se/ca/cacert.pem"_v; // TODO: auto-update cacert.pem
 
 size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
                              void *userp) {
 	size_t realsize = size * nmemb;
 	auto *slot = static_cast<NetContext::NetRequestSlot *>(userp);
-	auto *data = static_cast<uint8_t *>(contents);
+	auto *data = static_cast<unsigned char *>(contents);
 
 	auto &out = slot->req.memory_buffer;
 
-	bool is_enough_space = static_cast<size_t>(out.size) + realsize <
+	bool is_enough_space = static_cast<size_t>(out.size) + realsize <=
 	                       static_cast<size_t>(out.reserved);
 
 	if (!is_enough_space) {
@@ -57,10 +310,7 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 	out.size += bytes_to_copy;
 	return bytes_to_copy;
 }
-
 } // namespace
-
-extern thread_local ThreadContext *_tctx; // in worker.cpp
 
 int SDLCALL NetWorkerThread(void *userdata) {
 	KLAPPT_PROFILE_THREAD("net");
@@ -203,7 +453,8 @@ int SDLCALL NetWorkerThread(void *userdata) {
 							// auto on_f_mem = [](Size slot_index,
 							//                    int32_t request_id, int
 							//                    status, StrView file_name,
-							//                    DynArr<uint8_t> memory_buffer)
+							//                    DynArr<unsigned char>
+							//                    memory_buffer)
 							//                    {
 							// 	SDL_Log("mem loaded %d, status %d", request_id,
 							// 	        status);
@@ -216,7 +467,8 @@ int SDLCALL NetWorkerThread(void *userdata) {
 							// 	  "https://curl.se/ca/cacert.pem"_v,
 							// 	  {
 							// 			.data = tctx()->app_ctx->arena_screen()
-							//                           .pushN<uint8_t>(190000),
+							//                           .pushN<unsigned
+							//                           char>(190000),
 							// 			.size = 0,
 							// 			.reserved = 190000,
 							// 	  },
@@ -543,6 +795,31 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	return 0;
 }
 
+#else
+// NOTE: __EMSCRIPTEN__
+
+// TODO: unify nectx initialization
+void web_netctx_init(AppContext *ctx) {
+	auto tctx_var = new ThreadContext{
+		  .a = {1 << 20},
+		  .app_ctx = ctx,
+	};
+	_tctx = tctx_var;
+	auto netctx = new NetContext{
+		  .requests_pool =
+				DynArr<NetContext::NetRequestSlot>::filled_zero_or_default(
+					  tctx()->a, NetContext::MAX_REQUESTS),
+	};
+
+	for (Size i{0}; i < netctx->requests_pool.size; ++i) {
+		netctx->requests_pool[i].index_in_the_pool = i;
+	}
+	ctx->net = netctx;
+	_tctx->net = netctx;
+}
+
+#endif // __EMSCRIPTEN__
+
 // void Worker::net_cancel_all(AppContext *ctx) {
 // 	Measure m{__FUNCTION__};
 // 	for (Size i{0}; i < ctx->net->requests_pool.size; ++i) { // like really all
@@ -560,6 +837,10 @@ int SDLCALL NetWorkerThread(void *userdata) {
 void Worker::net_cancel_request(AppContext *ctx, Size req_index_in_the_pool) {
 	Atomic::set_true(
 		  &ctx->net->requests_pool[req_index_in_the_pool].req.is_cancelled);
+#ifdef __EMSCRIPTEN__
+	auto &req = ctx->net->requests_pool[req_index_in_the_pool].req;
+	js_fetch_cancel(req_index_in_the_pool, req.request_id);
+#endif // __EMSCRIPTEN__
 }
 
 Size Worker::net_download_file(AppContext *ctx, StrView url, StrView path,
@@ -577,7 +858,7 @@ Size Worker::net_download_file(AppContext *ctx, StrView url, StrView path,
 }
 
 Size Worker::net_download_memory(AppContext *ctx, StrView url,
-                                 DynArr<uint8_t> memory_buffer,
+                                 DynArr<unsigned char> memory_buffer,
                                  NetRequest::OnFinishedFunction cb) {
 	auto req_idx = ctx->net->thread_safe_get_unused_slot();
 	auto &slot = ctx->net->requests_pool[req_idx];
@@ -632,7 +913,7 @@ struct AssetsCallbacks {
 	};
 	static void on_zip_downloaded(Size slot_index, int32_t request_id,
 	                              int status, StrView file_name,
-	                              DynArr<uint8_t> memory_buffer) {
+	                              DynArr<unsigned char> memory_buffer) {
 		(void)request_id;
 		(void)memory_buffer;
 		auto &slot = tctx()->net->requests_pool[slot_index];
@@ -726,6 +1007,23 @@ void Worker::net_request_push(AppContext *ctx, Size req_index_in_the_pool) {
 	if (req.request_id < 0) {
 		req.request_id = Atomic::inc(&request_id_counter);
 	}
+#ifdef __EMSCRIPTEN__
+	long resume_offset = 0;
+	if (!req.is_write_to_memory()) {
+		std::error_code ec;
+		if (std::filesystem::exists(req.file_name.mutable_to_cstr(), ec)) {
+			resume_offset = std::filesystem::file_size(
+				  req.file_name.mutable_to_cstr(), ec);
+		}
+		auto &req_slot = ctx->net->requests_pool[req_index_in_the_pool];
+		req_slot.int_data.file_handle = fopen(req.file_name.mutable_to_cstr(),
+		                                      resume_offset > 0 ? "ab" : "wb");
+	}
+	js_fetch_start(req.url.mutable_to_cstr(), req_index_in_the_pool,
+	               req.request_id, static_cast<double>(resume_offset));
+#else
+	// NOTE: !__EMSCRIPTEN__
+
 	SDL_Log("Main Thread: Pushing Net Request %d to the net worker queue.",
 	        req.request_id);
 
@@ -733,6 +1031,7 @@ void Worker::net_request_push(AppContext *ctx, Size req_index_in_the_pool) {
 	ctx->net_worker_job_queue.queue.push(req_index_in_the_pool);
 	SDL_SignalCondition(ctx->net_worker_job_queue.cond);
 	SDL_UnlockMutex(ctx->net_worker_job_queue.mutex);
+#endif // !__EMSCRIPTEN__
 }
 // void Worker::net_request_retry(AppContext *ctx, Size req_index_in_the_pool) {
 // 	auto &req = ctx->net->requests_pool[req_index_in_the_pool].req;

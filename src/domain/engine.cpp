@@ -758,7 +758,7 @@ bool States::collect_due(Arena &a, Timestamp now, DynArr<WordId> &dst,
 #else
 namespace {
 
-constexpr char WEB_STATES_STORAGE_KEY[] = "lexi-sdl.states.v1";
+constexpr char WEB_STATES_STORAGE_KEY[] = "klappt-sdl.states.v1";
 
 struct WebStatesHeader {
 	uint32_t magic{};
@@ -786,7 +786,7 @@ EM_JS(int, web_storage_size, (const char *key_ptr), {
 	}
 });
 
-EM_JS(int, web_storage_load, (const char *key_ptr, uint8_t *dst, int size), {
+EM_JS(int, web_storage_load, (const char *key_ptr, unsigned char *dst, int size), {
 	const key = UTF8ToString(key_ptr);
 	try {
 		const value = globalThis.localStorage.getItem(key);
@@ -807,7 +807,7 @@ EM_JS(int, web_storage_load, (const char *key_ptr, uint8_t *dst, int size), {
 });
 
 EM_JS(int, web_storage_save,
-      (const char *key_ptr, const uint8_t *src, int size), {
+      (const char *key_ptr, const unsigned char *src, int size), {
 		  const key = UTF8ToString(key_ptr);
 		  try {
 			  const chunk_size = 0x8000;
@@ -857,7 +857,7 @@ bool persist_web_states(const States &states) {
 	const size_t total_size =
 		  sizeof(WebStatesHeader) + static_cast<size_t>(count) * record_size;
 
-	std::vector<uint8_t> bytes(total_size);
+	std::vector<unsigned char> bytes(total_size);
 	auto *cursor = bytes.data();
 
 	const WebStatesHeader header{
@@ -894,7 +894,7 @@ bool restore_web_states(States &states) {
 		return false;
 	}
 
-	std::vector<uint8_t> bytes(static_cast<size_t>(stored_size));
+	std::vector<unsigned char> bytes(static_cast<size_t>(stored_size));
 	const int load_rc =
 		  web_storage_load(storage_key, bytes.data(), stored_size);
 	if (load_rc != 1) {
@@ -927,7 +927,7 @@ bool restore_web_states(States &states) {
 	states.states.reserve(header.count);
 	states.due.reserve(header.count);
 
-	const uint8_t *cursor = bytes.data() + sizeof(WebStatesHeader);
+	const unsigned char *cursor = bytes.data() + sizeof(WebStatesHeader);
 	for (uint32_t i = 0; i < header.count; ++i) {
 		WordId word_id{};
 		State state{};

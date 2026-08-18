@@ -13,8 +13,8 @@ namespace {
 #ifdef __EMSCRIPTEN__
 constexpr char WEB_PERSIST_ROOT[] = "/persist/";
 #endif
-constexpr auto ORG = "lexi";
-constexpr auto APP = "lexi.sdl";
+constexpr auto ORG = "klappt";
+constexpr auto APP = "klappt.sdl";
 } // namespace
 
 StrView get_app_base_path() {

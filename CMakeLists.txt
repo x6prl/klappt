@@ -547,7 +547,6 @@ endif()
 # Set C++ version
 set (CMAKE_CXX_STANDARD 23)
 
-# on Web targets, we need CMake to generate a HTML webpage.
 if(EMSCRIPTEN)
     option(EMSCRIPTEN_ALLOW_MEMORY_GROWTH "Allow the WebAssembly heap to grow at runtime" ON)
     set(EMSCRIPTEN_INITIAL_MEMORY_MB "512" CACHE STRING "Initial WebAssembly heap size in MiB")
@@ -559,10 +558,17 @@ if(EMSCRIPTEN)
 
     set(CMAKE_EXECUTABLE_SUFFIX ".html" CACHE INTERNAL "")
 
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE
+        "-pthread"
+    )
     target_link_options(${EXECUTABLE_NAME} PRIVATE
+        "-pthread"
+        "-sPTHREAD_POOL_SIZE=4"
         "-sINITIAL_MEMORY=${EMSCRIPTEN_INITIAL_MEMORY_BYTES}"
+        "-sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString"
         "-lidbfs.js"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web/web_persist.js"
+        # on Web targets, we need CMake to generate a HTML webpage.
         "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web/web_shell.html"
     )
 
@@ -580,6 +586,14 @@ if(EMSCRIPTEN)
         )
     endif()
 
+    # for worker threads
+    # should be before add_subdirectory(SDL EXCLUDE_FROM_ALL)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
+
+    set(SDL_PTHREADS ON CACHE BOOL "Enable pthreads in SDL3" FORCE)
+    set(SDL_PTHREADS_SEM ON CACHE BOOL "Use pthread semaphores" FORCE)
     # Keep C++ exceptions catchable in browser builds so third-party library
     # failures surface through normal error handling instead of hard aborting.
     # target_compile_options(${EXECUTABLE_NAME} PRIVATE

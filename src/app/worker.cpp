@@ -8,10 +8,12 @@
 #include "app/app_context.h"
 #include "app/audio_context.h"
 #include "app/event_codes.h"
-#include "base/atomic.h"
-#include "base/dyn_arr.h"
 #if NEURO
 #include "app/neuro_context.h"
+#endif
+#include "base/atomic.h"
+#ifndef __EMSCRIPTEN__
+#include "base/dyn_arr.h"
 #endif
 
 thread_local ThreadContext *_tctx{};
