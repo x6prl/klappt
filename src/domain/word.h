@@ -359,6 +359,11 @@ inline StrView word_noun_get_plural_without_artikel(Arena &scratch,
 			             StrView_Arg(n.lemma), StrView_Arg(suf), __FILE_NAME__,
 			             __LINE__);
 		}
+	} else if (lemma.size > 1 && lemma[lemma.size - 1] == 'a' &&
+	           suf == "-en"_v) {
+		// NOTE: case — ends with _a_ (Firma -> Firmen, Thema -> Themen)
+		lemma =
+			  StrView::concat(scratch, lemma.slice(0, lemma.size - 1), "en"_v);
 	} else {
 		suf.mut_split_by('-');
 		lemma = StrView::concat(scratch, lemma, suf);
@@ -529,8 +534,9 @@ inline bool word_store_matches_query(Arena &a, const Word &word,
 }
 
 // Lexeme identity is the learner-relevant German side only.
-// The active store is scoped to a single target language, so translations may
-// vary within that language and can still be merged for duplicate lexemes.
+// The active store is scoped to a single target language, so translations
+// may vary within that language and can still be merged for duplicate
+// lexemes.
 inline bool word_has_same_lexeme(const Word &lhs, const Word &rhs) {
 	if (lhs.type != rhs.type) {
 		return false;
@@ -561,8 +567,8 @@ inline bool word_has_same_lexeme(const Word &lhs, const Word &rhs) {
 	return false;
 }
 
-// Full payload equality keeps the stricter comparison for callers which care
-// about annotations too.
+// Full payload equality keeps the stricter comparison for callers which
+// care about annotations too.
 inline bool word_has_same_payload(const Word &lhs, const Word &rhs) {
 	return word_has_same_lexeme(lhs, rhs) &&
 	       lhs.translations_raw == rhs.translations_raw &&
