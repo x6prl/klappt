@@ -1,15 +1,16 @@
 #include <SDL3/SDL_log.h>
 
+#include "app/app_context.h"
+#include "app/words_init.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "app/words_init.h"
+#include "screen_helpers.h"
 #include "ui/components/button.h"
-#include "ui/components/fast_list.h"
+#include "ui/components/lists.h"
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 #include "ui/dpi.h"
 #include "ui/tslt.h"
-#include "screen_helpers.h"
 
 void screen_words_list_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
@@ -77,12 +78,13 @@ void screen_words_list_draw(AppContext *ctx) {
 			CLAY(CLAY_ID("WordsListSlot"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_GROW(0)}}}) {
-				fast_list(
+				list::vertical_uniform_w(
 					  ctx, CLAY_ID("WordsList"), total_words,
-					  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
+					  dpi(WORD_CARD_ROW_HEIGHT),
+					  [&](AppContext *ctx, list::ItemsRange window) {
 						  ctx->word_store.for_each_matching_word_range(
 								ctx->arena_frame, query, window.first,
-								window.last - window.first,
+								window.last_exclusive - window.first,
 								[&](Size index, Word &w) {
 									CLAY(CLAY_IDI("WordRow", index),
 						                 {.layout = {

@@ -1,7 +1,7 @@
 #include "domain/word.h"
 #include "platform/neuro.h"
 #include "screen_helpers.h"
-#include "ui/components/fast_list.h"
+#include "ui/components/lists.h"
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 #include "ui/dpi.h"
@@ -37,12 +37,13 @@ void screen_learning_list_draw(AppContext *ctx) {
 		CLAY(CLAY_ID("WordsListSlot"),
 		     {.layout = {
 					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)}}}) {
-			fast_list(
+			list::vertical_uniform_w(
 				  ctx, CLAY_ID("WordsList"), total_words,
-				  dpi(WORD_CARD_ROW_HEIGHT), [&](FastListWindow window) {
+				  dpi(WORD_CARD_ROW_HEIGHT),
+				  [&](AppContext *ctx, list::ItemsRange window) {
 					  for_each_matching_learning_word_range(
 							ctx->arena_frame, *ctx->words, query, window.first,
-							window.last - window.first,
+							window.last_exclusive - window.first,
 							[&](Size index, const Word &w) {
 								CLAY(CLAY_IDI("WordRow", index),
 					                 {.layout = {

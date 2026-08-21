@@ -819,24 +819,23 @@ else()
         set(DEST_ROOT "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
     endif()
 
-    macro(copy_helper filename)
-        get_filename_component(outdir "${DEST_ROOT}/${filename}" DIRECTORY)
-        get_filename_component(filename_dir "${filename}" DIRECTORY)
-
-        set(input_name "${CMAKE_CURRENT_LIST_DIR}/src/assets/${filename}")
+    macro(copy_helper input_relpath output_filename)
+        set(input_name "${CMAKE_CURRENT_LIST_DIR}/src/assets/${input_relpath}")
+        set(output_path "${DEST_ROOT}/${output_filename}")
+        get_filename_component(outdir "${output_path}" DIRECTORY)
 
         add_custom_command(TARGET "${EXECUTABLE_NAME}" POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${outdir}"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${input_name}" "${DEST_ROOT}/${filename}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${input_name}" "${output_path}"
         )
     endmacro()
 
-    copy_helper("fonts/Inter-VariableFont.ttf")
-    copy_helper("fonts/ReadexPro-Regular.ttf")
-    copy_helper("fonts/Font-Awesome-7-Free-Solid-900.otf")
-    copy_helper("fonts/JetBrainsMono-Regular.ttf")
-    copy_helper("fonts/JetBrainsMono-Bold.ttf")
-    copy_helper("cacert.pem")
+    copy_helper("fonts/Inter-VariableFont.ttf" "Inter-VariableFont.ttf")
+    copy_helper("fonts/ReadexPro-Regular.ttf" "ReadexPro-Regular.ttf")
+    copy_helper("fonts/Font-Awesome-7-Free-Solid-900.otf" "Font-Awesome-7-Free-Solid-900.otf")
+    copy_helper("fonts/JetBrainsMono-Regular.ttf" "JetBrainsMono-Regular.ttf")
+    copy_helper("fonts/JetBrainsMono-Bold.ttf" "JetBrainsMono-Bold.ttf")
+    copy_helper("cacert.pem" "cacert.pem")
     # copy_helper("word_data/ar.txt")
     # copy_helper("word_data/en.txt")
     # copy_helper("word_data/ru.txt")
