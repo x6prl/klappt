@@ -10,7 +10,7 @@
 #include <cstring>
 
 #define StrView_Fmt "%.*s"
-#define StrView_Arg(str_view) (str_view).size, (str_view).data
+#define StrView_Arg(str_view) (int)((str_view).size), ((str_view).data)
 
 struct StrView {
 	const char *data{nullptr};

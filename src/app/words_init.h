@@ -36,11 +36,12 @@ inline void save_words_dat(Arena &scratch, const Settings &settings,
 }
 
 inline bool sync_learning_words_to_store(Arena &scratch, WordStore &store,
-                                         Words &words, bool &changed) {
+                                         Words &words, bool &changed,
+                                         uint64_t timestamp) {
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
 		auto &word = words[ref];
 		auto previous_id = word.word_id;
-		if (!store.ensure_word(scratch, word)) {
+		if (!store.ensure_word(scratch, word, timestamp)) {
 			return false;
 		}
 		changed = changed || word.word_id != previous_id;
@@ -98,7 +99,7 @@ inline bool sync_learning_words_to_states(Engine::States &states,
 
 inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
                                     const DynArr<Word> &parsed,
-                                    Size &added_count) {
+                                    Size &added_count, uint64_t timestamp) {
 	for (Size i = 0; i < parsed.size; ++i) {
 		const auto &word = parsed[i];
 		auto imported = word;
@@ -106,9 +107,9 @@ inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
 		//         static_cast<int>(word.type),
 		//         StrView_Arg(most_meaningfull_lemma(word)));
 		bool was_new = false;
-		if (!store.ensure_word(scratch, imported, &was_new)) {
+		if (!store.ensure_word(scratch, imported, timestamp, &was_new)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Importing parsed word #%d failed (" StrView_Fmt ")",
+			             "Importing parsed word #%lld failed (" StrView_Fmt ")",
 			             i, StrView_Arg(word_most_meaningfull_lemma(word)));
 			return false;
 		}
@@ -120,7 +121,7 @@ inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
 		}
 		++added_count;
 		if (added_count % 1024 == 0) {
-			SDL_Log("added %d of %d", added_count, parsed.size);
+			SDL_Log("added %lld of %lld", added_count, parsed.size);
 		}
 	}
 	return true;
@@ -237,7 +238,7 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 		}
 
 		auto word = word_clone(ctx.arena, *parsed_word);
-		if (!ctx.word_store.ensure_word(ctx.arena_frame, word)) {
+		if (!ctx.word_store.ensure_word(ctx.arena_frame, word, ctx.ticks)) {
 			SDL_LogError(
 				  SDL_LOG_CATEGORY_ERROR,
 				  "Ensuring default learning-list seed failed: " StrView_Fmt,
@@ -257,7 +258,7 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 	return true;
 }
 
-inline void txt_to_xapian(AppContext &ctx, StrView path) {
+inline void txt_to_xapian(AppContext &ctx, StrView path, uint64_t timestamp) {
 	Measure m{__FUNCTION__};
 
 	Arena a(1 << 30); // TODO: think harder
@@ -276,12 +277,12 @@ inline void txt_to_xapian(AppContext &ctx, StrView path) {
 	m.point().printus("txt file parsed");
 	if (parsed_words.size > ctx.word_store.word_count()) {
 		// TODO: update logic
-		SDL_Log("parsed %d, but we have %d. Should import the words",
+		SDL_Log("parsed %lld, but we have %lld. Should import the words",
 		        parsed_words.size, ctx.word_store.word_count());
 
 		Size added_count = 0;
 		if (!import_new_parsed_words(a, ctx.word_store, parsed_words,
-		                             added_count)) {
+		                             added_count, timestamp)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Importing parsed words failed");
 			exit(-1);
@@ -291,7 +292,7 @@ inline void txt_to_xapian(AppContext &ctx, StrView path) {
 			SDL_Log("Imported %d new words", static_cast<int>(added_count));
 		}
 	} else {
-		SDL_Log("parsed %d and we have %d", parsed_words.size,
+		SDL_Log("parsed %lld and we have %lld", parsed_words.size,
 		        ctx.word_store.word_count());
 	}
 	m.lap().printus("import active dictionary");
@@ -344,7 +345,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 		ctx.words = new Words;
 		FileLoader fl{};
 		if (fl.load_from_writable(scratch, words_leaf)) {
-			SDL_Log(StrView_Fmt " loaded: %d bytes", StrView_Arg(words_leaf),
+			SDL_Log(StrView_Fmt " loaded: %lld bytes", StrView_Arg(words_leaf),
 			        fl.size);
 			if (!WordsCodec::decode(ctx.arena, fl.data, fl.size, *ctx.words)) {
 				SDL_Log(StrView_Fmt
@@ -360,7 +361,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 				}
 				*ctx.words = {};
 			} else {
-				SDL_Log("main arena usage after decode: %td / %d bytes",
+				SDL_Log("main arena usage after decode: %lld / %lld bytes",
 				        ctx.arena.offset, ctx.arena.allocated_size);
 			}
 		} else {
@@ -368,14 +369,14 @@ inline bool init_runtime_data(AppContext &ctx) {
 			        " not found; starting with an empty learning list",
 			        StrView_Arg(words_leaf));
 		}
-		SDL_Log(StrView_Fmt " size: %d words", StrView_Arg(words_leaf),
+		SDL_Log(StrView_Fmt " size: %lld words", StrView_Arg(words_leaf),
 		        ctx.words->size);
 		m.lap().printus("learning list opened");
 	}
 
 	bool words_list_changed = false;
 	if (!sync_learning_words_to_store(ctx.arena_frame, ctx.word_store,
-	                                  *ctx.words, words_list_changed)) {
+	                                  *ctx.words, words_list_changed, SDL_GetTicks())) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Syncing learning list to Xapian failed");
 		return false;
@@ -399,7 +400,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 		m.lap().printus("save remapped snapshot");
 	}
 
-	SDL_Log("main arena usage after startup load: %td / %d bytes",
+	SDL_Log("main arena usage after startup load: %lld / %lld bytes",
 	        ctx.arena.offset, ctx.arena.allocated_size);
 	SDL_Log("==================");
 	return true;

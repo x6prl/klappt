@@ -9,10 +9,10 @@
 #include <SDL3/SDL_log.h>
 
 // NOTE: should be SIGNED
-using Size = int;
+using Size = int64_t;
 
 struct Arena {
-	using Offset = ptrdiff_t;
+	using Offset = Size;
 	unsigned char *data{};
 	Offset offset{0};
 	Offset size_objects{0};
@@ -30,11 +30,11 @@ struct Arena {
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
 		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		SDL_Log("Created arena of size %d KiB", arena_size / 1024);
+		SDL_Log("Created arena of size %lld KiB", arena_size / 1024);
 	}
 	~Arena() {
 		munmap(data, allocated_size);
-		SDL_Log("Destroyed arena of size %d KiB", allocated_size / 1024);
+		SDL_Log("Destroyed arena of size %lld KiB", allocated_size / 1024);
 	}
 	Arena(Arena const &) = delete;
 	void operator=(Arena const &) = delete;
@@ -51,7 +51,7 @@ struct Arena {
 		if (offset > allocated_size) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Arena: cannot allocate memory"
-			             " (request=%d aligned_used=%td capacity=%d)\n",
+			             " (request=%lld aligned_used=%lld capacity=%lld)\n",
 			             size, offset, allocated_size);
 			exit(-5);
 		}

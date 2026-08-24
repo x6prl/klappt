@@ -11,6 +11,7 @@
 #include "ui/components/switch_button.h"
 #include "ui/dpi.h"
 #include "ui/screen_helpers.h"
+#include "ui/themes.h"
 #include <utility>
 
 namespace {
@@ -65,15 +66,15 @@ bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 	auto &s = ctx->settings;
 	auto &r = s.asset(t);
 	auto es = StrView::from_number(ctx->arena_frame, r.expected_size);
-	SDL_Log("TYPE (%d) %d %d %d " StrView_Fmt, std::to_underlying(t),
-	        (int)r.is_zip_ready_to_unpack, (int)r.is_unpacked,
-	        (int)r.is_zip_removed, StrView_Arg(es));
+	SDL_Log("TYPE (%d) ready2unp=%d unp=%d ziprem=%d expected=" StrView_Fmt,
+	        std::to_underlying(t), (int)r.is_zip_ready_to_unpack,
+	        (int)r.is_unpacked, (int)r.is_zip_removed, StrView_Arg(es));
 	if (should_be_downloaded_f(ctx) && !r.is_unpacked && !r.is_zip_removed) {
 		auto pool_index = Worker::net_download_and_unpack_asset(ctx, t);
 		if (pool_index >= 0) {
 			download_track(ctx, pool_index, label);
 		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "unxepected index %d",
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "unxepected index %lld",
 			             pool_index);
 			if (pool_index == -2) {
 				return false;
@@ -86,6 +87,7 @@ bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 };
 
 bool run_download_and_unpack_tr_asset(AppContext *ctx) {
+	SDL_Log("run_download_and_unpack_tr_asset");
 	return check_and_run_download_and_unpack(                  //
 		  ctx, "Main dictionary"_v, AssetsDL::Type::XAPIAN_TR, //
 		  [](AppContext *_) { return true; }                   //
@@ -93,6 +95,7 @@ bool run_download_and_unpack_tr_asset(AppContext *ctx) {
 }
 
 bool run_download_and_unpack_optional_assets(AppContext *ctx) {
+	SDL_Log("run_download_and_unpack_optional_assets");
 	auto ret = true;
 	ret = ret &&
 	      check_and_run_download_and_unpack(
@@ -226,16 +229,21 @@ void screen_onboarding_draw(AppContext *const ctx) {
 						(void)run_download_and_unpack_tr_asset(ctx);
 					}
 				} else {
-					draw_option_row(
-						  ctx, CLAY_ID("DEWiki"), "German Wiktionary"_v,
-						  "Usable, if you already understand something. "
-						  "Glossary "
-						  "information, without translation."_v,
-						  settings.is_using_also_de, [ctx](bool new_val) {
-							  ctx->settings.is_using_also_de = new_val;
-							  ctx->settings.save(ctx->arena_frame);
-						  });
+					// TODO: upd
+					ctx->settings.is_using_also_de = false;
+					bool skip = true;
+					// draw_option_row(
+					// 	  ctx, CLAY_ID("DEWiki"), "German Wiktionary"_v,
+					// 	  "Usable, if you already understand something. "
+					// 	  "Glossary "
+					// 	  "information, without translation."_v,
+					// 	  settings.is_using_also_de, [ctx](bool new_val) {
+					// 		  ctx->settings.is_using_also_de = new_val;
+					// 		  ctx->settings.save(ctx->arena_frame);
+					// 	  });
 #if NEURO
+					// TODO: upd
+					skip = false;
 					draw_option_row(
 						  ctx, CLAY_ID("TTS"), "Text-to-speech"_v,
 						  "Allows you to hear the pronounciation of a word or a phrase, even when there is no audio in Wiktionary. Used for offline audio generation. May be very slow on old devices. ~80MB"_v,
@@ -255,7 +263,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 					auto next_btn =
 						  mobile_button(ctx, CLAY_ID("NextButton"), "Next"_v,
 					                    mobile_button_style_primary());
-					if (next_btn.activated()) {
+					// TODO: upd
+					if (skip || next_btn.activated()) {
 						run_download_and_unpack_optional_assets(ctx);
 						next_stage(true);
 					}
@@ -263,6 +272,43 @@ void screen_onboarding_draw(AppContext *const ctx) {
 			}
 			break;
 		case 2:
+			CLAY(CLAY_ID("DefaultScreen"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_GROW(0)},
+								   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
+								   .childGap = udpi(56.0f),
+								   .childAlignment = {CLAY_ALIGN_X_CENTER,
+			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+							 },
+				 }) {
+
+				draw_text("What would you like to open by default?"_v,
+				          theme()->onSurface, text_size);
+				auto current_default_screen =
+					  static_cast<Screen>(ctx->settings.default_screen);
+				Arr<Pair<Screen, StrView>, 2> options{{
+					  {Screen::Start, "Word trainer"_v},
+					  {Screen::WordsList, "Dictionary with search"_v},
+				}};
+				int option_counter = 0;
+				for (auto &[screen, label] : options) {
+					auto btn = mobile_button(
+						  ctx, CLAY_IDI_LOCAL("OptionButton", option_counter++),
+						  label);
+					if (btn.activated()) {
+						ctx->settings.default_screen =
+							  std::to_underlying(screen);
+						ctx->settings.save(ctx->arena_frame);
+						next_stage(true);
+					}
+				}
+			}
+			break;
+		case 3:
 			CLAY(CLAY_ID("WaitingForDownloads"),
 			     {
 					   .layout =
@@ -352,13 +398,14 @@ void screen_onboarding_draw(AppContext *const ctx) {
 				// resetting dl tracking
 				if (finished_count > 0 &&
 				    finished_count == ctx->downloads.size) {
-					SDL_Log("all %d downloads are successful", finished_count);
+					SDL_Log("all %lld downloads are successful",
+					        finished_count);
 					ctx->downloads.size = 0;
 					next_stage(true);
 				}
 			}
 			break;
-		case 3:
+		case 4:
 			CLAY(CLAY_ID("WaitingForUnpacking"),
 			     {
 					   .layout =

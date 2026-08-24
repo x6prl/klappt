@@ -159,7 +159,7 @@ inline void log_invalid_word_for_encode(uint16_t ref, const Word &word) {
 		if (!is_valid_encoded_str_view(view)) {
 			SDL_LogError(
 				  SDL_LOG_CATEGORY_ERROR,
-				  "WordsCodec::encode invalid field ref=%u field=%s size=%d",
+				  "WordsCodec::encode invalid field ref=%u field=%s size=%lld",
 				  ref, name, view.size);
 		}
 	};
@@ -251,7 +251,7 @@ inline StrView encode(Arena &a, const Words &words) {
 			}
 		}
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "WordsCodec::encode rejected blob size %d", total_size);
+		             "WordsCodec::encode rejected blob size %lld", total_size);
 		return {};
 	}
 	auto *data = static_cast<unsigned char *>(a.push(total_size));

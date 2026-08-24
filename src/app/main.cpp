@@ -419,6 +419,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	m.lap().printus("ui settings init");
 
 	if (argc > 1 && 0 == strncmp(argv[1], "xapian", 7)) {
+		auto timestamp = SDL_GetTicks();
 		auto rs_path = "/home/x/src/klappt-resources/"_v;
 		{
 			SDL_Log("en");
@@ -426,7 +427,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 				  StrView::concat(ctx->arena_frame, rs_path,
 			                      AssetsDL::word_store_leaf(lang_en));
 			ctx->word_store.open(word_store_path);
-			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/en.txt"_v);
+			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/en.txt"_v,
+			              timestamp);
 		}
 		{
 			SDL_Log("ru");
@@ -434,7 +436,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 				  StrView::concat(ctx->arena_frame, rs_path,
 			                      AssetsDL::word_store_leaf(lang_ru));
 			ctx->word_store.open(word_store_path);
-			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/ru.txt"_v);
+			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/ru.txt"_v,
+			              timestamp);
 		}
 		if (false) {
 			SDL_Log("tr");
@@ -442,7 +445,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 				  StrView::concat(ctx->arena_frame, rs_path,
 			                      AssetsDL::word_store_leaf(lang_tr));
 			ctx->word_store.open(word_store_path);
-			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/tr.txt"_v);
+			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/tr.txt"_v,
+			              timestamp);
 		}
 		SDL_Log("finished");
 		exit(0);
@@ -453,7 +457,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 			return SDL_APP_FAILURE;
 		}
 		m.lap().printus("runtime data initialized");
-		ctx->go(Screen::Start);
+		ctx->go(static_cast<Screen>(ctx->settings.default_screen));
 	}
 
 	{ // setup workers
@@ -620,7 +624,7 @@ extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	// MIX_Quit();
 	//
 	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled "
-	        "errors: %d",
+	        "errors: %lld",
 	        ctx->app_status.app_quit, ctx->app_status.error_msgs.size);
 	for (auto &emsg : ctx->app_status.error_msgs) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, StrView_Fmt, StrView_Arg(emsg));

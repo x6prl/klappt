@@ -31,21 +31,21 @@ struct Words {
 	Size size = 0;
 
 	constexpr WordRef begin() const { return {1}; }
-	constexpr WordRef end() const { return {next_free}; }
+	constexpr WordRef end() const { return {(int32_t)next_free}; }
 
 	WordRef add() {
 		for (Size ref = 1; ref < next_free; ++ref) {
 			if (!used[ref]) {
 				used[ref] = true;
 				++size;
-				return {ref};
+				return {(int32_t)ref};
 			}
 		}
 		if (next_free < MAX_WORDS) {
 			used[next_free] = true;
 			++size;
 			++next_free;
-			return {next_free - 1};
+			return {(int32_t)next_free - 1};
 		} else {
 			// TODO: handle the error? controll this somewhere else?
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s:\n\tNO SPACE",

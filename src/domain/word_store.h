@@ -30,7 +30,7 @@ struct WordStore {
 	 * from the stored copy. If it is new, a fresh immutable word_id is
 	 * assigned.
 	 */
-	bool ensure_word(Arena &scratch, Word &word, bool *was_new = nullptr);
+	bool ensure_word(Arena &scratch, Word &word, uint64_t creation_timestamp,  bool *was_new = nullptr);
 	bool get_by_id(Arena &scratch, WordId word_id, Word &word);
 	void save(Arena &scratch, Word &word);
 	void set_was_learned(Arena &scratch, Word &word);

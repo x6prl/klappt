@@ -176,7 +176,7 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 void bottom_bar_layout(AppContext *ctx) {
 	constexpr auto bottom_bar_size{60.f};
 	constexpr Arr<Triple<StrView, Screen, StrView>, 4> menu{{
-		  {""_v, Screen::Start},
+		  {""_v, Screen::Start},
 		  {"T"_v, Screen::TTS_ASR},
 		  {""_v, Screen::WordsList},
 		  {""_v, Screen::LearningList},

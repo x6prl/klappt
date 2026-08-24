@@ -20,6 +20,7 @@ struct Settings {
 	bool is_using_also_de{true};
 	bool is_using_tts{true};
 	bool is_using_asr{false};
+	int32_t default_screen{0};
 
 	static void for_every_lang(auto f) {
 		for (int32_t i{0}; i < (int)std::to_underlying(lang_COUNT); ++i) {

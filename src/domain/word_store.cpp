@@ -20,6 +20,9 @@ namespace {
 
 constexpr char NEXT_WORD_ID_KEY[] = "next_word_id";
 constexpr Xapian::valueno WORD_ID_VALUE_SLOT = 0;
+constexpr Xapian::valueno SCHEME_VERSION_VALUE_SLOT = 1;
+constexpr Xapian::valueno CREATION_TIMESTAMP_VALUE_SLOT = 2;
+constexpr Xapian::valueno TRAINED_COUNTER_VALUE_SLOT = 10;
 constexpr char TYPE_PREFIX[] = "XY";
 constexpr char LEMMA_PREFIX[] = "XL";
 constexpr char FORM_PREFIX[] = "XF";
@@ -219,15 +222,13 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 		doc.add_boolean_term("XYverb");
 		index_field(generator, word.v.infinitive, WEIGHT_HIGHEST, LEMMA_PREFIX);
 		if (word.v.third_person) {
-			auto third_p =
-				  word_verb_get_third_person_full(scratch, word.v);
+			auto third_p = word_verb_get_third_person_full(scratch, word.v);
 			index_field(generator, third_p, WEIGHT_NORM, FORM_PREFIX);
 		}
 		index_field(generator, word.v.praeteritum, WEIGHT_NORM, FORM_PREFIX);
 		if (word.v.auxv_and_past_participle) {
 			index_field(generator,
-			            word_verb_get_perfect_only_participle(scratch, 
-			                                                  word.v),
+			            word_verb_get_perfect_only_participle(scratch, word.v),
 			            WEIGHT_NORM, FORM_PREFIX);
 		}
 		break;
@@ -255,7 +256,8 @@ void configure_query_parser(Xapian::QueryParser &parser,
 	parser.add_boolean_prefix("type", TYPE_PREFIX);
 }
 
-bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc) {
+bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc,
+                    uint64_t timestamp=0) {
 	KLAPPT_PROFILE_SCOPE_N("word_store.build_document");
 	auto guard = scratch.guard();
 	const auto payload = WordsCodec::encode_word(scratch, word);
@@ -270,6 +272,10 @@ bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc) {
 	doc.add_boolean_term(content_hash_term(scratch, word_hash(scratch, word)));
 	doc.add_value(WORD_ID_VALUE_SLOT,
 	              encode_be_u64(scratch, word.word_id.value));
+	// doc.add_value(SCHEME_VERSION_VALUE_SLOT, encode_be_u64(scratch, 0));
+	// doc.add_value(CREATION_TIMESTAMP_VALUE_SLOT,
+	//               encode_be_u64(scratch, timestamp));
+	// doc.add_value(TRAINED_COUNTER_VALUE_SLOT, encode_be_u64(scratch, 0));
 	index_word_fields(scratch, doc, word);
 	return true;
 }
@@ -506,7 +512,8 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 	}
 }
 
-bool WordStore::ensure_word(Arena &scratch, Word &word, bool *was_new) {
+bool WordStore::ensure_word(Arena &scratch, Word &word,
+                            uint64_t creation_timestamp, bool *was_new) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::ensure_word");
 	if (was_new) {
 		*was_new = false;
