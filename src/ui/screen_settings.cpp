@@ -20,11 +20,11 @@ namespace {
 void screen_settings_draw(AppContext *ctx) {
 	CLAY(CLAY_ID("SettingsScreen"),
 	     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-	                 .padding = CLAY_PADDING_ALL(udpi(16.0f)),
+	                 .padding = CLAY_PADDING_ALL(udpi(0.0f)),
 	                 // .childGap = udpi(14.0f),
 	                 .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
 		auto text_size = udpi(24.f);
-		Clay_Padding padding = {udpi(4.0f), udpi(4.0f), udpi(12.0f),
+		Clay_Padding padding = {udpi(16.0f), udpi(16.0f), udpi(12.0f),
 		                        udpi(12.0f)};
 		auto settings_item_count = 4;
 		list::vertical_dynamic(
@@ -208,7 +208,7 @@ void screen_settings_draw(AppContext *ctx) {
 						  }
 						  auto button_unchosen_style =
 								mobile_button_style_surface_container_high();
-						  button_unchosen_style.font_size = udpi(18);
+						  button_unchosen_style.font_size = 18.f;
 						  button_unchosen_style.padding_x =
 								button_unchosen_style.padding_y = dpi(4.f);
 						  button_unchosen_style.font_id = FontID::MAIN;

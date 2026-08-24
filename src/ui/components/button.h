@@ -23,7 +23,8 @@ constexpr auto CIRCLE_EXCLAMATION = ""_v;
 constexpr auto ROTATE_LEFT = ""_v;
 constexpr auto CHEVRON_UP = ""_v;
 constexpr auto CHEVRON_DOWN = ""_v;
-constexpr auto CROSSHAIRS = ""_v;
+constexpr auto ROTATE = ""_v;
+constexpr auto BACK = ""_v;
 constexpr auto CLEAR = ""_v;
 } // namespace Icons
 

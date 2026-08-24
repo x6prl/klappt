@@ -764,10 +764,24 @@ void screen_word_view_draw(AppContext *ctx) {
 			// 	// TODO: prompt user
 			// 	// screen_word_edit_push(ctx, state.word_id);
 			// }
-			auto edit = mobile_icon_button<false>(ctx, CLAY_ID("EditButton"),
-			                                      Icons::EDIT);
-			if (edit.activated()) {
-				screen_word_edit_push(ctx);
+
+			// TODO: refactor editor
+			// auto edit = mobile_icon_button<false>(ctx, CLAY_ID("EditButton"),
+			//                                       Icons::EDIT);
+			// if (edit.activated()) {
+			// 	screen_word_edit_push(ctx);
+			// }
+			auto back_button = mobile_icon_button<false>(
+				  ctx, CLAY_ID_LOCAL("BackButton"), Icons::BACK);
+			if (back_button.activated()) {
+				ctx->pop();
+			}
+			auto back_and_clear_and_focus = mobile_icon_button<false>(
+				  ctx, CLAY_ID_LOCAL("BackClearFocusButton"), Icons::ROTATE);
+			if (back_and_clear_and_focus.activated()) {
+				ctx->words_search.clear();
+				ctx->mobile_text_input.activate_text_input = true;
+				ctx->pop();
 			}
 #if NEURO
 			if (ctx->settings.is_using_tts) {

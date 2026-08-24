@@ -126,7 +126,7 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 						 },
 			 }) {
 			if (ctx->is_backable()) {
-				auto back = mobile_button(ctx, CLAY_ID("BackButton"), ""_v,
+				auto back = mobile_button(ctx, CLAY_ID("BackButton"), Icons::BACK,
 				                          app_bar_button_style);
 				if (back.tapped) {
 					ctx->pop();
@@ -234,7 +234,8 @@ void bottom_bar_layout(AppContext *ctx) {
 			                       .height = CLAY_SIZING_FIXED(
 										 dpi(bottom_bar_size))},
 				  }}) {
-				bool activated = Clay_Hovered() && ctx->tslt.is_tap();
+				bool is_selected = menu[i].second == ctx->screen();
+				bool is_activated = Clay_Hovered() && ctx->tslt.is_tap();
 				CLAY(CLAY_IDI("Background", i),
 				     {.layout =
 				            {
@@ -245,12 +246,15 @@ void bottom_bar_layout(AppContext *ctx) {
 								  .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							},
 				      .backgroundColor =
-				            activated ? theme()->primary : Clay_Color{}}) {
+				            is_selected ? 
+							theme()->surfaceContainer
+				            : is_activated ? theme()->primary
+				                           : Clay_Color{}}) {
 
 					(void)mobile_button(ctx, CLAY_IDI("Button", i),
 					                    menu[i].first, style);
 
-					if (activated) {
+					if (is_activated) {
 						if (menu[i].second == Screen::WordsList) {
 							screen_words_list_go(ctx);
 						} else if (menu[i].second == Screen::LearningList) {
