@@ -126,8 +126,8 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 						 },
 			 }) {
 			if (ctx->is_backable()) {
-				auto back = mobile_button(ctx, CLAY_ID("BackButton"), Icons::BACK,
-				                          app_bar_button_style);
+				auto back = mobile_button(ctx, CLAY_ID("BackButton"),
+				                          Icons::BACK, app_bar_button_style);
 				if (back.tapped) {
 					ctx->pop();
 				}
@@ -245,11 +245,9 @@ void bottom_bar_layout(AppContext *ctx) {
 				                                     CLAY_ALIGN_Y_CENTER},
 								  .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							},
-				      .backgroundColor =
-				            is_selected ? 
-							theme()->surfaceContainer
-				            : is_activated ? theme()->primary
-				                           : Clay_Color{}}) {
+				      .backgroundColor = is_selected ? theme()->surfaceContainer
+				                         : is_activated ? theme()->primary
+				                                        : Clay_Color{}}) {
 
 					(void)mobile_button(ctx, CLAY_IDI("Button", i),
 					                    menu[i].first, style);
@@ -552,12 +550,14 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.ExerciseSummary");
 				app_bar_layout(ctx, "Summary"_v);
 				screen_exercise_summary_draw(ctx);
+				bottom_bar_layout(ctx);
 				break;
 			}
 			case Screen::ExerciseReview: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.ExerciseReview");
 				app_bar_layout(ctx, review_x_of_n(ctx));
 				screen_exercise_review_draw(ctx);
+				bottom_bar_layout(ctx);
 				break;
 			}
 			case Screen::WordsList: {
@@ -589,9 +589,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::WordView: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordView");
-				app_bar_layout(ctx, ""_v
-				               // ctx->word_view_state->title
-				);
+				app_bar_layout(ctx, ""_v);
 				screen_word_view_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;

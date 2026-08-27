@@ -97,4 +97,23 @@ struct StrBuilder {
 		}
 		return ret;
 	}
+	template <typename... Args>
+	[[nodiscard]]
+	static StrView concat(Arena &arena, const Args &...args);
 };
+
+template <typename... Args>
+StrView StrBuilder::concat(Arena &arena, const Args &...args) {
+	const Size new_size = (args.size + ...);
+	char *new_mem = arena.pushN<char>(new_size);
+
+	char *dst = new_mem;
+	auto append = [&](const StrView str) {
+		memcpy(dst, str.data, str.size);
+		dst += str.size;
+	};
+
+	(append(args), ...);
+
+	return {new_mem, new_size};
+}

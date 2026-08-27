@@ -3,7 +3,6 @@
 #include <sys/mman.h>
 
 #include <cassert>
-#include <cstddef>
 #include <cstdlib>
 
 #include <SDL3/SDL_log.h>
@@ -30,11 +29,11 @@ struct Arena {
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
 		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		SDL_Log("Created arena of size %lld KiB", arena_size / 1024);
+		SDL_Log("Created arena of size %ld KiB", arena_size / 1024);
 	}
 	~Arena() {
 		munmap(data, allocated_size);
-		SDL_Log("Destroyed arena of size %lld KiB", allocated_size / 1024);
+		SDL_Log("Destroyed arena of size %ld KiB", allocated_size / 1024);
 	}
 	Arena(Arena const &) = delete;
 	void operator=(Arena const &) = delete;

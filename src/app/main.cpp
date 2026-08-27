@@ -624,7 +624,7 @@ extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	// MIX_Quit();
 	//
 	SDL_Log("Application quit successfully!\nStatus code: %d\nUnhandled "
-	        "errors: %lld",
+	        "errors: %ld",
 	        ctx->app_status.app_quit, ctx->app_status.error_msgs.size);
 	for (auto &emsg : ctx->app_status.error_msgs) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, StrView_Fmt, StrView_Arg(emsg));

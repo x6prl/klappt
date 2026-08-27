@@ -52,7 +52,8 @@ struct StrView {
 	static StrView concat_with(Arena &arena, const StrView left,
 	                           const StrView right, char delimiter);
 
-	// Mutate this view by removing leading, trailing, or both-side whitespace.
+	// Mutate this view by removing leading, trailing, or both-side
+	// whitespace.
 	StrView &mut_triml();
 	StrView &mut_trimr();
 	StrView &mut_trim();
@@ -68,8 +69,9 @@ struct StrView {
 	[[nodiscard]]
 	StrView trim() const;
 
-	// Return the head before the delimiter and advance this view to the tail.
-	// If the delimiter is missing, return the whole view and clear this view.
+	// Return the head before the delimiter and advance this view to the
+	// tail. If the delimiter is missing, return the whole view and clear
+	// this view.
 	StrView mut_split_by(char delimiter);
 	StrView mut_split_by(int (*handler)(int ch));
 	StrView mut_split();

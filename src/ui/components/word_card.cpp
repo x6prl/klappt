@@ -59,7 +59,7 @@ uint16_t translation_font_id(const AppContext *ctx) {
 	                                            : FontID::MAIN;
 }
 
-void word_second_col(Clay_ElementId id, StrView text, Clay_Color color,
+void word_second_col(Clay_ElementId id, StrView translation, Clay_Color color,
                      uint16_t font_size, uint16_t font_id) {
 	CLAY(id,
 	     {
@@ -71,9 +71,7 @@ void word_second_col(Clay_ElementId id, StrView text, Clay_Color color,
 					 },
 			   .clip = {.horizontal = true},
 		 }) {
-		auto first_translation = text.split_by(';').first;
-		auto visible_text = first_translation.split_by('{').first;
-		CLAY_TEXT(visible_text.to_clay_string(),
+		CLAY_TEXT(translation.to_clay_string(),
 		          CLAY_TEXT_CONFIG({
 						.textColor = color,
 						.fontId = font_id,

@@ -26,7 +26,7 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 		return file.mut_split_by('\n').trim();
 	};
 	auto error = [&](const char msg[]) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "line %d: %s", linecount, msg);
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "line %ld: %s", linecount, msg);
 		app_status->set_exit_with_error(StrView::lit(msg));
 	};
 

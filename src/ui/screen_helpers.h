@@ -53,20 +53,18 @@ draw_text(StrView text, Clay_Color color, uint16_t font_size = 16,
           uint16_t font_id = FontID::MAIN,
           Clay_TextElementConfigWrapMode wrap_mode = CLAY_TEXT_WRAP_WORDS,
           Clay_TextAlignment text_alignment = CLAY_TEXT_ALIGN_CENTER) {
-	CLAY_TEXT(text.to_clay_string(),
-	          CLAY_TEXT_CONFIG({
-					.textColor = color,
-					.fontId = font_id,
-					.fontSize = static_cast<uint16_t>(font_size),
-					.wrapMode = wrap_mode,
-					.textAlignment = text_alignment,
-			  }));
+	CLAY_TEXT(text.to_clay_string(), CLAY_TEXT_CONFIG({
+										   .textColor = color,
+										   .fontId = font_id,
+										   .fontSize = font_size,
+										   .wrapMode = wrap_mode,
+										   .textAlignment = text_alignment,
+									 }));
 }
 
 inline uint16_t translation_font_id(const AppContext *ctx) {
-	return ctx->settings.tr_language == lang_ar
-	             ? FontID::ARABIC_MAIN
-	             : FontID::MAIN;
+	return ctx->settings.tr_language == lang_ar ? FontID::ARABIC_MAIN
+	                                            : FontID::MAIN;
 }
 
 inline float get_font_size_based_on_str_size(float viewpoint_width, float scale,
@@ -123,9 +121,9 @@ inline void remove_word_from_learning_list(Arena &tmparena, Word *word,
 }
 
 template <class F>
-bool for_each_matching_learning_word_range(Arena &scratch, const Words &words, StrView query,
-                                           Size start, Size count,
-                                           F &&visitor) {
+bool for_each_matching_learning_word_range(Arena &scratch, const Words &words,
+                                           StrView query, Size start,
+                                           Size count, F &&visitor) {
 	query.mut_trim();
 	Size matched = 0;
 	Size emitted = 0;

@@ -114,9 +114,9 @@ static void init_edit_from_view(AppContext *ctx) {
 	edit.type = word.type;
 	edit.in_learning_list = word.in_learning_list;
 	edit.was_learned = word.was_learned;
-	edit.has_learning_state = view.has_state;
-	if (view.has_state) {
-		edit.mode = view.state_copy.mode;
+	edit.has_learning_state = view.has_learning_state;
+	if (view.has_learning_state) {
+		edit.mode = view.learning_state_copy.mode;
 	}
 	assign_buffer(edit.translations_raw, word.translations_raw);
 
@@ -213,10 +213,10 @@ static void save_edit(AppContext *ctx) {
 
 	auto &view = *ctx->word_view_state;
 	view.word_copy = word;
-	view.title = word_most_meaningfull_lemma(view.word_copy);
-	if (view.has_state) {
-		view.state_copy.mode = edit.mode;
-		if (!ctx->states.set(view.word_id, view.state_copy)) {
+	// view.title = word_most_meaningfull_lemma(view.word_copy);
+	if (view.has_learning_state) {
+		view.learning_state_copy.mode = edit.mode;
+		if (!ctx->states.set(view.word_id, view.learning_state_copy)) {
 			ctx->app_status.push_error("Cannot save learning state"_v);
 		}
 	}

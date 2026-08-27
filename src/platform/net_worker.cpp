@@ -300,7 +300,7 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 
 	if (!is_enough_space) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "request %d: Bufffer size (%d) is too small!",
+		             "request %d: Bufffer size (%ld) is too small!",
 		             slot->req.request_id, out.reserved);
 		slot->req.error.copy_from("buffer size is too small"_v);
 	}
@@ -424,8 +424,8 @@ int SDLCALL NetWorkerThread(void *userdata) {
 			auto &req = pool_slot.req;
 			pool_slot.int_data = {};
 
-			SDL_Log("Net Thread: Processing Net Request %d "
-			        "(URL: " StrView_Fmt ", FNAME \"%s\", BUF %dB)",
+			SDL_Log("Net Thread: Processing Net Request %d (URL: " StrView_Fmt
+			        ", FNAME \"%s\", BUF %ldB)",
 			        req.request_id, StrView_Arg(req.url.view()),
 			        req.file_name.mutable_to_cstr(),
 			        req.memory_buffer.reserved);
