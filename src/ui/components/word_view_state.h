@@ -3,6 +3,7 @@
 #include "domain/engine.h"
 #include "domain/word.h"
 #include "domain/word_id.h"
+#include "domain/word_payload.h"
 #include "domain/words.h"
 
 struct WordViewState{
@@ -11,4 +12,5 @@ struct WordViewState{
 	bool has_learning_state{false};
 	Word word_copy{};
 	Engine::State learning_state_copy{};
+	WordPayload word_payload{};
 };

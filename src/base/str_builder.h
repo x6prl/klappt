@@ -11,6 +11,14 @@ struct StrBuilder {
 	DynArr<StrView> data{};
 	Size total_lenght{0};
 
+	StrBuilder() = default;
+	StrBuilder(DynArr<StrView> arr) {
+		for (auto &s : arr) {
+			total_lenght += s.size;
+		}
+		data = arr;
+	}
+
 	void push(Arena &a, StrView str) {
 		total_lenght += str.size;
 		data.push(a, str);

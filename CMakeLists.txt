@@ -745,6 +745,7 @@ if(USE_HOTRELOAD)
         lmdb
         xapian::xapian
         SDL3_ttf::SDL3_ttf
+        simdjson
 
         # sherpa-onnx-c-api
         # sherpa-onnx-core

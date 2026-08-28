@@ -616,3 +616,71 @@ inline Word word_clone(Arena &a, const Word &src) {
 
 	return dst;
 }
+
+// NOTE: unused
+static inline StrView word_to_lexemme_str(Arena &scratch, Arena &a,
+                                          const Word &w) {
+	StrBuilder strs{};
+	switch (w.type) {
+	case WordType::Nil:
+		return "<empty word>"_v;
+		break;
+	case WordType::Noun:
+		SDL_Log("noun %d " StrView_Fmt " " StrView_Fmt, (int)w.n.gender,
+		        StrView_Arg(w.n.lemma), StrView_Arg(w.n.plural_suffix));
+		strs.push(scratch, gender_to_article_nominative_strview(w.n.gender));
+		strs.push(scratch, w.n.lemma);
+		strs.push(scratch, w.n.plural_suffix);
+		break;
+	case WordType::Verb:
+		strs.push(scratch, w.v.infinitive);
+		if (w.v.third_person) {
+			strs.push(scratch, w.v.third_person);
+		}
+		if (w.v.praeteritum) {
+			strs.push(scratch, w.v.praeteritum);
+		}
+		if (w.v.auxv_and_past_participle) {
+			strs.push(scratch, w.v.auxv_and_past_participle);
+		}
+		if (w.v.third_person) {
+			SDL_Log("verb " StrView_Fmt " / " StrView_Fmt " / " StrView_Fmt
+			        " / " StrView_Fmt,
+			        StrView_Arg(w.v.infinitive), StrView_Arg(w.v.third_person),
+			        StrView_Arg(w.v.praeteritum),
+			        StrView_Arg(w.v.auxv_and_past_participle));
+		} else if (w.v.praeteritum || w.v.auxv_and_past_participle) {
+			SDL_Log("verb " StrView_Fmt " / " StrView_Fmt " / " StrView_Fmt,
+			        StrView_Arg(w.v.infinitive), StrView_Arg(w.v.praeteritum),
+			        StrView_Arg(w.v.auxv_and_past_participle));
+		} else {
+			SDL_Log("verb " StrView_Fmt, StrView_Arg(w.v.infinitive));
+		}
+		break;
+	case WordType::Adj:
+		strs.push(scratch, w.a.lemma);
+		if (w.a.is_indeclinable) {
+			SDL_Log("adj " StrView_Fmt " (indecl.)", StrView_Arg(w.a.lemma));
+			strs.push(scratch, "(indecl.)"_v);
+		} else if (w.a.comparative || w.a.superlative) {
+			SDL_Log("adj " StrView_Fmt " / " StrView_Fmt " / " StrView_Fmt,
+			        StrView_Arg(w.a.lemma), StrView_Arg(w.a.comparative),
+			        StrView_Arg(w.a.superlative));
+			if (w.a.comparative) {
+				strs.push(scratch, w.a.comparative);
+			}
+			if (w.a.superlative) {
+				strs.push(scratch, w.a.superlative);
+			}
+		} else {
+			SDL_Log("adj " StrView_Fmt, StrView_Arg(w.a.lemma));
+		}
+		break;
+	case WordType::Phrase:
+		strs.push(scratch, w.a.superlative);
+		SDL_Log("phrase " StrView_Fmt, StrView_Arg(w.p.text));
+		break;
+	}
+
+	return strs.join(a, ' ');
+}

@@ -82,8 +82,6 @@ Clay_Dimensions measure_text_sdl(Clay_StringSlice text,
 	return ctx->text->measure_text(text, config);
 }
 
-static bool dm = false;
-
 void app_bar_layout(AppContext *ctx, StrView title) {
 	if (ctx->app_status.error_msgs.size) {
 		StrBuilder strs{};
@@ -506,7 +504,6 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 		mobile_text_input_begin_frame(ctx);
 	}
 
-	Clay_SetDebugModeEnabled(dm);
 	{
 		KLAPPT_PROFILE_SCOPE_N("clay_update_scroll");
 		clay_update_scroll(frame_delta_time_seconds);
