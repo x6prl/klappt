@@ -443,7 +443,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         -Wextra
         # -Wfloat-equal
         -Wno-missing-field-initializers
-        -ffast-math # TODO: check the impact
+        -ffast-math
     )
 endif()
 

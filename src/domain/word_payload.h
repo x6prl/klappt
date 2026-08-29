@@ -10,13 +10,13 @@ struct WordAudioItem {
 };
 
 struct WordSenseItem {
-	StrView valency{}; // опционально
+	StrView valency{}; // NOTE: optional
 	DynArr<StrView> translations{};
 };
 
 struct WordExampleItem {
 	StrView text{};
-	StrView translation{}; // опционально (например, в de.txt)
+	StrView translation{}; // NOTE: optional (for de)
 };
 
 struct WordPayload {
@@ -32,29 +32,23 @@ struct WordPayload {
 	DynArr<StrView> de_glosses{};
 	DynArr<WordExampleItem> examples{};
 	DynArr<WordSenseItem> senses{};
+	DynArr<StrView> words{}; // NOTE: related to a phrase
 };
 
-// Хелпер: копирует строку из simdjson в арену и возвращает валидный StrView
 inline StrView copy_to_arena(Arena &a, std::string_view sv) {
-	return StrView{ sv.data(), static_cast<Size>(sv.size()) }.copy(a);
-	// if (sv.empty())
-	// 	return {};
-	// char *mem = a.pushN<char>(sv.size());
-	// memcpy(mem, sv.data(), sv.size());
-	// return {mem, static_cast<Size>(sv.size())};
+	return StrView{sv.data(), static_cast<Size>(sv.size())}.copy(a);
 }
 
 inline bool parse_word_json(Arena &scratch, Arena &a, StrView json_sv,
                             WordPayload &out, simdjson::dom::parser &parser) {
-	// 1. Обязательно сбрасываем структуру перед парсингом!
 	out = {};
 
-	if (!json_sv.data || json_sv.size == 0) {
+	if (!json_sv) {
 		return false;
 	}
 
-	// Выделяем буфер в арене с паддингом для simdjson
-	char *padded_buf = a.pushN<char>(json_sv.size + simdjson::SIMDJSON_PADDING);
+	char *padded_buf =
+		  scratch.pushN<char>(json_sv.size + simdjson::SIMDJSON_PADDING);
 	memcpy(padded_buf, json_sv.data, json_sv.size);
 	memset(padded_buf + json_sv.size, 0, simdjson::SIMDJSON_PADDING);
 
@@ -181,6 +175,15 @@ inline bool parse_word_json(Arena &scratch, Arena &a, StrView json_sv,
 		}
 	}
 
+	// 12. words for phrases
+	if (auto arr = doc["words"].get_array(); !arr.error()) {
+		for (auto item : arr.value()) {
+			if (auto str = item.get_string(); !str.error()) {
+				out.words.push(a, copy_to_arena(a, str.value()));
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -214,7 +217,7 @@ inline void log_word_payload(const WordPayload &p) {
 		}
 	}
 
-	// 5. senses (с валентностью и списком переводов)
+	// 5. senses
 	for (Size i = 0; i < p.senses.size; ++i) {
 		const auto &sense = p.senses[i];
 		if (sense.valency) {
@@ -267,5 +270,11 @@ inline void log_word_payload(const WordPayload &p) {
 			        static_cast<int>(i),
 			        StrView_Arg(p.examples[i].translation));
 		}
+	}
+
+	// 12. words
+	for (Size i = 0; i < p.words.size; ++i) {
+		SDL_Log("  word[%d]: " StrView_Fmt, static_cast<int>(i),
+		        StrView_Arg(p.words[i]));
 	}
 }

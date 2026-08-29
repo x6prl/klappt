@@ -237,7 +237,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(8.f),
+							   .childGap = udpi(6.f),
 							   .childAlignment = {CLAY_ALIGN_X_LEFT,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -247,8 +247,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 			     {
 					   .layout =
 							 {
-								   .padding = {udpi(8.f), udpi(8.f), udpi(4.f),
-			                                   udpi(4.f)},
+								   .padding = {udpi(8.f), udpi(8.f), udpi(3.f),
+			                                   udpi(3.f)},
 							 },
 					   .backgroundColor = theme()->secondary,
 					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
@@ -261,12 +261,33 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 				CLAY(CLAY_IDI("Badge", i),
 				     {
 						   .layout = {.padding = {udpi(8.f), udpi(8.f),
-				                                  udpi(4.f), udpi(4.f)}},
+				                                  udpi(3.f), udpi(3.f)}},
 						   .backgroundColor = theme()->surfaceContainerHigh,
 						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
 					 }) {
 					draw_text(badges[i], theme()->onSurfaceContainerHigh,
 					          static_cast<uint16_t>(udpi(12.f)));
+				}
+			}
+
+			// stylistical tags (colloquial, vulgar, rare, formal, etc.)
+			for (Size i{0}; i < word_payload.tags.size; ++i) {
+				const auto &tag = word_payload.tags[i];
+				bool is_warning = (tag == "vulgar"_v || tag == "obsolete"_v ||
+				                   tag == "archaic"_v);
+				Clay_Color bg = is_warning ? theme()->wrongContainer
+				                           : theme()->surfaceContainerHigh;
+				Clay_Color fg = is_warning ? theme()->onWrongContainer
+				                           : theme()->onSurfaceContainerHigh;
+
+				CLAY(CLAY_IDI("StyleTagBadge", i),
+				     {
+						   .layout = {.padding = {udpi(6.f), udpi(6.f),
+				                                  udpi(2.f), udpi(2.f)}},
+						   .backgroundColor = bg,
+						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
+					 }) {
+					draw_text(tag, fg, static_cast<uint16_t>(udpi(11.f)));
 				}
 			}
 
@@ -276,10 +297,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						   .layout =
 								 {
 									   .padding = {udpi(8.f), udpi(8.f),
-				                                   udpi(4.f), udpi(4.f)},
-									   .childGap = udpi(8.f),
-									   .childAlignment = {CLAY_ALIGN_X_LEFT,
-				                                          CLAY_ALIGN_Y_CENTER},
+				                                   udpi(3.f), udpi(3.f)},
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
 						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
@@ -317,13 +335,52 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 				break;
 			}
 
-			// TODO: last — the german?
-			if (!word_payload.ipa.is_empty() && word_payload.ipa.last()) {
-				draw_text(StrBuilder::concat(ctx->arena_frame, "/"_v,
-				                             word_payload.ipa.last(), "/"_v),
-				          theme()->onSurfaceContainer,
-				          static_cast<uint16_t>(udpi(14.f)), FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+			if (!word_payload.ipa.is_empty() ||
+			    !word_payload.audios.is_empty()) {
+				CLAY(CLAY_ID("PronunciationRow"),
+				     {
+						   .layout =
+								 {
+									   .sizing = {CLAY_SIZING_GROW(0),
+				                                  CLAY_SIZING_FIT(0)},
+									   .childGap = udpi(8.f),
+									   .childAlignment = {CLAY_ALIGN_X_LEFT,
+				                                          CLAY_ALIGN_Y_CENTER},
+									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+								 },
+					 }) {
+					if (!word_payload.ipa.is_empty()) {
+						StrView ipa_joined =
+							  StrBuilder(word_payload.ipa)
+									.join(ctx->arena_frame, " · "_v);
+						StrView ipa_display = StrBuilder::concat(
+							  ctx->arena_frame, "["_v, ipa_joined, "]"_v);
+						draw_text(ipa_display, theme()->onSurfaceContainer,
+						          static_cast<uint16_t>(udpi(13.f)),
+						          FontID::MAIN);
+					}
+
+					// TODO: add
+					// if (!word_payload.audios.is_empty()) {
+					// 	CLAY(CLAY_ID("AudioPlayButton"),
+					// 	     {
+					// 			   .layout =
+					// 					 {
+					// 						   .padding = {udpi(6.f), udpi(8.f),
+					// 	                                   udpi(2.f),
+					// udpi(2.f)}, 						   .childAlignment =
+					// {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
+					// 					 },
+					// 			   .backgroundColor =
+					// theme()->surfaceContainerHigh, 			   .cornerRadius
+					// = CLAY_CORNER_RADIUS(dpi(12.f)),
+					// 		 }) {
+					// 		// "🔊" ?
+					// 		draw_text(Icons::PLAY, theme()->primary,
+					// 		          static_cast<uint16_t>(udpi(11.f)));
+					// 	}
+					// }
+				}
 			}
 		}
 
@@ -445,33 +502,6 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								          static_cast<uint16_t>(udpi(11.f)));
 							}
 						}
-						// if (word_payload.senses.size > 1) {
-						// 	CLAY(CLAY_IDI("SenseNumberBadge", sense_index),
-						// 	     {
-						// 			   .layout =
-						// 					 {
-						// 						   .sizing =
-						// 								 {CLAY_SIZING_FIT(0),
-						// 	                              CLAY_SIZING_FIT(0)},
-						// 						   .padding = {udpi(5.f),
-						// 	                                   udpi(5.f),
-						// 	                                   udpi(2.f),
-						// 	                                   udpi(2.f)},
-						// 						   .childAlignment =
-						// 								 {CLAY_ALIGN_X_CENTER,
-						// 	                              CLAY_ALIGN_Y_CENTER},
-						// 					 },
-						// 			   .backgroundColor =
-						// 					 theme()->surfaceContainerHigh,
-						// 			   .cornerRadius =
-						// 					 CLAY_CORNER_RADIUS(dpi(4.f)),
-						// 		 }) {
-						// 		draw_text(StrView::from_number(ctx->arena_frame,
-						// 		                               sense_index + 1),
-						// 		          theme()->onSurfaceContainerHigh,
-						// 		          static_cast<uint16_t>(udpi(11.f)));
-						// 	}
-						// }
 
 						CLAY(CLAY_IDI("SenseContent", sense_index),
 						     {
@@ -489,17 +519,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								CLAY(CLAY_IDI("ValencyBadge", sense_index),
 								     {
 										   .layout =
-												 {
-													   .sizing =
-															 {CLAY_SIZING_FIT(
-																	0),
-								                              CLAY_SIZING_FIXED(
-																	dpi(18.f))},
-													   .padding = {udpi(6.f),
-								                                   udpi(6.f),
-								                                   udpi(2.f),
-								                                   udpi(2.f)},
-												 },
+												 {.sizing = {CLAY_SIZING_FIT(0),
+								                             CLAY_SIZING_FIT(
+																   0)},
+								                  .padding = {udpi(6.f),
+								                              udpi(6.f),
+								                              udpi(2.f),
+								                              udpi(2.f)}},
 										   .backgroundColor =
 												 theme()->surfaceContainerHigh,
 										   .cornerRadius =
@@ -542,7 +568,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									          translation_font_size);
 									draw_text(
 										  sense.translations[translation_index],
-										  theme()->onSurfaceContainer,
+										  theme()->onSurface,
 										  translation_font_size,
 										  translation_font_id(ctx),
 										  CLAY_TEXT_WRAP_WORDS,
@@ -553,11 +579,74 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					}
 				}
 			}
+		} else if (!word_payload.de_glosses.is_empty()) {
+			// NOTE: de only
+			CLAY(CLAY_ID("DeGlossesList"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIT(0)},
+								   .childGap = udpi(6.f),
+								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+							 },
+				 }) {
+				for (Size i{0}; i < word_payload.de_glosses.size; ++i) {
+					CLAY(CLAY_IDI("DeGlossItem", i),
+					     {
+							   .layout =
+									 {
+										   .sizing = {CLAY_SIZING_GROW(0),
+					                                  CLAY_SIZING_FIT(0)},
+										   .childGap = udpi(6.f),
+										   .layoutDirection =
+												 CLAY_LEFT_TO_RIGHT,
+									 },
+						 }) {
+						draw_text("•"_v, theme()->outline,
+						          translation_font_size);
+						draw_text(word_payload.de_glosses[i],
+						          theme()->onSurface, translation_font_size,
+						          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+						          CLAY_TEXT_ALIGN_LEFT);
+					}
+				}
+			}
 		} else if (w.translations_raw) {
-			// NOTE: fallback
-			draw_text(w.translations_raw, theme()->onSurfaceContainer,
+			draw_text(w.translations_raw, theme()->onSurface,
 			          translation_font_size, translation_font_id(ctx),
 			          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+		}
+
+		// NOTE: phrase only
+		if (w.type == WordType::Phrase && !word_payload.words.is_empty()) {
+			CLAY(CLAY_ID("PhraseKeywordsRow"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIT(0)},
+								   .childGap = udpi(4.f),
+								   .childAlignment = {CLAY_ALIGN_X_LEFT,
+			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+							 },
+				 }) {
+				draw_text("Words:"_v, theme()->outline,
+				          static_cast<uint16_t>(udpi(12.f)));
+				for (Size k{0}; k < word_payload.words.size; ++k) {
+					CLAY(CLAY_IDI("KeywordPill", k),
+					     {
+							   .layout = {.padding = {udpi(6.f), udpi(6.f),
+					                                  udpi(2.f), udpi(2.f)}},
+							   .backgroundColor = theme()->surfaceContainer,
+							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(4.f)),
+						 }) {
+						draw_text(word_payload.words[k], theme()->primary,
+						          static_cast<uint16_t>(udpi(11.f)));
+					}
+				}
+			}
 		}
 
 		if (!word_payload.examples.is_empty()) {
@@ -571,7 +660,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					   .backgroundColor = theme()->outline,
 				 }) {}
 
-			draw_text("Examples"_v, theme()->onSurface,
+			draw_text("Examples"_v, theme()->onSurfaceContainer,
 			          static_cast<uint16_t>(udpi(13.f)));
 
 			CLAY(CLAY_ID("ExamplesList"),
@@ -597,17 +686,25 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					                                  CLAY_SIZING_FIT(0)},
 										   .padding =
 												 {
-													   .left = udpi(10.f),
+													   .left = udpi(12.f),
 													   .right = udpi(10.f),
 													   .top = udpi(8.f),
 													   .bottom = udpi(8.f),
 												 },
-										   .childGap = udpi(3.f),
+										   .childGap = udpi(4.f),
 										   .layoutDirection =
 												 CLAY_TOP_TO_BOTTOM,
 									 },
 							   .backgroundColor = theme()->surfaceContainer,
-							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
+							   // .cornerRadius =
+					           // {
+					           //    0,
+					           //    dpi(8.f),
+					           //    0,
+					           //    dpi(8.f),
+					           // }, // CLAY_CORNER_RADIUS(dpi(8.f)),
+							   .border = {.color = theme()->secondary,
+					                      .width = {.left = udpi(3.f)}},
 						 }) {
 						draw_text(ex.text, theme()->onSurface,
 						          static_cast<uint16_t>(udpi(14.f)),
@@ -625,9 +722,11 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 				}
 			}
 		}
+
 		if (!word_payload.synonyms.is_empty() ||
-		    !word_payload.antonyms.is_empty()) {
-			const float syn_ant_label_width = udpi(32.f);
+		    !word_payload.antonyms.is_empty() ||
+		    !word_payload.hypernyms.is_empty()) {
+			const float syn_ant_label_width = udpi(36.f);
 
 			CLAY(CLAY_ID("SynAntContainer"),
 			     {
@@ -636,7 +735,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
 								   .padding = {.top = udpi(4.f)},
-								   .childGap = udpi(6.f),
+								   .childGap = udpi(4.f),
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
@@ -664,17 +763,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text("Syn:"_v, theme()->onSurface,
+							draw_text("Syn:"_v, theme()->outline,
 							          static_cast<uint16_t>(udpi(12.f)));
 						}
-
 						CLAY(CLAY_ID("SynTextCol"),
 						     {
-								   .layout =
-										 {
-											   .sizing = {CLAY_SIZING_GROW(0),
-						                                  CLAY_SIZING_FIT(0)},
-										 },
+								   .layout = {.sizing = {CLAY_SIZING_GROW(0),
+						                                 CLAY_SIZING_FIT(0)}},
 							 }) {
 							auto syn_text =
 								  StrBuilder(word_payload.synonyms)
@@ -711,17 +806,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text("Ant:"_v, theme()->onSurface,
+							draw_text("Ant:"_v, theme()->outline,
 							          static_cast<uint16_t>(udpi(12.f)));
 						}
-
 						CLAY(CLAY_ID("AntTextCol"),
 						     {
-								   .layout =
-										 {
-											   .sizing = {CLAY_SIZING_GROW(0),
-						                                  CLAY_SIZING_FIT(0)},
-										 },
+								   .layout = {.sizing = {CLAY_SIZING_GROW(0),
+						                                 CLAY_SIZING_FIT(0)}},
 							 }) {
 							auto ant_text =
 								  StrBuilder(word_payload.antonyms)
@@ -733,36 +824,80 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						}
 					}
 				}
-			}
-		}
-		if (word_payload.etymology) {
-			CLAY(CLAY_ID("EtymologyCard"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIT(0)},
-								   .padding =
-										 {
-											   .left = udpi(10.f),
-											   .right = udpi(10.f),
-											   .top = udpi(8.f),
-											   .bottom = udpi(8.f),
-										 },
-								   .childGap = udpi(3.f),
-								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-							 },
-					   .backgroundColor = theme()->surfaceContainer,
-					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
-				 }) {
-				draw_text("Origin"_v, theme()->secondary,
-				          static_cast<uint16_t>(udpi(11.f)));
 
-				draw_text(word_payload.etymology, theme()->onSurfaceContainer,
-				          static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+				if (!word_payload.hypernyms.is_empty()) {
+					CLAY(CLAY_ID("HyperRow"),
+					     {
+							   .layout =
+									 {
+										   .sizing = {CLAY_SIZING_GROW(0),
+					                                  CLAY_SIZING_FIT(0)},
+										   .childGap = udpi(4.f),
+										   .childAlignment = {CLAY_ALIGN_X_LEFT,
+					                                          CLAY_ALIGN_Y_TOP},
+										   .layoutDirection =
+												 CLAY_LEFT_TO_RIGHT,
+									 },
+						 }) {
+						CLAY(CLAY_ID("HyperLabelCol"),
+						     {
+								   .layout =
+										 {
+											   .sizing =
+													 {CLAY_SIZING_FIXED(
+															syn_ant_label_width),
+						                              CLAY_SIZING_FIT(0)},
+										 },
+							 }) {
+							draw_text("Hyp:"_v, theme()->outline,
+							          static_cast<uint16_t>(udpi(12.f)));
+						}
+						CLAY(CLAY_ID("HyperTextCol"),
+						     {
+								   .layout = {.sizing = {CLAY_SIZING_GROW(0),
+						                                 CLAY_SIZING_FIT(0)}},
+							 }) {
+							auto hyp_text =
+								  StrBuilder(word_payload.hypernyms)
+										.join(ctx->arena_frame, ", "_v);
+							draw_text(hyp_text, theme()->onSurfaceContainer,
+							          static_cast<uint16_t>(udpi(12.f)),
+							          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+							          CLAY_TEXT_ALIGN_LEFT);
+						}
+					}
+				}
 			}
 		}
+
+		// if (word_payload.etymology) {
+		// 	CLAY(CLAY_ID("EtymologyCard"),
+		// 	     {
+		// 			   .layout =
+		// 					 {
+		// 						   .sizing = {CLAY_SIZING_GROW(0),
+		// 	                                  CLAY_SIZING_FIT(0)},
+		// 						   .padding =
+		// 								 {
+		// 									   .left = udpi(10.f),
+		// 									   .right = udpi(10.f),
+		// 									   .top = udpi(8.f),
+		// 									   .bottom = udpi(8.f),
+		// 								 },
+		// 						   .childGap = udpi(3.f),
+		// 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		// 					 },
+		// 			   .backgroundColor = theme()->surfaceContainer,
+		// 			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
+		// 		 }) {
+		// 		draw_text("Origin"_v, theme()->secondary,
+		// 		          static_cast<uint16_t>(udpi(11.f)));
+		//
+		// 		draw_text(word_payload.etymology, theme()->onSurfaceContainer,
+		// 		          static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
+		// 		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+		// 	}
+		// }
 	}
 }
 
