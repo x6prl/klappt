@@ -350,6 +350,10 @@ inline StrView word_noun_get_plural_without_artikel(Arena &scratch,
 				lemma = StrView::concat(scratch, lemma.slice(0, lemma.size - 2),
 				                        "iatantum"_v);
 			}
+		} else if (suf == "-es"_v) {
+			// NOTE: Spillbaum -> Spillbaumes
+			// https://en.wiktionary.org/wiki/Spillbaum
+			lemma = StrView::concat(scratch, lemma, "es"_v);
 		}
 		// -------------------------------------------
 		else {
