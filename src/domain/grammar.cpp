@@ -7,7 +7,7 @@
 #include "word.h"
 
 namespace {
-static constexpr Arr<StrView, 35> separable_prefixes = {
+static constexpr Arr<StrView, 34> separable_prefixes = {
 	  "ab"_v,
 	  "an"_v,
 	  "auf"_v,
@@ -40,7 +40,6 @@ static constexpr Arr<StrView, 35> separable_prefixes = {
 	  // separable parts, but not prefixes
 	  "statt"_v,
 	  "frei"_v,
-	  "teil"_v,
 	  "bloß"_v,
 	  "gut"_v,
 	  "tot"_v,
@@ -58,7 +57,7 @@ template <Size N>
 StrView starts_with_one_of(StrView str, Arr<StrView, N> arr,
                            Size size_addon = 4) {
 	for (auto &pref : arr) {
-		bool is_long_enough = pref.size >= pref.size + size_addon;
+		bool is_long_enough = str.size >= pref.size + size_addon;
 		if (is_long_enough && pref == str.slice(0, pref.size)) {
 			return pref;
 		}
@@ -68,7 +67,7 @@ StrView starts_with_one_of(StrView str, Arr<StrView, N> arr,
 
 template <Size N> StrView ends_with_one_of(StrView str, Arr<StrView, N> arr) {
 	for (auto &suf : arr) {
-		if (suf == str.slice(str.size - suf.size)) {
+		if (str.size >= suf.size && suf == str.slice(str.size - suf.size)) {
 			return suf;
 		}
 	}
@@ -116,18 +115,22 @@ StrView verb_form_pp(Arena &scratch, StrView inf, bool is_separable) {
 
 	builder.push(scratch, base);
 
-	bool is_d_or_t = base.last() == 'd' || base.last() == 't';
-	bool is_m_or_n_and_cons_before_them =
-		  (base.last() == 'm' || base.last() == 'n') &&
-		  (base[base.size - 2] != 'l' || base[base.size - 2] != 'r') &&
-		  is_consonant(base[base.size - 2]);
-	if (                                    //
-		  is_d_or_t ||                      //
-		  is_m_or_n_and_cons_before_them || //
-		  false                             //
-	) {
-		// should add _e_
-		builder.push(scratch, "e"_v);
+	if (base.size >= 2) {
+		char last = base.last();
+		char prev = base[base.size - 2];
+
+		bool is_d_or_t = (last == 'd' || last == 't');
+
+		// we need -e- for -tm, -dm, -fn, -chn, -gn, -kn, etc.
+		// and not for -mm, -nn, -lm, -rm, -hm:
+		bool is_m_or_n_with_hard_cons =
+			  (last == 'm' || last == 'n') && is_consonant(prev) &&
+			  (prev != 'l' && prev != 'r' && prev != 'm' && prev != 'n' &&
+		       prev != 'h');
+
+		if (is_d_or_t || is_m_or_n_with_hard_cons) {
+			builder.push(scratch, "e"_v);
+		}
 	}
 	builder.push(scratch, "t"_v);
 	return builder.join(scratch);
@@ -163,18 +166,22 @@ StrView verb_form_with_ending(Arena &scratch, StrView inf, StrView ending,
 	StrBuilder builder{};
 	builder.push(scratch, base);
 
-	bool is_d_or_t = base.last() == 'd' || base.last() == 't';
-	bool is_m_or_n_and_cons_before_them =
-		  (base.last() == 'm' || base.last() == 'n') &&
-		  (base[base.size - 2] != 'l' || base[base.size - 2] != 'r') &&
-		  is_consonant(base[base.size - 2]);
-	if (                                    //
-		  is_d_or_t ||                      //
-		  is_m_or_n_and_cons_before_them || //
-		  false                             //
-	) {
-		// should add _e_
-		builder.push(scratch, "e"_v);
+	if (base.size >= 2) {
+		char last = base.last();
+		char prev = base[base.size - 2];
+
+		bool is_d_or_t = (last == 'd' || last == 't');
+
+		// we need -e- for -tm, -dm, -fn, -chn, -gn, -kn, etc.
+		// and not for -mm, -nn, -lm, -rm, -hm:
+		bool is_m_or_n_with_hard_cons =
+			  (last == 'm' || last == 'n') && is_consonant(prev) &&
+			  (prev != 'l' && prev != 'r' && prev != 'm' && prev != 'n' &&
+		       prev != 'h');
+
+		if (is_d_or_t || is_m_or_n_with_hard_cons) {
+			builder.push(scratch, "e"_v);
+		}
 	}
 	builder.push(scratch, ending);
 	if (pref) {

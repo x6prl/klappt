@@ -155,17 +155,6 @@ inline bool learning_list_seed_matches(const Word &word,
 	return false;
 }
 
-inline const Word *
-find_learning_list_seed_word(const DynArr<Word> &parsed,
-                             const LearningListSeedSpec &spec) {
-	for (Size i = 0; i < parsed.size; ++i) {
-		if (learning_list_seed_matches(parsed[i], spec)) {
-			return &parsed[i];
-		}
-	}
-	return nullptr;
-}
-
 inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
                                              Words &words,
                                              WordStore &word_store,
@@ -187,9 +176,8 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 			}
 		}
 		return true;
-	} else {
-		return false;
 	}
+	return false;
 }
 
 inline bool seed_default_learning_list(AppContext &ctx) {
@@ -213,45 +201,48 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 		  {WordType::Phrase, "Los geht's!"_v},
 		  {WordType::Phrase, "Ich bin dafür!"_v},
 	};
-	DynArr<Word> parsed;
+
 	bool added_any = false;
+
 	for (const auto &spec : DEFAULT_SEEDS) {
 		auto g = ctx.arena_screen().guard();
 
+		Word matched_word{};
+		bool found = false;
+
 		ctx.word_store.for_each_matching_word_range(
 			  ctx.arena_frame, spec.key, 0, ctx.word_store.word_count(),
-			  [a = &ctx.arena_screen(), list = &parsed, spec](Size,
-		                                                      const Word &w) {
-				  if (spec.type == w.type &&
-			          word_primary_lemma(w).is_contains_substr(
-							spec.key)) {
-					  list->push(*a, word_clone(*a, w));
-					  // SDL_Log(" found word: " StrView_Fmt,
-				      //            StrView_Arg(word_tts_full(*a, *a, w)));
+			  [&](Size, const Word &w) {
+				  if (learning_list_seed_matches(w, spec)) {
+					  matched_word = word_clone(ctx.arena, w);
+					  found = true;
+					  return false;
 				  }
 				  return true;
 			  });
-		const auto *parsed_word = find_learning_list_seed_word(parsed, spec);
 
-		if (!parsed_word) {
+		if (!found) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Default learning-list seed not found: " StrView_Fmt,
 			             StrView_Arg(spec.key));
 			continue;
 		}
 
-		auto word = word_clone(ctx.arena, *parsed_word);
-		if (!ctx.word_store.ensure_word(ctx.arena_frame, word, ctx.ticks)) {
+		if (!ctx.word_store.ensure_word(ctx.arena_frame, matched_word,
+		                                ctx.ticks)) {
 			SDL_LogError(
 				  SDL_LOG_CATEGORY_ERROR,
 				  "Ensuring default learning-list seed failed: " StrView_Fmt,
 				  StrView_Arg(spec.key));
 			return false;
 		}
-		if (!add_word_to_learning_list_seeded(ctx.arena_frame, word, *ctx.words,
-		                                      ctx.word_store, ctx.states)) {
+
+		if (!add_word_to_learning_list_seeded(ctx.arena_frame, matched_word,
+		                                      *ctx.words, ctx.word_store,
+		                                      ctx.states)) {
 			ctx.app_status.push_error("Failed to seed learning list"_v);
 		}
+
 		added_any = true;
 	}
 
@@ -350,7 +341,8 @@ inline bool init_runtime_data(AppContext &ctx) {
 		if (fl.load_from_writable(scratch, words_leaf)) {
 			SDL_Log(StrView_Fmt " loaded: %" PRSize " bytes",
 			        StrView_Arg(words_leaf), fl.size);
-			if (!WordsCodec::words_decode(ctx.arena, fl.data, fl.size, *ctx.words)) {
+			if (!WordsCodec::words_decode(ctx.arena, fl.data, fl.size,
+			                              *ctx.words)) {
 				SDL_Log(StrView_Fmt
 				        " exists but is not a valid WordsCodec blob; "
 				        "resetting learning list snapshot",

@@ -175,13 +175,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		type = "Verb"_v;
 		forms.push(ctx->arena_frame,
 		           {"er/sie/es:"_v,
-				   grammar::verb_third_person_full(ctx->arena_frame, w.v)});
+		            grammar::verb_third_person_full(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Präteritum:"_v,
-				   grammar::verb_praeteritum_full(ctx->arena_frame, w.v)});
+		            grammar::verb_praeteritum_full(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Perfekt:"_v,
-				   grammar::verb_perfect_full(ctx->arena_frame, w.v)});
+		            grammar::verb_perfect_full(ctx->arena_frame, w.v)});
 	} break;
 	case WordType::Adj: {
 		type = "Adjective"_v;
@@ -1095,10 +1095,12 @@ void screen_word_view_push(AppContext *ctx, WordId word_id) {
 		KLAPPT_PROFILE_SCOPE_N("parse JSON");
 		simdjson::dom::parser parser{};
 
-		if (word_json_parse(ctx->arena_frame, ctx->arena_screen(),
-		                    state.word_copy.json_payload, state.word_payload,
-		                    parser)) {
-			log_word_payload(state.word_payload);
+		if (!word_json_parse(ctx->arena_frame, ctx->arena_screen(),
+		                     state.word_copy.json_payload, state.word_payload,
+		                     parser)) {
+			ctx->app_status.push_error("word_json_parse() error"_v);
+		} else {
+			// log_word_payload(state.word_payload);
 		}
 	}
 }
@@ -1174,7 +1176,7 @@ void screen_word_view_draw(AppContext *ctx) {
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 						 },
 				   .backgroundColor = theme()->surface,
-		           // .border =
+				   // .border =
 		           // {
 		           //    .color = theme()->outline,
 		           //    .width = {0, 0, udpi(1.f), 0},
