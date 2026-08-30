@@ -403,6 +403,8 @@ set(APP_BASE_FILES
     src/base/shuffle.cpp
 )
 set(APP_DOMAIN_FILES
+    src/domain/word.cpp
+    src/domain/grammar.cpp
     src/domain/engine.cpp
     src/domain/exercises.cpp
     src/domain/wparser.cpp
@@ -869,7 +871,8 @@ set_target_properties(${EXECUTABLE_NAME} PROPERTIES
 if(NOT ANDROID)
     add_executable(codec_tests
         tests/codec_test.cpp
-        src/ui/clay_impl.cpp
+        src/domain/grammar.cpp
+        src/domain/word.cpp
         src/base/str_view.cpp
     )
     target_include_directories(codec_tests PRIVATE

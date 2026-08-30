@@ -9,6 +9,7 @@
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
+#include "domain/grammar.h"
 #include "domain/word.h"
 #include "domain/word_payload.h"
 #include "platform/neuro.h"
@@ -95,8 +96,6 @@ static StrView successful_reviews_to_next_mode(Arena &a,
 
 static void draw_noun_title(AppContext *ctx, const Noun &n) {
 	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
-	const uint16_t form_font_size = static_cast<uint16_t>(udpi(20.f));
-	const float label_width = udpi(60.f);
 
 	CLAY(CLAY_ID("NounTitleRow"),
 	     {
@@ -162,13 +161,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 	switch (w.type) {
 	case WordType::Noun: {
 		type = "Noun"_v;
-		if (is_singular_only(w.n)) {
+		if (grammar::is_singular_only(w.n)) {
 			badges.push(ctx->arena_frame, "Singular only"_v);
-		} else if (is_plural_only(w.n)) {
+		} else if (grammar::is_plural_only(w.n)) {
 			badges.push(ctx->arena_frame, "Plural only"_v);
 		} else {
 			auto plural =
-				  word_noun_get_plural_with_artikel(ctx->arena_frame, w.n);
+				  grammar::noun_plural_with_article(ctx->arena_frame, w.n);
 			forms.push(ctx->arena_frame, {"Plural:"_v, plural});
 		}
 	} break;
@@ -176,13 +175,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		type = "Verb"_v;
 		forms.push(ctx->arena_frame,
 		           {"er/sie/es:"_v,
-		            word_verb_get_third_person_full(ctx->arena_frame, w.v)});
+				   grammar::verb_third_person_full(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Präteritum:"_v,
-		            word_verb_get_praeteritum_full(ctx->arena_frame, w.v)});
+				   grammar::verb_praeteritum_full(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Perfekt:"_v,
-		            word_verb_get_perfect_full(ctx->arena_frame, w.v)});
+				   grammar::verb_perfect_full(ctx->arena_frame, w.v)});
 	} break;
 	case WordType::Adj: {
 		type = "Adjective"_v;
@@ -1096,7 +1095,7 @@ void screen_word_view_push(AppContext *ctx, WordId word_id) {
 		KLAPPT_PROFILE_SCOPE_N("parse JSON");
 		simdjson::dom::parser parser{};
 
-		if (parse_word_json(ctx->arena_frame, ctx->arena_screen(),
+		if (word_json_parse(ctx->arena_frame, ctx->arena_screen(),
 		                    state.word_copy.json_payload, state.word_payload,
 		                    parser)) {
 			log_word_payload(state.word_payload);
@@ -1108,7 +1107,6 @@ void screen_word_view_draw(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("screen_word_view_draw");
 	auto &state = *ctx->word_view_state;
 
-	// Корневой контейнер экрана: вертикальная колонка во весь экран
 	CLAY(CLAY_ID("WordViewScreen"),
 	     {
 			   .layout =
@@ -1121,9 +1119,6 @@ void screen_word_view_draw(AppContext *ctx) {
 			   .backgroundColor = theme()->surface,
 		 }) {
 
-		// =====================================================================
-		// 1. Скроллируемая область карточек (занимает всё пространство сверху)
-		// =====================================================================
 		CLAY(CLAY_ID("WordViewScrollArea"),
 		     {
 				   .layout =
@@ -1135,7 +1130,6 @@ void screen_word_view_draw(AppContext *ctx) {
 			const auto padding = CLAY_PADDING_ALL(udpi(14.f));
 			const uint16_t gap = udpi(12.f);
 
-			// Только реальные карточки (1 или 2, без фиктивных Dummy-элементов)
 			const Size count = state.has_learning_state ? 2 : 1;
 
 			auto draw_cards = [&state](AppContext *ctx, Size i,
@@ -1161,9 +1155,6 @@ void screen_word_view_draw(AppContext *ctx) {
 			                            padding, count, draw_cards);
 		}
 
-		// =====================================================================
-		// 2. Фиксированная нижняя панель (Bottom Action Bar)
-		// =====================================================================
 		CLAY(CLAY_ID("WordViewBottomBar"),
 		     {
 				   .layout =
@@ -1183,7 +1174,6 @@ void screen_word_view_draw(AppContext *ctx) {
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 						 },
 				   .backgroundColor = theme()->surface,
-				   // Тонкая разделительная черта сверху панели
 		           // .border =
 		           // {
 		           //    .color = theme()->outline,
@@ -1191,14 +1181,12 @@ void screen_word_view_draw(AppContext *ctx) {
 		           // },
 			 }) {
 
-			// Кнопка "Назад"
 			auto back_button = mobile_icon_button<false>(
 				  ctx, CLAY_ID_LOCAL("BackButton"), Icons::BACK);
 			if (back_button.activated()) {
 				ctx->pop();
 			}
 
-			// Кнопка "Озвучить (TTS)"
 #if NEURO
 			if (ctx->settings.is_using_tts) {
 				auto play = mobile_icon_button<true>(ctx, CLAY_ID("PlayButton"),
@@ -1211,7 +1199,6 @@ void screen_word_view_draw(AppContext *ctx) {
 			}
 #endif // NEURO
 
-			// Кнопка "Сброс поиска и переход к поисковой строке"
 			auto back_and_clear_and_focus = mobile_icon_button<false>(
 				  ctx, CLAY_ID_LOCAL("BackClearFocusButton"), Icons::ROTATE);
 			if (back_and_clear_and_focus.activated()) {
@@ -1221,7 +1208,7 @@ void screen_word_view_draw(AppContext *ctx) {
 			}
 		}
 	}
-	log_word_payload(state.word_payload);
-	SDL_Log("RAW\n" StrView_Fmt "\n",
-	        StrView_Arg(state.word_copy.json_payload));
+	// log_word_payload(state.word_payload);
+	// SDL_Log("RAW\n" StrView_Fmt "\n",
+	//         StrView_Arg(state.word_copy.json_payload));
 }

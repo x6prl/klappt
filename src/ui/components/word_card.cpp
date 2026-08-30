@@ -2,9 +2,11 @@
 
 #include "../dpi.h"
 #include "../themes.h"
-#include "base/pair.h"
 #include "base/profiler.h"
+#include "base/str_builder.h"
 #include "base/str_view.h"
+#include "domain/word.h"
+#include "ui/components/button.h"
 #include "ui/translations/langs.h"
 #include "ui/tslt.h"
 #include <SDL3/SDL_log.h>
@@ -59,8 +61,8 @@ uint16_t translation_font_id(const AppContext *ctx) {
 	                                            : FontID::MAIN;
 }
 
-void word_second_col(Clay_ElementId id, StrView translation, Clay_Color color,
-                     uint16_t font_size, uint16_t font_id) {
+void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
+                     Clay_Color color, uint16_t font_size, uint16_t font_id) {
 	CLAY(id,
 	     {
 			   .layout =
@@ -71,13 +73,17 @@ void word_second_col(Clay_ElementId id, StrView translation, Clay_Color color,
 					 },
 			   .clip = {.horizontal = true},
 		 }) {
-		CLAY_TEXT(translation.to_clay_string(),
-		          CLAY_TEXT_CONFIG({
-						.textColor = color,
-						.fontId = font_id,
-						.fontSize = font_size,
-						.wrapMode = CLAY_TEXT_WRAP_NONE,
-				  }));
+		auto trs =
+			  StrBuilder{
+					word_translations_discrete(
+						  a, translations_plain)}
+					.join(a, ", "_v);
+		CLAY_TEXT(trs.to_clay_string(), CLAY_TEXT_CONFIG({
+											  .textColor = color,
+											  .fontId = font_id,
+											  .fontSize = font_size,
+											  .wrapMode = CLAY_TEXT_WRAP_NONE,
+										}));
 	}
 }
 
@@ -136,9 +142,9 @@ word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
 		          col, udpi(13), udpi(3));
 
-		auto tr = w.translations_raw;
-		word_second_col(CLAY_IDI("SecondCol", id.id), tr, col, udpi(13),
-		                translation_font_id(ctx));
+		auto tr_plain = w.translations_raw;
+		word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
+		                tr_plain, col, udpi(13), translation_font_id(ctx));
 
 		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
 		                          ctx->tslt.state == TapSwipeLongTap::LongTap);
@@ -201,9 +207,9 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
 		          col, udpi(13), udpi(4));
 
-		auto tr = w.translations_raw;
-		word_second_col(CLAY_IDI("SecondCol", id.id), tr, col, udpi(13),
-		                translation_font_id(ctx));
+		auto trs_plain = w.translations_raw;
+		word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
+		                trs_plain, col, udpi(13), translation_font_id(ctx));
 
 		if (ctx->tslt.is_tap() && Clay_Hovered()) {
 			ret = true;
@@ -276,15 +282,15 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 						 },
 				   .backgroundColor = theme()->surfaceContainer,
 			 }) {
-			auto tr = w.translations_raw;
-			word_second_col(CLAY_IDI("SecondCol", id.id), tr, col, udpi(13),
-			                translation_font_id(ctx));
+			auto trs_plain = w.translations_raw;
+			word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
+			                trs_plain, col, udpi(13), translation_font_id(ctx));
 		}
-		StrView already = ""_v;
+		StrView already_should_icon = Icons::ENVELOPE;
 		if (due_mark < 0) {
 			auto color_due = theme()->primary;
 			color_due.a = 255.f;
-			CLAY_TEXT(already.to_clay_string(),
+			CLAY_TEXT(already_should_icon.to_clay_string(),
 			          CLAY_TEXT_CONFIG({
 							.textColor = color_due,
 							.fontId = FontID::ICONS,
@@ -324,13 +330,13 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 			auto res = std::to_chars(str_buf, str_buf + sizeof(str_buf) - 1,
 			                         to_draw);
 			*res.ptr = time_ch;
-			already =
+			already_should_icon =
 				  StrView::from_chars(ctx->arena_frame, str_buf,
 			                          static_cast<Size>(res.ptr - str_buf + 1));
 
 			// SDL_Log("due_mark %d %d %d", due_mark, min, hours);
 			// SDL_Log("already " StrView_Fmt, StrView_Arg(already));
-			CLAY_TEXT(already.to_clay_string(),
+			CLAY_TEXT(already_should_icon.to_clay_string(),
 			          CLAY_TEXT_CONFIG({
 							.textColor = color_wait,
 							.fontId = FontID::MAIN,

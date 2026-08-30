@@ -31,14 +31,15 @@ static constexpr Arr<StrView, 8> plurals = {
 StrView populate_prompt_sub_fields(Arena &a, StrView trs_raw,
                                    ExerciseState *exercise) {
 	auto [ret, rest] = trs_raw.split_by(';');
-	auto translations = translations_from_raw(a, rest);
+	auto translations =
+		  word_translations_discrete(a, rest);
 	if (!translations.is_empty()) {
 		StrBuilder strs{};
 		Size n{0};
-		for(auto&tr: translations) {
+		for (auto &tr : translations) {
 			if (n < SUB_TRANSLATIONS_COUNT_MAX) {
-				if(!tr.text.is_contains('#') && tr.text.utf8_length() < 25) {
-					strs.push(a,tr.text);
+				if (!tr.is_contains('#') && tr.utf8_length() < 25) {
+					strs.push(a, tr);
 					++n;
 				}
 			} else {
@@ -347,7 +348,7 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 	bool is_gaps_mode = e.mode == Mode::Gaps;
 	Size last_stage_index_with_content = 0;
 	for (Size i{0}; i < e.stages.size; ++i) {
-		SDL_Log("===stage %d", i);
+		SDL_Log("===stage %" PRSize "", i);
 		auto &stage = e.stages[i];
 		bool stage_started = false;
 		auto __debugj = 0;
@@ -373,7 +374,7 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 			}
 		}
 		if (!stage_started && i - 1 == last_stage_index_with_content) {
-			SDL_Log("i %d, cur sta %d, total sta %d ", i, e.current_stage,
+			SDL_Log("i %" PRSize ", cur sta %" PRSize ", total sta %" PRSize " ", i, e.current_stage,
 			        e.stages.size);
 			parts.push(tmpa, " "_v);
 			parts.push(tmpa, e.stages[i].before_answer);
@@ -531,8 +532,8 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	// 	                             return words.is_used(ref);
 	//                             });
 	auto &words = *ctx->words;
-	SDL_Log("collected %d", due_id.size);
-	SDL_Log("words list %d", words.size);
+	SDL_Log("collected %" PRSize "", due_id.size);
+	SDL_Log("words list %" PRSize "", words.size);
 	// searching for them in learning list and setting due_ref
 	// and lists of spare words
 	// NOTE: big lists will contain due-words too
@@ -586,7 +587,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	auto phrase_words_list_and_adjectives = DynArr<StrView>::concat(
 		  ctx->arena_frame, phrase_words_list, adjective_lemma_list);
 
-	SDL_Log("due in words list %d", due_ref.size);
+	SDL_Log("due in words list %" PRSize "", due_ref.size);
 	// TODO: check the sizes of the lists
 	if (noun_lemma_list.size < 5) {
 		// TODO: add more nouns from words store if too little of them present
@@ -606,7 +607,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		}
 	}
 
-	SDL_Log("preparing %d exercises for:", exercise_words.size);
+	SDL_Log("preparing %" PRSize " exercises for:", exercise_words.size);
 	for (auto &word_ref : exercise_words) {
 		// print_word(words[word_ref]);
 		auto &word = words[word_ref];
@@ -656,14 +657,12 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		} else if (word.type == WordType::Verb) {
 			auto first_tr_raw = populate_prompt_sub_fields(
 				  a, word.translations_raw, &exercise);
-			StrView source_inf;
-			StrView source_3p;
-			StrView source_past;
-			StrView source_aux;
-			StrView source_pp;
-			Translation first_translation{first_tr_raw};
-			source_inf = first_translation.text ? first_translation.text
-			                                    : first_tr_raw;
+			StrView source_inf{};
+			StrView source_3p{};
+			StrView source_past{};
+			StrView source_aux{};
+			StrView source_pp{};
+			source_inf = first_tr_raw;
 			source_3p =
 				  StrView::concat_with(a, source_inf, "(er/sie/es)"_v, ' ');
 			source_past = StrView::concat_with(a, source_inf, "(Prät.)"_v, ' ');
@@ -690,12 +689,11 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		} else if (word.type == WordType::Adj) {
 			auto first_tr_raw = populate_prompt_sub_fields(
 				  a, word.translations_raw, &exercise);
-			StrView source_lemma;
-			StrView source_cmp;
-			StrView source_sup;
-			Translation first_translation{first_tr_raw};
-			source_lemma = first_translation.text ? first_translation.text
-			                                      : first_tr_raw;
+			StrView source_lemma{};
+			StrView source_cmp{};
+			StrView source_sup{};
+
+			source_lemma = first_tr_raw;
 			source_cmp =
 				  StrView::concat_with(a, source_lemma, "(comp.)"_v, ' ');
 			source_sup = StrView::concat_with(a, source_lemma, "(sup.)"_v, ' ');
@@ -730,13 +728,13 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 				append_common_stage(w, kind, spare_words_list, source);
 			}
 		}
-		int i{0};
+		Size i{0};
 		for (auto &stage : exercise.stages) {
 			SDL_Log(StrView_Fmt, StrView_Arg(word.n.lemma));
-			SDL_Log("stage %d of %d", i++, exercise.stages.size);
-			int j{0};
+			SDL_Log("stage %" PRSize " of %" PRSize "", i++, exercise.stages.size);
+			Size j{0};
 			for (auto &substage : stage.substages) {
-				SDL_Log("substage %d of %d, total opts: %d", j++,
+				SDL_Log("substage %" PRSize " of %" PRSize ", total opts: %" PRSize "", j++,
 				        stage.substages.size, substage.opts.size);
 				for (auto &option : substage.opts) {
 					SDL_Log("opts " StrView_Fmt, StrView_Arg(option));
@@ -866,7 +864,7 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 	}
 
 	SDL_Log("%s", __PRETTY_FUNCTION__);
-	SDL_Log("pending selection %d |" StrView_Fmt "|", pending_selection_index,
+	SDL_Log("pending selection %" PRSize " |" StrView_Fmt "|", pending_selection_index,
 	        StrView_Arg(substage().opts[pending_selection_index]));
 	auto result = CommitResult::None;
 	auto &exercise = exercises[exercise_current_idx];
@@ -900,7 +898,7 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 			exercise_current_idx = 0;
 			result = CommitResult::ShowSummary;
 		} else {
-			SDL_Log("--- Finished exercise %d of %d ---", exercise_current_idx,
+			SDL_Log("--- Finished exercise %" PRSize " of %" PRSize " ---", exercise_current_idx,
 			        exercises.size);
 			// we still have exercises
 		}

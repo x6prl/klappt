@@ -35,12 +35,13 @@ struct WordPayload {
 	DynArr<StrView> words{}; // NOTE: related to a phrase
 };
 
-inline StrView copy_to_arena(Arena &a, std::string_view sv) {
-	return StrView{sv.data(), static_cast<Size>(sv.size())}.copy(a);
-}
-
-inline bool parse_word_json(Arena &scratch, Arena &a, StrView json_sv,
+inline bool word_json_parse(Arena &scratch, Arena &a, StrView json_sv,
                             WordPayload &out, simdjson::dom::parser &parser) {
+
+	auto copy_to_arena = [](Arena &a, std::string_view sv) -> StrView {
+		return StrView{sv.data(), static_cast<Size>(sv.size())}.copy(a);
+	};
+
 	out = {};
 
 	if (!json_sv) {

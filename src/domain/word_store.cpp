@@ -1,69 +1,109 @@
 #include "word_store.h"
 
-#include "SDL3/SDL_log.h"
-#include "base/str_view.h"
-#include "domain/word.h"
-#include "xapian.h"
-
 #include <cstddef>
 #include <filesystem>
+#include <string>
+#include <string_view>
 
+#include <SDL3/SDL_log.h>
+#include <xapian.h>
+
+#include "base/arena.h"
+#include "base/hash.h"
 #include "base/profiler.h"
+#include "base/str_view.h"
+#include "domain/grammar.h"
+#include "domain/word.h"
+#include "ui/screen_helpers.h"
+#include "words_codec.h"
+
 #ifdef __EMSCRIPTEN__
 #include "platform/web_persist.h"
 #endif
-#include "base/arena.h"
-#include "base/hash.h"
-#include "words_codec.h"
 
 namespace {
 
-constexpr char NEXT_WORD_ID_KEY[] = "next_word_id";
-constexpr Xapian::valueno WORD_ID_VALUE_SLOT = 0;
-constexpr Xapian::valueno SCHEME_VERSION_VALUE_SLOT = 1;
-constexpr Xapian::valueno CREATION_TIMESTAMP_VALUE_SLOT = 2;
-constexpr Xapian::valueno TRAINED_COUNTER_VALUE_SLOT = 10;
+constexpr char NEXT_WORD_ID_KEY[] =
+	  "next_word_id"; // TODO: mmmm... truly separate client/serverside word
+                      // gen?..
+constexpr char NEXT_LOCAL_WORD_ID_KEY[] = "next_local_word_id";
+constexpr char DB_LANG_KEY[] = "db_lang";
+
+constexpr Xapian::valueno POPULARITY_VALUE_SLOT = 1;
+
 constexpr char TYPE_PREFIX[] = "XY";
 constexpr char LEMMA_PREFIX[] = "XL";
 constexpr char FORM_PREFIX[] = "XF";
 constexpr char TRANSLATION_PREFIX[] = "XT";
+
+constexpr char DIRTY_TERM[] = "SDIRTY";
+constexpr char NEW_TERM[] = "SNEW";
 
 constexpr int WEIGHT_HIGHEST = 6;
 constexpr int WEIGHT_HIGH = 5;
 constexpr int WEIGHT_NORM = 1;
 constexpr int WEIGHT_LOW = 1;
 
+constexpr uint64_t LOCAL_WORD_ID_FLAG = 1ULL << 63;
+
+inline bool is_local_temp_id(WordId id) {
+	return (id.value & LOCAL_WORD_ID_FLAG) != 0;
+}
+
+// NOTE: yet unused
+WordId generate_next_local_temp_id(Arena &scratch,
+                                   Xapian::WritableDatabase &db) {
+	auto g = scratch.guard();
+	uint32_t counter = 1;
+	const auto value = db.get_metadata(NEXT_LOCAL_WORD_ID_KEY);
+	if (!value.empty()) {
+		try {
+			counter = static_cast<uint32_t>(std::stoul(value));
+		} catch (...) {
+			counter = 1;
+		}
+	}
+
+	auto counter_str = StrView::from_number(scratch, counter + 1);
+	db.set_metadata(NEXT_LOCAL_WORD_ID_KEY,
+	                {counter_str.data, (size_t)counter_str.size});
+
+	uint64_t id_val = LOCAL_WORD_ID_FLAG | counter;
+
+	return WordId{id_val};
+}
+
 std::string_view word_id_term(Arena &a, WordId word_id) {
 	auto str =
 		  StrView::concat(a, "Q"_v, StrView::from_number_hex(a, word_id.value));
-	return {str.data, (size_t)str.size};
+	return {str.data, static_cast<size_t>(str.size)};
 }
 
 std::string_view content_hash_term(Arena &a, uint64_t hash) {
 	auto str = StrView::concat(a, "K"_v, StrView::from_number_hex(a, hash));
-	return {str.data, (size_t)str.size};
+	return {str.data, static_cast<size_t>(str.size)};
 }
 
-std::string_view encode_be_u64(Arena &a, uint64_t value) {
-	auto data = a.pushN<char>(16);
-	for (int i = 7; i >= 0; --i) {
-		data[7 - i] = static_cast<char>((value >> (i * 8)) & 0xffu);
-	}
-	return {data, 8};
-}
+// std::string_view encode_be_u64(Arena &a, uint64_t value) {
+// 	auto data = a.pushN<char>(8);
+// 	for (int i = 7; i >= 0; --i) {
+// 		data[7 - i] = static_cast<char>((value >> (i * 8)) & 0xffu);
+// 	}
+// 	return {data, 8};
+// }
+//
+// bool decode_be_u64(std::string_view data, uint64_t &value) {
+// 	if (data.size() != 8) {
+// 		return false;
+// 	}
+// 	value = 0;
+// 	for (uint8_t ch : data) {
+// 		value = (value << 8) | static_cast<uint64_t>(ch);
+// 	}
+// 	return true;
+// }
 
-bool decode_be_u64(const std::string_view &data, uint64_t &value) {
-	if (data.size() != 8) {
-		return false;
-	}
-	value = 0;
-	for (uint8_t ch : data) {
-		value = (value << 8) | static_cast<uint64_t>(ch);
-	}
-	return true;
-}
-
-bool list_contains_item(StrView list, StrView item, char delimiter) {
+bool is_list_contains_item(StrView list, StrView item, char delimiter) {
 	item.mut_trim();
 	if (!item) {
 		return true;
@@ -80,11 +120,11 @@ bool list_contains_item(StrView list, StrView item, char delimiter) {
 StrView merge_unique_items(Arena &a, StrView base, StrView extra,
                            char delimiter) {
 	StrView merged = base;
-	bool changed = false;
+	bool is_changed = false;
 	for (; extra;) {
 		auto item = extra.mut_split_by(delimiter).trim();
-		if (!item || list_contains_item(base, item, delimiter) ||
-		    list_contains_item(merged, item, delimiter)) {
+		if (!item || is_list_contains_item(base, item, delimiter) ||
+		    is_list_contains_item(merged, item, delimiter)) {
 			continue;
 		}
 		if (merged) {
@@ -100,12 +140,12 @@ StrView merge_unique_items(Arena &a, StrView base, StrView extra,
 		} else {
 			merged = item.copy(a);
 		}
-		changed = true;
+		is_changed = true;
 	}
-	if (changed && delimiter == ';' && merged.last() != ';') {
+	if (is_changed && delimiter == ';' && merged.last() != ';') {
 		merged = StrView::concat(a, merged, ";"_v);
 	}
-	return changed ? merged : base;
+	return is_changed ? merged : base;
 }
 
 uint64_t word_hash(Arena &scratch, const Word &word) {
@@ -113,7 +153,8 @@ uint64_t word_hash(Arena &scratch, const Word &word) {
 	auto field_size = [](StrView v) {
 		return static_cast<Size>(sizeof(v.size) + (v ? v.size : 0));
 	};
-	Size size = 2 + field_size(word.json_payload);
+
+	Size size = 2; // type + alignment
 	switch (word.type) {
 	case WordType::Nil:
 		break;
@@ -124,7 +165,7 @@ uint64_t word_hash(Arena &scratch, const Word &word) {
 		size += field_size(word.v.infinitive) +
 		        field_size(word.v.third_person) +
 		        field_size(word.v.praeteritum) +
-		        field_size(word.v.auxv_and_past_participle);
+		        field_size(word.v.auxv_and_past_participle) + 2;
 		break;
 	case WordType::Adj:
 		size += field_size(word.a.lemma) + field_size(word.a.comparative) +
@@ -134,20 +175,23 @@ uint64_t word_hash(Arena &scratch, const Word &word) {
 		size += field_size(word.p.text);
 		break;
 	}
+
 	char *data = scratch.pushN<char>(size);
 	char *cursor = data;
 	auto put_char = [&](char ch) { *cursor++ = ch; };
 	auto feed = [&](StrView v) {
-		memcpy(cursor, &v.size, sizeof(v.size));
+		std::memcpy(cursor, &v.size, sizeof(v.size));
 		cursor += sizeof(v.size);
 		if (v) {
-			memcpy(cursor, v.data, static_cast<size_t>(v.size));
+			std::memcpy(cursor, v.data, static_cast<size_t>(v.size));
 			cursor += v.size;
 		}
 	};
+
 	put_char(static_cast<char>(word.type));
 	put_char('\0');
-	feed(word.json_payload);
+
+	// NOTE: we are not hashing json and plain translations
 	switch (word.type) {
 	case WordType::Nil:
 		break;
@@ -176,29 +220,26 @@ uint64_t word_hash(Arena &scratch, const Word &word) {
 		feed(word.p.text);
 		break;
 	}
+
 	return hash_str_view({data, size});
 }
 
 void index_field(Xapian::TermGenerator &generator, StrView text, int weight,
                  std::string_view prefix = {}) {
-	if (!text) {
+	if (!text)
 		return;
-	}
-	generator.index_text_without_positions(
-		  std::string_view{text.data, static_cast<size_t>(text.size)}, weight);
+	std::string_view sv{text.data, static_cast<size_t>(text.size)};
+	generator.index_text_without_positions(sv, weight);
 	if (!prefix.empty()) {
-		generator.index_text_without_positions(
-			  std::string_view{text.data, static_cast<size_t>(text.size)},
-			  weight, prefix);
+		generator.index_text_without_positions(sv, weight, prefix);
 	}
 }
 
 void index_translation_fields(Arena &scratch, Xapian::TermGenerator &generator,
                               StrView translations_raw) {
-	auto translations = translations_from_raw(scratch, translations_raw);
-	for (const auto &translation : translations) {
-		// NOTE: we do not index grammar
-		index_field(generator, translation.text, WEIGHT_HIGH,
+	auto translations = word_translations_split(scratch, translations_raw);
+	for (const auto &discrete_translation : translations) {
+		index_field(generator, discrete_translation, WEIGHT_HIGH,
 		            TRANSLATION_PREFIX);
 	}
 }
@@ -214,21 +255,30 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 	case WordType::Noun:
 		doc.add_boolean_term("XYnoun");
 		index_field(generator, word.n.lemma, WEIGHT_HIGHEST, LEMMA_PREFIX);
+		// index plural if it differs
+		{
+			auto plural_form =
+				  grammar::noun_plural_without_article(scratch, word.n);
+			if (plural_form != word.n.lemma) {
+				index_field(generator, plural_form, WEIGHT_NORM, FORM_PREFIX);
+			}
+		}
+		// index singular with its article
 		index_field(generator,
-		            word_noun_get_plural_without_artikel(scratch, word.n),
-		            WEIGHT_NORM, FORM_PREFIX);
+		            grammar::noun_singular_with_article(scratch, word.n),
+		            WEIGHT_HIGH, FORM_PREFIX);
 		break;
 	case WordType::Verb:
 		doc.add_boolean_term("XYverb");
 		index_field(generator, word.v.infinitive, WEIGHT_HIGHEST, LEMMA_PREFIX);
 		if (word.v.third_person) {
-			auto third_p = word_verb_get_third_person_full(scratch, word.v);
+			auto third_p = grammar::verb_third_person_full(scratch, word.v);
 			index_field(generator, third_p, WEIGHT_NORM, FORM_PREFIX);
 		}
 		index_field(generator, word.v.praeteritum, WEIGHT_NORM, FORM_PREFIX);
 		if (word.v.auxv_and_past_participle) {
 			index_field(generator,
-			            word_verb_get_perfect_only_participle(scratch, word.v),
+			            grammar::verb_past_participle(scratch, word.v),
 			            WEIGHT_NORM, FORM_PREFIX);
 		}
 		break;
@@ -257,10 +307,10 @@ void configure_query_parser(Xapian::QueryParser &parser,
 }
 
 bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc,
-                    uint64_t timestamp=0) {
+                    bool is_mark_dirty_or_new = false) {
 	KLAPPT_PROFILE_SCOPE_N("word_store.build_document");
 	auto guard = scratch.guard();
-	const auto payload = WordsCodec::encode_word(scratch, word);
+	const auto payload = WordsCodec::word_encode(scratch, word);
 	if (!payload) {
 		return false;
 	}
@@ -270,12 +320,30 @@ bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc,
 		  std::string_view{payload.data, static_cast<size_t>(payload.size)});
 	doc.add_boolean_term(word_id_term(scratch, word.word_id));
 	doc.add_boolean_term(content_hash_term(scratch, word_hash(scratch, word)));
-	doc.add_value(WORD_ID_VALUE_SLOT,
-	              encode_be_u64(scratch, word.word_id.value));
-	// doc.add_value(SCHEME_VERSION_VALUE_SLOT, encode_be_u64(scratch, 0));
-	// doc.add_value(CREATION_TIMESTAMP_VALUE_SLOT,
-	//               encode_be_u64(scratch, timestamp));
-	// doc.add_value(TRAINED_COUNTER_VALUE_SLOT, encode_be_u64(scratch, 0));
+
+	doc.add_value(POPULARITY_VALUE_SLOT,
+	              std::string(1, static_cast<char>(word.popularity)));
+
+	// NOTE: === popularity ===
+	if (word.popularity >= 180) {
+		doc.add_boolean_term("XP1"); // Top ~1000
+		doc.add_boolean_term("XP2");
+		doc.add_boolean_term("XP3");
+	} else if (word.popularity >= 100) {
+		doc.add_boolean_term("XP2"); // Top ~5000
+		doc.add_boolean_term("XP3");
+	} else if (word.popularity >= 40) {
+		doc.add_boolean_term("XP3"); // Top ~20000
+	}
+
+	// setting sync flags
+	if (is_mark_dirty_or_new) {
+		if (is_local_temp_id(word.word_id)) {
+			doc.add_boolean_term(NEW_TERM);
+		} else {
+			doc.add_boolean_term(DIRTY_TERM);
+		}
+	}
 	index_word_fields(scratch, doc, word);
 	return true;
 }
@@ -286,7 +354,6 @@ bool get_next_word_id(const Xapian::WritableDatabase &db, WordId &word_id) {
 		word_id.value = 1;
 		return true;
 	}
-
 	try {
 		word_id = WordId{std::stoull(value)};
 		return word_id.value != 0;
@@ -306,7 +373,7 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 		Word stored{};
 		auto guard = scratch.guard();
 		const auto data = doc.get_data();
-		if (!WordsCodec::decode_word(scratch, data.data(),
+		if (!WordsCodec::word_decode(scratch, data.data(),
 		                             static_cast<Size>(data.size()), stored)) {
 			continue;
 		}
@@ -314,28 +381,16 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 			continue;
 		}
 
-		uint64_t decoded_word_id{};
-		if (decode_be_u64(doc.get_value(WORD_ID_VALUE_SLOT), decoded_word_id)) {
-			word_id.value = decoded_word_id;
-		} else {
-			word_id = stored.word_id;
-		}
+		word_id = stored.word_id;
+
 		auto merged = stored;
-		bool changed = false;
+		bool is_changed = false;
 		auto merged_translations =
 			  merge_unique_items(scratch, stored.translations_raw,
 		                         candidate.translations_raw, ';');
 		if (merged_translations != stored.translations_raw) {
-			SDL_Log("word_store: merging translations for existing "
-			        "word_id=%llu |" StrView_Fmt "|",
-			        static_cast<unsigned long long>(word_id.value),
-			        StrView_Arg(word_most_meaningfull_lemma(stored)));
-			SDL_Log("tr "
-			        "|" StrView_Fmt "| -> |" StrView_Fmt "|",
-			        StrView_Arg(stored.translations_raw),
-			        StrView_Arg(merged_translations));
 			merged.translations_raw = merged_translations;
-			changed = true;
+			is_changed = true;
 		}
 		const auto merged_learning_list =
 			  candidate.in_learning_list > stored.in_learning_list
@@ -343,13 +398,18 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 					: stored.in_learning_list;
 		if (merged_learning_list != stored.in_learning_list) {
 			merged.in_learning_list = merged_learning_list;
-			changed = true;
+			is_changed = true;
 		}
-		if (changed) {
+		if (is_changed) {
 			merged.word_id = word_id;
 			Xapian::Document merged_doc;
 			if (build_document(scratch, merged, merged_doc)) {
+				db.begin_transaction();
 				db.replace_document(word_id_term(scratch, word_id), merged_doc);
+				db.commit_transaction();
+#ifdef __EMSCRIPTEN__
+				web_persist_sync();
+#endif
 			}
 		}
 		return word_id.value != 0;
@@ -360,49 +420,49 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 
 } // namespace
 
-WordStore::~WordStore() {
-	if (db)
-		delete db;
-};
+WordStore::~WordStore() { close(); }
 
-bool WordStore::open(StrView requested_path_) {
-	;
+bool WordStore::open(StrView requested_path, StrView _lang) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::open");
 	close();
-	has_cached_word_count = false;
-	cached_word_count = 0;
 
-	path = {requested_path_.data, static_cast<size_t>(requested_path_.size)};
-	if (path.empty()) {
+	if (!requested_path || !_lang) {
 		return false;
 	}
+	lang.copy_from(_lang);
 
+	std::string path_str{requested_path.data,
+	                     static_cast<size_t>(requested_path.size)};
 	std::error_code ec;
 	std::filesystem::create_directories(
-		  std::filesystem::path(path).parent_path(), ec);
+		  std::filesystem::path(path_str).parent_path(), ec);
 	if (ec) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "create_directories(%s) failed: %s", path.c_str(),
+		             "create_directories(%s) failed: %s", path_str.c_str(),
 		             ec.message().c_str());
 		return false;
 	}
 
 	try {
-		if (db) {
-			delete db;
+		db = new Xapian::WritableDatabase(path_str, Xapian::DB_CREATE_OR_OPEN);
+		auto db_lang = db->get_metadata(DB_LANG_KEY);
+		if (db_lang.empty()) {
+			db->set_metadata(DB_LANG_KEY, lang.mutable_to_cstr());
+			SDL_Log("DB language is set to %s", lang.mutable_to_cstr());
+		} else if (db_lang != lang.mutable_to_cstr()) {
+			SDL_LogWarn(SDL_LOG_CATEGORY_ERROR,
+			            "Opening Xapian DB failed: "
+			            "Expected lang %s but got %s",
+			            lang.mutable_to_cstr(), db_lang.c_str());
+		} else {
+			SDL_Log("Successfully opened %s", lang.mutable_to_cstr());
 		}
-		db = new Xapian::WritableDatabase(
-			  path, Xapian::DB_CREATE_OR_OPEN
-			  // |
-		      //                                             Xapian::DB_DANGEROUS
-		);
 		return true;
 	} catch (const Xapian::Error &e) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening Xapian DB failed: %s",
 		             e.get_description().c_str());
-		// NOTE: we do not care
-		// delete db;
-		// db = nullptr;
+		delete db;
+		db = nullptr;
 		return false;
 	}
 }
@@ -410,8 +470,6 @@ bool WordStore::open(StrView requested_path_) {
 void WordStore::close() {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::close");
 	if (!db) {
-		has_cached_word_count = false;
-		cached_word_count = 0;
 		return;
 	}
 	try {
@@ -423,33 +481,20 @@ void WordStore::close() {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Closing Xapian DB failed: %s",
 		             e.get_description().c_str());
 	}
-	// delete db;
-	// db = nullptr;
-	has_cached_word_count = false;
-	cached_word_count = 0;
+	delete db;
+	db = nullptr;
 }
 
 Size WordStore::word_count() const {
-	KLAPPT_PROFILE_SCOPE_N("WordStore::word_count");
-	if (has_cached_word_count) {
-		return cached_word_count;
-	}
-
-	Size count = 0;
+	if (!db)
+		return 0;
 	try {
-		for (auto it = db->allterms_begin("Q"); it != db->allterms_end("Q");
-		     ++it) {
-			++count;
-		}
+		return static_cast<Size>(db->get_doccount());
 	} catch (const Xapian::Error &e) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Counting Xapian words failed: %s",
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "WordStore::word_count failed: %s",
 		             e.get_description().c_str());
 		return 0;
 	}
-
-	cached_word_count = count;
-	has_cached_word_count = true;
-	return cached_word_count;
 }
 
 Size WordStore::matching_word_count(StrView query) const {
@@ -459,36 +504,32 @@ Size WordStore::matching_word_count(StrView query) const {
 		return word_count();
 	}
 
-	Size count = 0;
 	try {
 		Xapian::MSet mset;
 		if (!search_mset(query, 0, 0, mset)) {
 			return 0;
 		}
-		count = static_cast<Size>(mset.get_matches_estimated());
+		return static_cast<Size>(mset.get_matches_estimated());
 	} catch (const Xapian::Error &e) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Counting matching Xapian words failed: %s",
 		             e.get_description().c_str());
 		return 0;
 	}
-	return count;
 }
 
 bool WordStore::search_mset(StrView query, Size start, Size count,
                             Xapian::MSet &mset) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::search_mset");
 	query.mut_trim();
-	if (!query) {
+	if (!query || !db) {
 		return false;
 	}
 
-	if (start < 0) {
+	if (start < 0)
 		start = 0;
-	}
-	if (count < 0) {
+	if (count < 0)
 		count = 0;
-	}
 
 	try {
 		Xapian::QueryParser parser;
@@ -500,6 +541,10 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 					Xapian::QueryParser::FLAG_PARTIAL);
 		Xapian::Enquire enquire(*db);
 		enquire.set_query(parsed);
+
+		// sort by popularyty (descending = true)
+		enquire.set_sort_by_value_then_relevance(POPULARITY_VALUE_SLOT, true);
+
 		constexpr auto CHECK_AT_LEAST = 30;
 		mset = enquire.get_mset(static_cast<Xapian::doccount>(start),
 		                        static_cast<Xapian::doccount>(count),
@@ -512,31 +557,21 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 	}
 }
 
+// TODO: add another arena param
 bool WordStore::ensure_word(Arena &scratch, Word &word,
                             uint64_t creation_timestamp, bool *was_new) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::ensure_word");
-	if (was_new) {
+	if (was_new)
 		*was_new = false;
-	}
-	if (word.type == WordType::Nil) {
+	if (word.type == WordType::Nil || !db)
 		return false;
-	}
-	// SDL_Log("word_store.ensure_word begin type=%d id=%llu lemma="
-	// StrView_Fmt,
-	//         static_cast<int>(word.type),
-	//         static_cast<unsigned long long>(word.word_id.value),
-	//         StrView_Arg(most_meaningfull_lemma(word)));
 
 	try {
 		WordId existing_id;
 		if (find_existing_word(scratch, *db, word, existing_id)) {
 			word.word_id = existing_id;
-			// SDL_Log("word_store.ensure_word existing id=%llu",
-			//         static_cast<unsigned long long>(word.word_id.value));
 			return true;
 		}
-
-		// not found, going to insert
 
 		WordId next_word_id;
 		if (!get_next_word_id(*db, next_word_id)) {
@@ -545,31 +580,32 @@ bool WordStore::ensure_word(Arena &scratch, Word &word,
 			return false;
 		}
 
-		// let us hope for the better... btw, dead index is not a big problem
 		word.word_id = next_word_id;
+		word.timestamp = creation_timestamp;
+
 		Xapian::Document doc;
-		if (!build_document(scratch, word, doc)) {
+		if (!build_document(scratch, word, doc, false)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Serializing word for Xapian failed");
 			return false;
 		}
 
+		auto g = scratch.guard();
+
 		db->begin_transaction();
 		db->replace_document(word_id_term(scratch, word.word_id), doc);
+		auto next_id_str =
+			  StrView::from_number(scratch, word.word_id.value + 1);
 		db->set_metadata(NEXT_WORD_ID_KEY,
-		                 std::to_string(word.word_id.value + 1));
+		                 {next_id_str.data, (size_t)next_id_str.size});
 		db->commit_transaction();
+
 #ifdef __EMSCRIPTEN__
 		web_persist_sync();
 #endif
-		if (was_new) {
+		if (was_new)
 			*was_new = true;
-		}
-		if (has_cached_word_count) {
-			++cached_word_count;
-		}
-		// SDL_Log("word_store.ensure_word inserted id=%llu",
-		//         static_cast<unsigned long long>(word.word_id.value));
+
 		return true;
 	} catch (const Xapian::Error &e) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Updating Xapian DB failed: %s",
@@ -582,11 +618,13 @@ bool WordStore::ensure_word(Arena &scratch, Word &word,
 	}
 }
 
-bool WordStore::get_by_id(Arena &scratch, WordId word_id, Word &word) {
+bool WordStore::get_by_id(Arena &scratch, WordId word_id, Word &word) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::get_by_id");
+	if (!db)
+		return false;
+
 	try {
 		auto term = word_id_term(scratch, word_id);
-
 		if (!db->term_exists(term)) {
 			return false;
 		}
@@ -595,51 +633,40 @@ bool WordStore::get_by_id(Arena &scratch, WordId word_id, Word &word) {
 		if (it != db->postlist_end(term)) {
 			auto doc = db->get_document(*it);
 			const auto data = doc.get_data();
-			if (!WordsCodec::decode_word(scratch, data.data(),
-			                             static_cast<Size>(data.size()),
-			                             word)) {
-				return false;
-			}
+			return WordsCodec::word_decode(
+				  scratch, data.data(), static_cast<Size>(data.size()), word);
 		}
-		return true;
+		return false;
 	} catch (const Xapian::Error &e) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Updating Xapian DB failed: %s",
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Reading from Xapian DB failed: %s",
 		             e.get_description().c_str());
 		return false;
 	}
 }
 
-void WordStore::save(Arena &scratch, Word &word) {
+void WordStore::save(Arena &scratch, Word &word, bool is_mark_dirty_or_new) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::save");
-	if (word.type == WordType::Nil) {
+	if (word.type == WordType::Nil || !db)
 		return;
-	}
 
 	try {
 		Xapian::Document doc;
-		if (!build_document(scratch, word, doc)) {
+		if (!build_document(scratch, word, doc, is_mark_dirty_or_new)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Serializing word for Xapian failed");
 			return;
 		}
 
-		{
-			KLAPPT_PROFILE_SCOPE_N("begin_transaction");
-			db->begin_transaction();
-		}
-		{
-			KLAPPT_PROFILE_SCOPE_N("replace_document");
-			db->replace_document(word_id_term(scratch, word.word_id), doc);
-		}
-		{
-			KLAPPT_PROFILE_SCOPE_N("commit_transaction");
-			db->commit_transaction();
-		}
+		db->begin_transaction();
+		db->replace_document(word_id_term(scratch, word.word_id), doc);
+		db->commit_transaction();
+
 #ifdef __EMSCRIPTEN__
 		web_persist_sync();
 #endif
 	} catch (const Xapian::Error &e) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Updating Xapian DB failed: %s",
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Saving to Xapian DB failed: %s",
 		             e.get_description().c_str());
 		try {
 			db->cancel_transaction();
@@ -649,36 +676,232 @@ void WordStore::save(Arena &scratch, Word &word) {
 }
 
 void WordStore::set_was_learned(Arena &scratch, Word &word) {
-	KLAPPT_PROFILE_SCOPE_N("WordStore::set_was_learned");
+	word.was_learned = 1;
+	save(scratch, word, false);
+}
+
+bool WordStore::remove_by_id(Arena &scratch, WordId word_id) {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::remove_by_id");
+	if (!db)
+		return false;
+
 	try {
-		Xapian::Document doc;
-		word.was_learned = 1;
-		if (!build_document(scratch, word, doc)) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Serializing word for Xapian failed");
-			return;
+		auto term = word_id_term(scratch, word_id);
+		if (!db->term_exists(term)) {
+			return false;
 		}
-		{
-			KLAPPT_PROFILE_SCOPE_N("begin_transaction");
-			db->begin_transaction();
-		}
-		{
-			KLAPPT_PROFILE_SCOPE_N("replace_document");
-			db->replace_document(word_id_term(scratch, word.word_id), doc);
-		}
-		{
-			KLAPPT_PROFILE_SCOPE_N("commit_transaction");
-			db->commit_transaction();
-		}
+
+		db->begin_transaction();
+		db->delete_document(term);
+		db->commit_transaction();
+
 #ifdef __EMSCRIPTEN__
 		web_persist_sync();
 #endif
+		return true;
 	} catch (const Xapian::Error &e) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Updating Xapian DB failed: %s",
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Deleting from Xapian DB failed: %s",
 		             e.get_description().c_str());
 		try {
 			db->cancel_transaction();
 		} catch (...) {
 		}
+		return false;
 	}
+}
+
+bool WordStore::mark_synced(Arena &scratch, WordId word_id) {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::mark_synced");
+	Word word{};
+	if (!get_by_id(scratch, word_id, word)) {
+		return false;
+	}
+	save(scratch, word, false);
+	return true;
+}
+
+bool WordStore::rekey_word(Arena &scratch, WordId old_id, WordId new_id) {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::rekey_word");
+	if (!db || old_id == new_id)
+		return false;
+
+	try {
+		Word word{};
+		if (!get_by_id(scratch, old_id, word)) {
+			return false;
+		}
+
+		word.word_id = new_id;
+		Xapian::Document new_doc;
+		if (!build_document(scratch, word, new_doc, false)) {
+			return false;
+		}
+
+		db->begin_transaction();
+		db->delete_document(word_id_term(scratch, old_id));
+		db->replace_document(word_id_term(scratch, new_id), new_doc);
+		db->commit_transaction();
+
+#ifdef __EMSCRIPTEN__
+		web_persist_sync();
+#endif
+		return true;
+	} catch (const Xapian::Error &e) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Rekeying Xapian word failed: %s",
+		             e.get_description().c_str());
+		try {
+			db->cancel_transaction();
+		} catch (...) {
+		}
+		return false;
+	}
+}
+
+Size WordStore::get_random_unlearned_words(Arena &scratch, Arena &out_arena,
+                                           Size count, DynArr<Word> &out,
+                                           uint64_t *rng_state) const {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::get_random_unlearned_words");
+	if (!db || count <= 0)
+		return 0;
+
+	const auto last_docid = db->get_lastdocid();
+	if (last_docid == 0)
+		return 0;
+
+	Size picked = 0;
+	const Size max_attempts = count * 20 + 50;
+	Size attempts = 0;
+
+	for (; picked < count && attempts < max_attempts;) {
+		++attempts;
+		auto guard = scratch.guard();
+
+		// random docid [1, last_docid]
+		const auto docid = static_cast<Xapian::docid>(
+			  random_num(1, static_cast<int64_t>(last_docid) + 1, rng_state));
+
+		try {
+			const auto doc = db->get_document(docid);
+			const auto data = doc.get_data();
+
+			Word word{};
+			if (!WordsCodec::word_decode(scratch, data.data(),
+			                             static_cast<Size>(data.size()),
+			                             word)) {
+				continue;
+			}
+
+			// filter
+			if (word.type == WordType::Phrase || word.type == WordType::Nil ||
+			    word.in_learning_list != 0 || word.was_learned != 0) {
+				continue;
+			}
+
+			bool is_duplicate = false;
+			for (Size i = 0; i < out.size; ++i) {
+				if (out[i].word_id == word.word_id) {
+					is_duplicate = true;
+					break;
+				}
+			}
+			if (is_duplicate) {
+				continue;
+			}
+
+			out.push(out_arena, word_clone(out_arena, word));
+			++picked;
+		} catch (const Xapian::DocNotFoundError &) {
+			// doc was removed
+			continue;
+		} catch (const Xapian::Error &e) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "Xapian error during random pick: %s",
+			             e.get_description().c_str());
+			break;
+		}
+	}
+
+	return picked;
+}
+
+Size WordStore::get_smart_suggestions(Arena &scratch, Arena &out_arena,
+                                      Size count, DynArr<Word> &out,
+                                      uint64_t *rng_state) const {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::get_smart_suggestions");
+	if (!db || count <= 0)
+		return 0;
+
+	auto try_pick_from_term = [&](const char *term, Size need) -> Size {
+		if (!db->term_exists(term))
+			return 0;
+		const auto freq = db->get_termfreq(term);
+		if (freq == 0)
+			return 0;
+
+		Size local_picked = 0;
+		Size attempts = 0;
+		const Size max_attempts = need * 5 + 10;
+
+		for (; local_picked < need && attempts < max_attempts;) {
+			++attempts;
+			auto guard = scratch.guard();
+
+			auto offset =
+				  static_cast<Xapian::doccount>(random_num(0, freq, rng_state));
+			auto it = db->postlist_begin(term);
+			it.skip_to(offset);
+			if (it == db->postlist_end(term))
+				continue;
+
+			try {
+				const auto doc = db->get_document(*it);
+				const auto data = doc.get_data();
+				Word word{};
+				if (!WordsCodec::word_decode(scratch, data.data(),
+				                             static_cast<Size>(data.size()),
+				                             word)) {
+					continue;
+				}
+
+				if (word.type == WordType::Phrase ||
+				    word.in_learning_list != 0 || word.was_learned != 0) {
+					continue;
+				}
+
+				bool is_duplicate = false;
+				for (Size i = 0; i < out.size; ++i) {
+					if (out[i].word_id == word.word_id) {
+						is_duplicate = true;
+						break;
+					}
+				}
+				if (is_duplicate)
+					continue;
+
+				out.push(out_arena, word_clone(out_arena, word));
+				++local_picked;
+			} catch (...) {
+			}
+		}
+		return local_picked;
+	};
+
+	// 70% XP1
+	Size need_xp1 = (count * 7) / 10;
+	Size picked = try_pick_from_term("XP1", need_xp1);
+
+	// 20% XP2
+	Size need_xp2 = count - picked - (count / 10);
+	if (need_xp2 > 0) {
+		picked += try_pick_from_term("XP2", need_xp2);
+	}
+
+	// random
+	if (out.size < count) {
+		get_random_unlearned_words(scratch, out_arena, count - out.size, out,
+		                           rng_state);
+	}
+
+	return out.size;
 }

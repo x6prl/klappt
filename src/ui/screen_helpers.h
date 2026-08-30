@@ -129,7 +129,7 @@ bool for_each_matching_learning_word_range(Arena &scratch, const Words &words,
 	Size emitted = 0;
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
 		const auto &word = words[ref];
-		if (!word_store_matches_query(scratch, word, query)) {
+		if (!word_matches_query(scratch, word, query)) {
 			continue;
 		}
 		if (matched < start) {
@@ -153,7 +153,7 @@ inline Size matching_learning_word_count(Arena &a, const Words &words,
 	query.mut_trim();
 	Size count = 0;
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
-		if (word_store_matches_query(a, words[ref], query)) {
+		if (word_matches_query(a, words[ref], query)) {
 			++count;
 		}
 	}

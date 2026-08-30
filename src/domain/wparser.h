@@ -1,9 +1,7 @@
 #pragma once
 
-#include <cstddef>
+#include <SDL3/SDL_log.h>
 
-#include "SDL3/SDL_log.h"
-#include "app/app_status.h"
 #include "base/measure.h"
 #include "base/stats.h"
 #include "base/str_view.h"
@@ -13,7 +11,7 @@
 
 template <class AddWord>
 inline bool wparse_entries(Arena &a, const char *data, size_t size,
-                           AddWord add_word, AppStatus *app_status) {
+                           AddWord add_word) {
 	SDL_Log("%s %ld bytes", __PRETTY_FUNCTION__, size);
 	StrView file{data, static_cast<Size>(size)};
 	Measure perf;
@@ -27,7 +25,6 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 	};
 	auto error = [&](const char msg[]) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "line %ld: %s", linecount, msg);
-		app_status->set_exit_with_error(StrView::lit(msg));
 	};
 
 	for (; file;) {
@@ -209,24 +206,12 @@ inline bool wparse_entries(Arena &a, const char *data, size_t size,
 	return true;
 }
 
-// inline void wparse(Arena &a, const char *data, size_t size, Words &words) {
-// 	wparse_entries(a, data, size, [&]() -> Word & {
-// 		auto wref = words.add();
-// 		return words[wref];
-// 	});
-// }
-
-inline bool wparse(Arena &a, const char *data, size_t size, DynArr<Word> &words,
-                   AppStatus *app_status) {
-	return wparse_entries(
-		  a, data, size,
-		  [&]() -> Word & {
-			  words.push(a, Word{});
-			  return words.last();
-		  },
-		  app_status);
+inline bool wparse(Arena &a, const char *data, size_t size,
+                   DynArr<Word> &words) {
+	return wparse_entries(a, data, size, [&]() -> Word & {
+		words.push(a, Word{});
+		return words.last();
+	});
 }
 
-// bool wparse_file(Arena &a, const char *filename, Words &words);
-bool wparse_file(Arena &a, const char *filename, DynArr<Word> &words,
-                 AppStatus *app_status);
+bool wparse_file(Arena &a, const char *filename, DynArr<Word> &words);

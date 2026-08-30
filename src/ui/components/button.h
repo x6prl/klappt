@@ -26,6 +26,7 @@ constexpr auto CHEVRON_DOWN = ""_v;
 constexpr auto ROTATE = ""_v;
 constexpr auto BACK = ""_v;
 constexpr auto CLEAR = ""_v;
+constexpr auto ENVELOPE = ""_v;
 } // namespace Icons
 
 struct MobileButtonStyle {

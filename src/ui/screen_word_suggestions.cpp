@@ -1,23 +1,27 @@
-#include "app/words_init.h"
+#include <SDL3/SDL_log.h>
+
 #include "base/arena.h"
 #include "base/measure.h"
 #include "base/str_view.h"
+#include "app/words_init.h"
 #include "domain/word.h"
-#include "screen_helpers.h"
+
 #include "ui/components/button.h"
 #include "ui/components/word_card.h"
 #include "ui/dpi.h"
-#include <SDL3/SDL_log.h>
+
+#include "screen_helpers.h"
+
 namespace {
 constexpr Size SUGGESTIONS_COUNT = 10;
-constexpr Size WORDS_CHECK_MAX = 1000;
 } // namespace
 
 void screen_word_suggestions_go(AppContext *ctx) {
 	Measure m{__FUNCTION__};
-	// TODO: review
+
 	auto &suggestions_arena = ctx->arena_screen();
 	auto &suggestions_list = ctx->suggestions_list;
+
 	if (suggestions_list.is_empty()) {
 		suggestions_list = DynArr<Word>::filled_zero_or_default(
 			  suggestions_arena, SUGGESTIONS_COUNT);
@@ -26,56 +30,18 @@ void screen_word_suggestions_go(AppContext *ctx) {
 
 	uint64_t rng_state = ctx->ticks;
 
-	DynArr<WordId> candidates{};
-
-	auto word_count = ctx->word_store.word_count();
-	// TODO: make uniform
-	auto range_start =
-		  random_num(0,
-	                 WORDS_CHECK_MAX < word_count ? word_count - WORDS_CHECK_MAX
-	                                              : word_count,
-	                 &rng_state);
-	auto range_count = WORDS_CHECK_MAX;
-	SDL_Log("st=%d, c=%d", range_start, range_count);
-
-	ctx->word_store.for_each_word_range(
-		  ctx->arena_frame, range_start, range_count,
-		  [a = &suggestions_arena, list = &candidates](Size, const Word &w) {
-			  if (0 == w.in_learning_list && 0 == w.was_learned &&
-		          WordType::Phrase != w.type) {
-				  list->push(*a, w.word_id);
-				  SDL_Log(StrView_Fmt, StrView_Arg(word_tts_full(*a, w)));
-			  }
-			  return true;
-		  });
-
-	auto &store = ctx->word_store;
-	{
-		auto g = ctx->arena_frame.guard();
-		DynArr<Size> candidates_used_indices{};
-		auto list_size = std::min(SUGGESTIONS_COUNT, candidates.size);
-		for (; suggestions_list.size < list_size;) {
-			auto rindex = random_num(0, candidates.size, &rng_state);
-			if (candidates_used_indices.is_contains(rindex)) {
-				continue;
-			}
-			candidates_used_indices.push(ctx->arena_frame, rindex);
-			Word tmpword;
-			store.get_by_id(ctx->arena_frame, candidates[rindex], tmpword);
-			suggestions_list[suggestions_list.size] =
-				  word_clone(suggestions_arena, tmpword);
-			suggestions_list.size += 1;
-		}
-	}
+	ctx->word_store.get_smart_suggestions(
+		  ctx->arena_frame, suggestions_arena, SUGGESTIONS_COUNT,
+		  suggestions_list, &rng_state);
 
 	m.lap().printus();
-	for (auto &c : candidates) {
-		Word tmpword;
-		store.get_by_id(ctx->arena_frame, c, tmpword);
-		SDL_Log(StrView_Fmt,
-		        StrView_Arg(word_tts_full(ctx->arena_frame, tmpword)));
+
+	for (Size i = 0; i < suggestions_list.size; ++i) {
+		SDL_Log("Suggestion [%d]: " StrView_Fmt, static_cast<int>(i),
+		        StrView_Arg(word_tts_full(ctx->arena_frame, suggestions_list[i])));
 	}
-	SDL_Log("found %d candidates", candidates.size);
+
+	SDL_Log("Picked %d suggestions", static_cast<int>(suggestions_list.size));
 	ctx->go(Screen::WordSuggestions);
 }
 

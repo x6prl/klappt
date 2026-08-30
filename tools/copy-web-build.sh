@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
-src_dir="${repo_root}/build/web"
+src_dir="${repo_root}/build/web/Release"
 dst_dir="${repo_root}/../klappt-web"
 
 required_files=(

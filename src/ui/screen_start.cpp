@@ -5,7 +5,6 @@
 #include "app/worker.h"
 #include "base/str_view.h"
 #include "ui/components/button.h"
-#include "ui/components/lists.h"
 #include "ui/dpi.h"
 #include "ui/themes.h"
 

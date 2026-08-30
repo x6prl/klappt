@@ -418,41 +418,9 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 	m.lap().printus("ui settings init");
 
-	if (argc > 1 && 0 == strncmp(argv[1], "xapian", 7)) {
-		auto timestamp = SDL_GetTicks();
-		auto rs_path = "/home/x/src/klappt-resources/"_v;
-		{
-			SDL_Log("en");
-			auto word_store_path =
-				  StrView::concat(ctx->arena_frame, rs_path,
-			                      AssetsDL::word_store_leaf(lang_en));
-			ctx->word_store.open(word_store_path);
-			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/en.txt"_v,
-			              timestamp);
-		}
-		{
-			SDL_Log("ru");
-			auto word_store_path =
-				  StrView::concat(ctx->arena_frame, rs_path,
-			                      AssetsDL::word_store_leaf(lang_ru));
-			ctx->word_store.open(word_store_path);
-			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/ru.txt"_v,
-			              timestamp);
-		}
-		if (false) {
-			SDL_Log("tr");
-			auto word_store_path =
-				  StrView::concat(ctx->arena_frame, rs_path,
-			                      AssetsDL::word_store_leaf(lang_tr));
-			ctx->word_store.open(word_store_path);
-			txt_to_xapian(*ctx, "/home/x/downloads/wiki/e0/tr.txt"_v,
-			              timestamp);
-		}
-		SDL_Log("finished");
-		exit(0);
-	}
+	bool is_gen_dbs = argc > 1 && 0 == strncmp(argv[1], "xapian", 7);
 
-	if (ctx->settings.onboarding_stage < 0) {
+	if (!is_gen_dbs && ctx->settings.onboarding_stage < 0) {
 		if (!init_runtime_data(*ctx)) {
 			return SDL_APP_FAILURE;
 		}
@@ -502,6 +470,49 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		// SDL_Thread *net_worker =
 		// SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
 		// net_worker_job_push(ctx, {.type = NetJob::Type::INIT});
+	}
+
+	if (is_gen_dbs) {
+		auto timestamp = SDL_GetTicks();
+		ctx->ticks = timestamp;
+		Worker::job_push(
+			  ctx, {.func = []() {
+				  {
+					  auto rs_path = "/home/x/src/klappt-resources/"_v;
+					  SDL_Log("===> ru");
+					  WordStore ws{};
+					  auto word_store_path =
+							StrView::concat(tctx()->a, rs_path,
+				                            AssetsDL::word_store_leaf(lang_ru));
+					  ws.open(word_store_path, "ru"_v);
+					  txt_to_xapian(ws, "/home/x/downloads/wiki/e0/ru.txt"_v,
+				                    tctx()->app_ctx->ticks);
+					  SDL_Log(" <===> ru FINISHED <===>");
+				  }
+			  }});
+
+		auto rs_path = "/home/x/src/klappt-resources/"_v;
+		{
+			SDL_Log("===> en");
+			WordStore ws{};
+			auto word_store_path =
+				  StrView::concat(ctx->arena_frame, rs_path,
+			                      AssetsDL::word_store_leaf(lang_en));
+			ws.open(word_store_path, "en"_v);
+			txt_to_xapian(ws, "/home/x/downloads/wiki/e0/en.txt"_v, timestamp);
+		}
+		// TODO:
+		if (false) {
+			WordStore ws{};
+			SDL_Log("tr");
+			auto word_store_path =
+				  StrView::concat(ctx->arena_frame, rs_path,
+			                      AssetsDL::word_store_leaf(lang_tr));
+			ws.open(word_store_path, "tr"_v);
+			txt_to_xapian(ws, "/home/x/downloads/wiki/e0/tr.txt"_v, timestamp);
+		}
+		SDL_Log("finished");
+		exit(0);
 	}
 
 	SDL_Log("Application started successfully!");

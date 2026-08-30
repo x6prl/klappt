@@ -368,7 +368,7 @@ bool parse_due_key(const MDB_val &key, Timestamp &due, WordId &word_id) {
 bool read_state_value(StrView key, const MDB_val &value, State &out) {
 	if (value.mv_size != sizeof(State)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "LMDB state payload has wrong size for key %.*s", key.size,
+		             "LMDB state payload has wrong size for key %.*s", (int)key.size,
 		             key.data ? key.data : "");
 		return false;
 	}

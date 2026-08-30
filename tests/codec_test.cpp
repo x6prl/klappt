@@ -18,13 +18,13 @@ static void test_codec() {
 		  .v = v,
 		  .json_payload = {},
 	};
-	auto encoded = WordsCodec::encode_word(a, w0);
+	auto encoded = WordsCodec::word_encode(a, w0);
 
 	Word w1{};
-	bool ok = WordsCodec::decode_word(a, encoded.data, encoded.size, w1);
+	bool ok = WordsCodec::word_decode(a, encoded.data, encoded.size, w1);
 	assert(ok);
 
-	bool comp = words_equal_ignoring_id(w0, w1) && w0.word_id == w0.word_id;
+	bool comp = word_has_same_lexeme_and_payload(w0, w1) && w0.word_id == w0.word_id;
 	assert(comp);
 }
 

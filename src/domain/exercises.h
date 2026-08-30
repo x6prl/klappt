@@ -183,7 +183,7 @@ struct Exercises {
 
 	void reset() {
 		SDL_Log("=======> %s <========= this=%p arena=%p offset=%td "
-		        "exercises=%d results=%d",
+		        "exercises=%" PRSize " results=%" PRSize,
 		        __PRETTY_FUNCTION__, static_cast<void *>(this),
 		        static_cast<void *>(a.data), a.offset, exercises.size,
 		        results.size);
