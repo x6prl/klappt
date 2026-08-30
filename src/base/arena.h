@@ -3,12 +3,14 @@
 #include <sys/mman.h>
 
 #include <cassert>
+#include <cinttypes>
 #include <cstdlib>
 
 #include <SDL3/SDL_log.h>
 
 // NOTE: should be SIGNED
 using Size = int64_t;
+#define PRSize PRId64
 
 struct Arena {
 	using Offset = Size;
@@ -20,9 +22,14 @@ struct Arena {
 	struct TempGuard {
 		Arena *a;
 		const Offset pos{0};
+		const Offset objects;
 
-		TempGuard(Arena *_a) : a{_a}, pos{a->offset} {}
-		~TempGuard() { a->offset = pos; }
+		TempGuard(Arena *_a)
+			  : a{_a}, pos{a->offset}, objects{_a->size_objects} {}
+		~TempGuard() {
+			a->offset = pos;
+			a->size_objects = objects;
+		}
 	};
 
 	Arena(Size arena_size = 1 << 19) : allocated_size{arena_size} {
@@ -38,12 +45,13 @@ struct Arena {
 	Arena(Arena const &) = delete;
 	void operator=(Arena const &) = delete;
 
-	void *push(Size size, Size allign = 32) {
+	// NOTE: ^2 alignment only!
+	void *push(Size size, Size align = 32) {
 		size_objects += size;
-		// allignment
+		// alignment
 		{
-			offset += allign - 1;
-			offset &= ~Offset{allign - 1};
+			offset += align - 1;
+			offset &= ~Offset{align - 1};
 		}
 		auto ret = data + offset;
 		offset += size;
@@ -57,11 +65,29 @@ struct Arena {
 		return static_cast<void *>(ret);
 	}
 
-	template <class T> T *pushN(int count) {
-		return static_cast<T *>(push(count * sizeof(T)));
+	template <class T> T *pushN(Size count) {
+		return static_cast<T *>(
+			  push(count * static_cast<Size>(sizeof(T)), alignof(T)));
 	}
 
-	void clear() { offset = 0; }
+	void clear() {
+		offset = 0;
+		size_objects = 0;
+	}
 
+	void print_stats() const {
+		const auto used = offset;
+		const auto free = allocated_size - used;
+		const auto alignment_overhead = used - size_objects;
+
+		SDL_Log("Arena stats: "
+		        "capacity=%" PRSize " KiB, "
+		        "used=%" PRSize " KiB, "
+		        "free=%" PRSize " KiB, "
+		        "objects=%" PRSize " KiB, "
+		        "alignment_overhead=%" PRSize " B",
+		        allocated_size / 1024, used / 1024, free / 1024,
+		        size_objects / 1024, alignment_overhead);
+	}
 	TempGuard guard() { return {this}; }
 };

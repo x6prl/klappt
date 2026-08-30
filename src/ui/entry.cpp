@@ -674,6 +674,14 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 		frame_end(ctx);
 	}
 
+	if (false) { // arenas info
+		SDL_Log("\n===== arena stats ====");
+		ctx->arena_frame.print_stats();
+		ctx->arena_screen().print_stats();
+		ctx->arena.print_stats();
+		SDL_Log("\n");
+	}
+
 	return ctx->app_status.app_quit;
 }
 
