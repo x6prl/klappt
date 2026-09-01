@@ -349,6 +349,9 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
 	};
+	// ctx->tts_input.data = ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
+	// ctx->dictionary_search.data = ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
+	// ctx->learning_search.data = ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
 	ctx->downloads = DynArr<DownloadData>{
 		  .data = ctx->arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
 		  .size = 0,

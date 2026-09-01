@@ -32,7 +32,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 			auto b = mobile_icon_button<false>(ctx, CLAY_ID("FLOATING"),
 			                                   Icons::ROTATE);
 			if (Clay_Hovered() && b.activated()) {
-				ctx->words_search.clear();
+				ctx->dictionary_search.clear();
 				// screen_words_list_go(ctx);
 				ctx->mobile_text_input.activate_text_input = true;
 				// ctx->mobile_text_input.focused_value =
@@ -60,7 +60,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 		     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
 			auto search = mobile_text_input(
-				  ctx, CLAY_ID("WordsSearch"), &ctx->words_search,
+				  ctx, CLAY_ID("WordsSearch"), &ctx->dictionary_search,
 				  "Search words"_v, mobile_text_input_style_default(),
 				  floating_button_clear_id);
 			if (search.changed || search.submitted || search.blurred) {
@@ -68,9 +68,9 @@ void screen_dictionary_draw(AppContext *ctx) {
 			}
 		}
 		// NOTE: at least 2 chars to start searching
-		if (ctx->words_search.size >= 2) {
+		if (ctx->dictionary_search.size >= 2) {
 			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
-			const auto query = ctx->words_search.view();
+			const auto query = ctx->dictionary_search.view();
 			const auto total_words = ctx->word_store.matching_word_count(query);
 			CLAY(CLAY_ID("WordsListSlot"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),

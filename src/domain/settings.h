@@ -1,15 +1,13 @@
 #pragma once
 
-#include "app/assets_dl.h"
+#include <SDL3/SDL_log.h>
+
 #include "base/str_view.h"
+#include "app/assets_dl.h"
 #include "platform/files.h"
 #include "ui/themes.h"
 #include "ui/translations/langs.h"
 
-#include <SDL3/SDL_log.h>
-#include <cstdint>
-#include <cstring>
-#include <utility>
 
 struct Settings {
 	Theme::Type theme_type{};
@@ -20,6 +18,7 @@ struct Settings {
 	bool is_using_also_de{true};
 	bool is_using_tts{true};
 	bool is_using_asr{false};
+	bool is_using_suggestions{true};
 	int32_t default_screen{0};
 
 	static void for_every_lang(auto f) {

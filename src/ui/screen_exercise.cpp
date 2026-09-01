@@ -2,11 +2,11 @@
 
 #include <SDL3/SDL_log.h>
 
+#include "app/app_context.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "domain/word.h"
-#include "app/app_context.h"
 
 #include "ui/components/button.h"
 #include "ui/components/list_island.h"
@@ -17,7 +17,8 @@
 
 namespace {
 
-static inline float calculate_exercise_internal_progress(const ExerciseState &ex) {
+static inline float
+calculate_exercise_internal_progress(const ExerciseState &ex) {
 	Size total_substages = 0;
 	Size passed_substages = 0;
 
@@ -31,11 +32,14 @@ static inline float calculate_exercise_internal_progress(const ExerciseState &ex
 		}
 	}
 
-	if (total_substages <= 0) return 0.0f;
-	return static_cast<float>(passed_substages) / static_cast<float>(total_substages);
+	if (total_substages <= 0)
+		return 0.0f;
+	return static_cast<float>(passed_substages) /
+	       static_cast<float>(total_substages);
 }
 
-static inline void draw_exercise_progress_bar(AppContext *ctx, const ExerciseState &ex) {
+static inline void draw_exercise_progress_bar(AppContext *ctx,
+                                              const ExerciseState &ex) {
 	const float progress = calculate_exercise_internal_progress(ex);
 
 	CLAY(CLAY_ID("ExerciseProgressBarTrack"),
@@ -71,7 +75,8 @@ void screen_exercise_go(AppContext *ctx, bool reset_stack) {
 	Size due_count{};
 	{
 		KLAPPT_PROFILE_SCOPE_N("generate_new_exercises");
-		due_count = ctx->exercises.generate_new_exercises(ctx, generate_at_most);
+		due_count =
+			  ctx->exercises.generate_new_exercises(ctx, generate_at_most);
 	}
 	m.lap().printus();
 	if (reset_stack) {
@@ -83,27 +88,32 @@ void screen_exercise_go(AppContext *ctx, bool reset_stack) {
 
 void screen_exercise_draw(AppContext *ctx) {
 	if (!ctx->exercises.is_initialized()) {
-		CLAY(CLAY_ID("ExerciseEmpty"),
-		     {
-				   .layout =
-						 {
-							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_GROW(0)},
-							   .childGap = udpi(24.f),
-							   .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                          CLAY_ALIGN_Y_CENTER},
-							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-						 },
-				   .backgroundColor = theme()->surface,
-			 }) {
-			draw_text("No exercises due"_v, theme()->onSurface,
-			          static_cast<uint16_t>(udpi(24.f)));
+		if (ctx->settings.is_using_suggestions) {
+			CLAY(CLAY_ID("ExerciseEmpty"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_GROW(0)},
+								   .childGap = udpi(24.f),
+								   .childAlignment = {CLAY_ALIGN_X_CENTER,
+			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+							 },
+					   .backgroundColor = theme()->surface,
+				 }) {
+				draw_text("No exercises due"_v, theme()->onSurface,
+				          static_cast<uint16_t>(udpi(24.f)));
 
-			auto gen = mobile_button(ctx, CLAY_ID("GenExercises"),
-			                         "Add more words to the learning list"_v);
-			if (gen.activated()) {
-				screen_word_suggestions_go(ctx);
+				auto gen =
+					  mobile_button(ctx, CLAY_ID("GenExercises"),
+				                    "Add more words to the learning list"_v);
+				if (gen.activated()) {
+					screen_word_suggestions_go(ctx);
+				}
 			}
+		} else {
+			screen_trainer_go(ctx);
 		}
 		return;
 	}
@@ -114,7 +124,8 @@ void screen_exercise_draw(AppContext *ctx) {
 
 	const auto source_text = es.source();
 	const Size text_length = source_text.utf8_length();
-	const bool is_phrase = (current_ex.word_type == WordType::Phrase) || (text_length > 40);
+	const bool is_phrase =
+		  (current_ex.word_type == WordType::Phrase) || (text_length > 40);
 
 	CLAY(CLAY_ID("ExerciseScreenRoot"),
 	     {
@@ -128,9 +139,14 @@ void screen_exercise_draw(AppContext *ctx) {
 
 		draw_exercise_progress_bar(ctx, current_ex);
 
-		const float source_font_size = is_phrase
-		      ? get_font_size_based_on_str_size(ctx->display_width, ctx->scale, text_length, 16.f, 22.f)
-		      : get_font_size_based_on_str_size(ctx->display_width, ctx->scale, text_length, 22.f, 36.f);
+		const float source_font_size =
+			  is_phrase
+					? get_font_size_based_on_str_size(ctx->display_width,
+		                                              ctx->scale, text_length,
+		                                              16.f, 22.f)
+					: get_font_size_based_on_str_size(ctx->display_width,
+		                                              ctx->scale, text_length,
+		                                              22.f, 36.f);
 
 		const auto font_id = translation_font_id(ctx);
 
@@ -139,7 +155,8 @@ void screen_exercise_draw(AppContext *ctx) {
 				   .layout =
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_PERCENT(is_phrase ? 0.20f : 0.18f)},
+		                                  CLAY_SIZING_PERCENT(
+												is_phrase ? 0.20f : 0.18f)},
 							   .padding =
 									 {
 										   .left = padding,
@@ -228,7 +245,8 @@ void screen_exercise_draw(AppContext *ctx) {
 				   .layout =
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_PERCENT(is_phrase ? 0.30f : 0.32f)},
+		                                  CLAY_SIZING_PERCENT(
+												is_phrase ? 0.30f : 0.32f)},
 							   .padding =
 									 {
 										   .left = padding,
@@ -237,7 +255,9 @@ void screen_exercise_draw(AppContext *ctx) {
 										   .bottom = udpi(6.f),
 									 },
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                          is_phrase ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER},
+		                                          is_phrase
+		                                                ? CLAY_ALIGN_Y_TOP
+		                                                : CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
 			 }) {
@@ -246,8 +266,10 @@ void screen_exercise_draw(AppContext *ctx) {
 				auto scroll_id = CLAY_ID("AnswerScrollBox");
 				auto scd = Clay_GetScrollContainerData(scroll_id);
 				float autoscroll_y = 0.0f;
-				if (scd.found && scd.contentDimensions.height > scd.scrollContainerDimensions.height) {
-					autoscroll_y = -(scd.contentDimensions.height - scd.scrollContainerDimensions.height);
+				if (scd.found && scd.contentDimensions.height >
+				                       scd.scrollContainerDimensions.height) {
+					autoscroll_y = -(scd.contentDimensions.height -
+					                 scd.scrollContainerDimensions.height);
 				}
 
 				CLAY(scroll_id,
@@ -269,10 +291,8 @@ void screen_exercise_draw(AppContext *ctx) {
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
 						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
-						   .clip = {
-								.vertical = true,
-								.childOffset = {0.0f, autoscroll_y}
-						   },
+						   .clip = {.vertical = true,
+				                    .childOffset = {0.0f, autoscroll_y}},
 					 }) {
 					draw_text(es.response(), theme()->onSurfaceContainer,
 					          static_cast<uint16_t>(udpi(17.f)),

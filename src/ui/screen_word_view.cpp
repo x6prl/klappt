@@ -1215,7 +1215,7 @@ void screen_word_view_draw(AppContext *ctx) {
 					  ctx, CLAY_ID_LOCAL("BackClearFocusButton"),
 					  Icons::ROTATE);
 				if (back_and_clear_and_focus.activated()) {
-					ctx->words_search.clear();
+					ctx->dictionary_search.clear();
 					ctx->mobile_text_input.activate_text_input = true;
 					ctx->pop();
 				}

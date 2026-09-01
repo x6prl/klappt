@@ -57,8 +57,8 @@ static StrView gender_name(Gender gender) {
 static void assign_buffer(MobileTextInputBuffer &dst, StrView src) {
 	MobileTextInputBuffer next{};
 	Size copy_size = src.size;
-	if (copy_size > MobileTextInputBuffer::max_size - 1) {
-		copy_size = MobileTextInputBuffer::max_size - 1;
+	if (copy_size > MobileTextInputBuffer::MAX_SIZE - 1) {
+		copy_size = MobileTextInputBuffer::MAX_SIZE - 1;
 	}
 	if (copy_size > 0) {
 		SDL_memcpy(next.data, src.data, copy_size);
