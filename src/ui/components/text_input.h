@@ -1,13 +1,13 @@
 #pragma once
 
-// TODO: rewrite
-#include "SDL3/SDL_keyboard.h"
-#include "SDL3/SDL_properties.h"
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_properties.h>
+
 #include "ui/components/button.h"
 #include "ui/dpi.h"
 #include "ui/textcache.h"
 #include "ui/translations/langs.h"
-#include <SDL3/SDL_log.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -114,91 +114,108 @@ inline void mobile_text_input_clear_composition(AppContext *ctx) {
 inline float mobile_text_input_measure_text(AppContext *ctx, StrView text,
                                             uint16_t font_id,
                                             uint16_t font_size) {
-	if (!text.size || !ctx || !ctx->text) {
+	if (!text.size || !text.data || !ctx || !ctx->text) {
 		return 0.0f;
 	}
 
-	TTF_Font *font = ctx->text->get_font(font_id, font_size);
-	if (!font) {
-		return 0.0f;
-	}
-
-	int width = 0;
-	int height = 0;
-	if (!TTF_GetStringSize(font, text.data, text.size, &width, &height)) {
-		return 0.0f;
-	}
-
-	return static_cast<float>(width);
+	auto slice = CLAY__INIT(Clay_StringSlice){
+		  .length = static_cast<int32_t>(text.size),
+		  .chars = text.data,
+		  .baseChars = text.data,
+	};
+	return ctx->text
+	      ->measure_text(slice, CLAY_TEXT_CONFIG({
+									  .fontId = font_id,
+									  .fontSize = font_size,
+									  .wrapMode = CLAY_TEXT_WRAP_NONE,
+								}))
+	      .width;
 }
 
-inline bool mobile_text_input_append(MobileTextInputBuffer &dst,
-                                     const char *utf8) {
-	if (!utf8) {
+inline bool mobile_text_input_insert(MobileTextInputBuffer &dst,
+                                     Size &cursor_offset, const char *utf8) {
+	if (!utf8 || !utf8[0])
 		return false;
+
+	if (cursor_offset > dst.size) {
+		cursor_offset = dst.size;
 	}
 
-	bool changed = false;
-	Size i = 0;
-	while (utf8[i] && dst.size < MobileTextInputBuffer::max_size - 1) {
-		const unsigned char lead = static_cast<unsigned char>(utf8[i]);
-		const Size count = mobile_text_input_utf8_codepoint_bytes(lead);
-		if (utf8[i] == '\r' || utf8[i] == '\n') {
-			++i;
-			continue;
-		}
-
-		Size available = 0;
-		for (; available < count && utf8[i + available]; ++available) {
-		}
-		if (available < count ||
-		    dst.size + count > MobileTextInputBuffer::max_size - 1) {
-			break;
-		}
-
-		for (Size j = 0; j < count; ++j) {
-			dst.data[dst.size++] = utf8[i + j];
-		}
-		i += count;
-		changed = true;
+	Size insert_len = 0;
+	while (utf8[insert_len] && utf8[insert_len] != '\r' &&
+	       utf8[insert_len] != '\n') {
+		++insert_len;
 	}
-
-	dst.c_str();
-	return changed;
-}
-
-inline bool mobile_text_input_assign(MobileTextInputBuffer &dst,
-                                     const char *utf8) {
-	MobileTextInputBuffer next{};
-	mobile_text_input_append(next, utf8 ? utf8 : "");
-	if (dst.size == next.size &&
-	    SDL_memcmp(dst.data, next.data, next.size + 1) == 0) {
+	if (insert_len == 0)
 		return false;
+
+	if (dst.size + insert_len >= MobileTextInputBuffer::MAX_SIZE) {
+		insert_len = MobileTextInputBuffer::MAX_SIZE - 1 - dst.size;
+		if (insert_len <= 0)
+			return false;
 	}
-	dst = next;
+
+	std::memmove(dst.data + cursor_offset + insert_len,
+	             dst.data + cursor_offset, dst.size - cursor_offset);
+
+	std::memcpy(dst.data + cursor_offset, utf8, insert_len);
+
+	dst.size += insert_len;
+	cursor_offset += insert_len;
+	dst.data[dst.size] = '\0';
 	return true;
 }
 
-inline bool mobile_text_input_backspace(MobileTextInputBuffer &dst) {
-	if (!dst.size) {
+inline bool mobile_text_input_backspace_at_cursor(MobileTextInputBuffer &dst,
+                                                  Size &cursor_offset) {
+	if (!dst.size || cursor_offset == 0)
 		return false;
+
+	if (cursor_offset > dst.size) {
+		cursor_offset = dst.size;
 	}
 
-	Size index = dst.size - 1;
-	while (index > 0 && mobile_text_input_is_utf8_continuation(
-							  static_cast<unsigned char>(dst.data[index]))) {
-		--index;
+	Size prev_index = cursor_offset - 1;
+	while (prev_index > 0 &&
+	       mobile_text_input_is_utf8_continuation(
+				 static_cast<unsigned char>(dst.data[prev_index]))) {
+		--prev_index;
 	}
 
-	for (Size i = index; i < dst.size; ++i) {
-		dst.data[i] = '\0';
-	}
-	dst.size = index;
-	dst.c_str();
+	Size bytes_to_remove = cursor_offset - prev_index;
+
+	std::memmove(dst.data + prev_index, dst.data + cursor_offset,
+	             dst.size - cursor_offset);
+
+	dst.size -= bytes_to_remove;
+	cursor_offset = prev_index;
+	dst.data[dst.size] = '\0';
 	return true;
 }
 
-inline void mobile_text_input_deactivate(AppContext *ctx, bool notify_blur);
+inline void mobile_text_input_clear(AppContext *ctx,
+                                    MobileTextInputBuffer *value) {
+	if (value) {
+		value->clear();
+	}
+	auto &runtime = ctx->mobile_text_input;
+	runtime.cursor_byte_offset = 0;
+	runtime.scroll_offset_px = 0.0f;
+	runtime.cursor_offset_px = 0.0f;
+	runtime.composition.clear();
+
+#ifdef __EMSCRIPTEN__
+	EM_ASM({
+		const state = Module.lexiSDLTextInput;
+		if (state && state.input) {
+			state.input.value = "";
+		}
+	});
+#endif
+}
+
+inline void mobile_text_input_deactivate(AppContext *ctx,
+                                         bool notify_blur = false);
 
 inline void
 mobile_text_input_native_activate(SDL_Window *window,
@@ -231,12 +248,54 @@ inline void mobile_text_input_native_deactivate(SDL_Window *window) {
 inline bool mobile_text_input_native_handle_key_down(AppContext *ctx,
                                                      SDL_Event *event) {
 	auto &runtime = ctx->mobile_text_input;
+	if (!runtime.focused_value)
+		return false;
+
+	auto &buf = *runtime.focused_value;
+	if (runtime.cursor_byte_offset > buf.size) {
+		runtime.cursor_byte_offset = buf.size;
+	}
+
 	if (runtime.composition.size > 0) {
 		return false;
 	}
+
+	if (event->key.key == SDLK_LEFT) {
+		if (runtime.cursor_byte_offset > 0) {
+			--runtime.cursor_byte_offset;
+			while (runtime.cursor_byte_offset > 0 &&
+			       mobile_text_input_is_utf8_continuation(
+						 static_cast<unsigned char>(
+							   buf.data[runtime.cursor_byte_offset]))) {
+				--runtime.cursor_byte_offset;
+			}
+		}
+		return true;
+	}
+	if (event->key.key == SDLK_RIGHT) {
+		if (runtime.cursor_byte_offset < buf.size) {
+			const unsigned char lead = static_cast<unsigned char>(
+				  buf.data[runtime.cursor_byte_offset]);
+			runtime.cursor_byte_offset +=
+				  mobile_text_input_utf8_codepoint_bytes(lead);
+			if (runtime.cursor_byte_offset > buf.size) {
+				runtime.cursor_byte_offset = buf.size;
+			}
+		}
+		return true;
+	}
+	if (event->key.key == SDLK_HOME) {
+		runtime.cursor_byte_offset = 0;
+		return true;
+	}
+	if (event->key.key == SDLK_END) {
+		runtime.cursor_byte_offset = buf.size;
+		return true;
+	}
 	if (event->key.key == SDLK_BACKSPACE) {
 		mobile_text_input_clear_composition(ctx);
-		if (mobile_text_input_backspace(*runtime.focused_value)) {
+		if (mobile_text_input_backspace_at_cursor(buf,
+		                                          runtime.cursor_byte_offset)) {
 			runtime.changed_id = runtime.focused_id;
 		}
 		return true;
@@ -516,8 +575,7 @@ inline bool mobile_text_input_web_take_blurred() {
 }
 #endif
 
-inline void mobile_text_input_deactivate(AppContext *ctx,
-                                         bool notify_blur = false) {
+inline void mobile_text_input_deactivate(AppContext *ctx, bool notify_blur) {
 	auto &runtime = ctx->mobile_text_input;
 	if (notify_blur && runtime.focused_id) {
 		runtime.blurred_id = runtime.focused_id;
@@ -526,6 +584,7 @@ inline void mobile_text_input_deactivate(AppContext *ctx,
 	runtime.focused_element = {};
 	runtime.focused_value = nullptr;
 	runtime.focused_bounds = {};
+	runtime.cursor_byte_offset = 0;
 	runtime.scroll_offset_px = 0.0f;
 	runtime.cursor_offset_px = 0.0f;
 	runtime.focused_bounds_valid = false;
@@ -561,6 +620,7 @@ inline void mobile_text_input_activate(AppContext *ctx, Clay_ElementId id,
 	runtime.focused_id = id.id;
 	runtime.focused_element = id;
 	runtime.focused_value = value;
+	runtime.cursor_byte_offset = value->size;
 	runtime.rtl = style.rtl;
 #ifdef __EMSCRIPTEN__
 	if (mobile_text_input_web_should_use()) {
@@ -592,7 +652,8 @@ inline bool mobile_text_input_handle_event(AppContext *ctx, SDL_Event *event) {
 		}
 #endif
 		runtime.composition.clear();
-		mobile_text_input_append(runtime.composition, event->edit.text);
+		mobile_text_input_insert(runtime.composition,
+		                         runtime.cursor_byte_offset, event->edit.text);
 		return true;
 	case SDL_EVENT_TEXT_INPUT:
 #ifdef __EMSCRIPTEN__
@@ -600,7 +661,8 @@ inline bool mobile_text_input_handle_event(AppContext *ctx, SDL_Event *event) {
 			return true;
 		}
 #endif
-		if (mobile_text_input_append(*runtime.focused_value,
+		if (mobile_text_input_insert(*runtime.focused_value,
+		                             runtime.cursor_byte_offset,
 		                             event->text.text)) {
 			runtime.changed_id = runtime.focused_id;
 		}
@@ -681,7 +743,11 @@ inline void mobile_text_input_sync(AppContext *ctx) {
 		char web_value[MobileTextInputBuffer::max_size]{};
 		mobile_text_input_web_copy_value(web_value,
 		                                 MobileTextInputBuffer::max_size);
-		if (mobile_text_input_assign(*runtime.focused_value, web_value)) {
+		if (std::strcmp(runtime.focused_value->data, web_value) != 0) {
+			runtime.focused_value->clear();
+			Size offset = 0;
+			mobile_text_input_insert(*runtime.focused_value, offset, web_value);
+			runtime.cursor_byte_offset = runtime.focused_value->size;
 			runtime.changed_id = runtime.focused_id;
 		}
 		if (mobile_text_input_web_take_submitted()) {
@@ -711,6 +777,7 @@ inline MobileTextInputResult mobile_text_input(
 	  const MobileTextInputStyle &style = mobile_text_input_style_default(),
 	  Clay_ElementId detached_clear_button_id =
 			CLAY_ID("DetachedClearButton")) {
+
 	const uint16_t padding_x = udpi(style.padding_x);
 	const uint16_t padding_y = udpi(style.padding_y);
 	const uint16_t border_width = udpi(style.border_width);
@@ -720,17 +787,22 @@ inline MobileTextInputResult mobile_text_input(
 	const float min_width = dpi(style.min_width);
 	const float height = dpi(style.height);
 	const float corner_radius = dpi(style.corner_radius);
-	const bool rtl = style.rtl || ctx->settings.tr_language ==
-	                                    lang_ar;
+
+	const bool rtl = style.rtl || (ctx->settings.tr_language == lang_ar);
 	MobileTextInputStyle effective_style = style;
 	effective_style.rtl = rtl;
 	if (rtl && effective_style.font_id == FontID::MAIN) {
 		effective_style.font_id = FontID::ARABIC_MAIN;
 	}
 
+	const bool has_value = (value && value->size > 0);
+	const float clear_btn_reserve =
+		  (style.clearable && has_value) ? udpi(36.0f) : 0.0f;
+
 	auto &runtime = ctx->mobile_text_input;
 	const bool is_pointer_over =
-		  Clay_PointerOver(id) || Clay_PointerOver(detached_clear_button_id);
+		  Clay_PointerOver(id) ||
+		  (style.clearable && Clay_PointerOver(detached_clear_button_id));
 
 	const bool tapped = is_pointer_over && ctx->tslt.is_tap();
 	if (tapped || runtime.activate_text_input) {
@@ -743,17 +815,22 @@ inline MobileTextInputResult mobile_text_input(
 		mobile_text_input_deactivate(ctx, true);
 	}
 
-	const bool focused = runtime.focused_id == id.id;
-	const bool blurred = runtime.blurred_id == id.id;
+	const bool focused = (runtime.focused_id == id.id);
+	const bool blurred = (runtime.blurred_id == id.id);
 	if (focused) {
 		runtime.focused_drawn_this_frame = true;
 		runtime.focused_element = id;
 		runtime.focused_value = value;
 		runtime.rtl = rtl;
 		runtime.padding_left = padding_x;
-		runtime.padding_right = padding_x;
+		runtime.padding_right =
+			  padding_x + static_cast<uint16_t>(clear_btn_reserve);
 		runtime.padding_top = padding_y;
 		runtime.padding_bottom = padding_y;
+
+		if (value && runtime.cursor_byte_offset > value->size) {
+			runtime.cursor_byte_offset = value->size;
+		}
 	}
 
 	const StrView committed =
@@ -764,18 +841,30 @@ inline MobileTextInputResult mobile_text_input(
 	const bool has_composition = composition.size > 0;
 	const bool show_placeholder = !has_committed && !has_composition;
 
+	Size cursor_pos = focused ? runtime.cursor_byte_offset : 0;
+	if (cursor_pos > committed.size)
+		cursor_pos = committed.size;
+
+	StrView left_part = (has_committed && cursor_pos > 0)
+	                          ? committed.slice(0, cursor_pos)
+	                          : StrView{};
+	StrView right_part = (has_committed && cursor_pos < committed.size)
+	                           ? committed.slice(cursor_pos)
+	                           : StrView{};
+
 	float scroll_offset_px = 0.0f;
 	float cursor_offset_px =
-		  mobile_text_input_measure_text(ctx, committed,
+		  mobile_text_input_measure_text(ctx, left_part,
 	                                     effective_style.font_id, font_size) +
 		  mobile_text_input_measure_text(ctx, composition,
 	                                     effective_style.font_id, font_size);
+
 	if (focused && runtime.focused_bounds_valid) {
-		float inner_width =
-			  runtime.focused_bounds.width - static_cast<float>(padding_x * 2);
-		if (inner_width < 1.0f) {
+		float inner_width = runtime.focused_bounds.width -
+		                    static_cast<float>(padding_x * 2) -
+		                    clear_btn_reserve;
+		if (inner_width < 1.0f)
 			inner_width = 1.0f;
-		}
 		const float caret_extent =
 			  cursor_offset_px + static_cast<float>(caret_width) + dpi(4.0f);
 		if (caret_extent > inner_width) {
@@ -798,8 +887,10 @@ inline MobileTextInputResult mobile_text_input(
 												 : CLAY_SIZING_FIT(min_width),
 										   CLAY_SIZING_FIXED(height),
 									 },
-							   .padding = {padding_x, padding_x, padding_y,
-	                                       padding_y},
+							   .padding = {padding_x,
+	                                       static_cast<uint16_t>(
+												 padding_x + clear_btn_reserve),
+	                                       padding_y, padding_y},
 							   .childAlignment = {rtl ? CLAY_ALIGN_X_RIGHT
 	                                                  : CLAY_ALIGN_X_LEFT,
 	                                              CLAY_ALIGN_Y_CENTER},
@@ -812,9 +903,10 @@ inline MobileTextInputResult mobile_text_input(
 							   .color = focused ? style.border_focused
 	                                            : style.border,
 							   .width = {border_width, border_width,
-	                                     border_width, border_width, 0},
+	                                     border_width, border_width},
 						 },
 			 }) {
+
 		CLAY(CLAY_ID_LOCAL("Viewport"),
 		     {
 				   .layout =
@@ -831,37 +923,39 @@ inline MobileTextInputResult mobile_text_input(
 		                                        : -scroll_offset_px,
 		                                    0}},
 			 }) {
+
 			CLAY(CLAY_ID_LOCAL("Content"),
 			     {
 					   .layout =
 							 {
 								   .sizing = {CLAY_SIZING_FIT(0),
 			                                  CLAY_SIZING_GROW(0)},
-								   .childGap = udpi(2.0f),
+								   .childGap = 0,
 								   .childAlignment = {rtl ? CLAY_ALIGN_X_RIGHT
 			                                              : CLAY_ALIGN_X_LEFT,
 			                                          CLAY_ALIGN_Y_CENTER},
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							 },
 				 }) {
-				if (focused && rtl) {
-					CLAY(CLAY_ID_LOCAL("Caret"),
-					     {
-							   .layout =
-									 {
-										   .sizing =
-												 {CLAY_SIZING_FIXED(
-														static_cast<float>(
-															  caret_width)),
-					                              CLAY_SIZING_FIXED(
-														static_cast<float>(
-															  caret_height))},
-									 },
-							   .backgroundColor = style.caret,
-							   .cornerRadius = CLAY_CORNER_RADIUS(0),
-						 }) {}
-				}
+
 				if (show_placeholder) {
+					if (focused) {
+						CLAY(CLAY_ID_LOCAL("Caret"),
+						     {
+								   .layout =
+										 {
+											   .sizing =
+													 {CLAY_SIZING_FIXED(
+															static_cast<float>(
+																  caret_width)),
+						                              CLAY_SIZING_FIXED(
+															static_cast<float>(
+																  caret_height))},
+										 },
+								   .backgroundColor = style.caret,
+							 }) {}
+					}
+
 					CLAY_TEXT(placeholder.to_clay_string(),
 					          CLAY_TEXT_CONFIG({
 									.textColor = style.placeholder,
@@ -870,8 +964,8 @@ inline MobileTextInputResult mobile_text_input(
 									.wrapMode = CLAY_TEXT_WRAP_NONE,
 							  }));
 				} else {
-					if (has_committed) {
-						CLAY_TEXT(committed.to_clay_string(),
+					if (left_part.size > 0) {
+						CLAY_TEXT(left_part.to_clay_string(),
 						          CLAY_TEXT_CONFIG({
 										.textColor = style.text,
 										.fontId = effective_style.font_id,
@@ -879,6 +973,24 @@ inline MobileTextInputResult mobile_text_input(
 										.wrapMode = CLAY_TEXT_WRAP_NONE,
 								  }));
 					}
+
+					if (focused) {
+						CLAY(CLAY_ID_LOCAL("Caret"),
+						     {
+								   .layout =
+										 {
+											   .sizing =
+													 {CLAY_SIZING_FIXED(
+															static_cast<float>(
+																  caret_width)),
+						                              CLAY_SIZING_FIXED(
+															static_cast<float>(
+																  caret_height))},
+										 },
+								   .backgroundColor = style.caret,
+							 }) {}
+					}
+
 					if (has_composition) {
 						CLAY_TEXT(composition.to_clay_string(),
 						          CLAY_TEXT_CONFIG({
@@ -888,55 +1000,50 @@ inline MobileTextInputResult mobile_text_input(
 										.wrapMode = CLAY_TEXT_WRAP_NONE,
 								  }));
 					}
-				}
 
-				if (focused && !rtl) {
-					CLAY(CLAY_ID_LOCAL("Caret"),
-					     {
-							   .layout =
-									 {
-										   .sizing =
-												 {CLAY_SIZING_FIXED(
-														static_cast<float>(
-															  caret_width)),
-					                              CLAY_SIZING_FIXED(
-														static_cast<float>(
-															  caret_height))},
-									 },
-							   .backgroundColor = style.caret,
-							   .cornerRadius = CLAY_CORNER_RADIUS(0),
-						 }) {}
+					if (right_part.size > 0) {
+						CLAY_TEXT(right_part.to_clay_string(),
+						          CLAY_TEXT_CONFIG({
+										.textColor = style.text,
+										.fontId = effective_style.font_id,
+										.fontSize = font_size,
+										.wrapMode = CLAY_TEXT_WRAP_NONE,
+								  }));
+					}
 				}
 			}
 		}
-		if (style.clearable) {
-			CLAY(CLAY_ID("ClearButtonContainer"),
-			     {.floating = {
-						.attachPoints =
-							  {
-									.element = CLAY_ATTACH_POINT_RIGHT_CENTER,
-									.parent = CLAY_ATTACH_POINT_RIGHT_CENTER,
-							  },
-						.pointerCaptureMode =
-							  CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-						.attachTo = CLAY_ATTACH_TO_PARENT,
-				  }}) {
-				auto style = mobile_button_style_surface_container_high();
-				style.background.a = 0.f;
-				style.background_pressed.a = 0.f;
-				style.font_id = FontID::ICONS;
-				style.font_size *= 2;
-				if (value->size) {
-					style.text.a *= 0.5f;
-				} else {
-					style.text.a = 0.f;
-					style.text_pressed.a = 0.f;
-				}
 
-				auto b = mobile_button(ctx, CLAY_ID("ClearButton"),
-				                       Icons::CLEAR, style);
+		if (style.clearable && has_value) {
+			CLAY(CLAY_ID_LOCAL("ClearButtonContainer"),
+			     {
+					   .floating =
+							 {
+								   .attachPoints =
+										 {
+											   .element =
+													 CLAY_ATTACH_POINT_RIGHT_CENTER,
+											   .parent =
+													 CLAY_ATTACH_POINT_RIGHT_CENTER,
+										 },
+								   .pointerCaptureMode =
+										 CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+								   .attachTo = CLAY_ATTACH_TO_PARENT,
+							 },
+				 }) {
+
+				auto btn_style = mobile_button_style_surface_container_high();
+				btn_style.background.a = 0.f;
+				btn_style.background_pressed.a = 0.f;
+				btn_style.font_id = FontID::ICONS;
+				btn_style.font_size *= 1.5f;
+				btn_style.text.a *= 0.6f;
+
+				auto b = mobile_button(ctx, CLAY_ID_LOCAL("ClearButton"),
+				                       Icons::CLEAR, btn_style);
 				if (b.activated()) {
-					value->clear();
+					mobile_text_input_clear(ctx, value);
+					runtime.changed_id = id.id;
 				}
 			}
 		}

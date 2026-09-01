@@ -5,14 +5,14 @@
 #include <cstring>
 
 struct MobileTextInputBuffer {
-	static constexpr Size max_size{256};
+	static constexpr Size MAX_SIZE{256};
 
-	char data[max_size]{};
+	char data[MAX_SIZE]; // TODO: make thinner :o
 	Size size{0};
 
 	void clear() {
-		if (true) { // TODO: quick bugfix
-			memset(data, 0, max_size);
+		if (true) {
+			memset(data, 0, MAX_SIZE);
 			size = 0;
 		} else {
 			size = 0;
@@ -36,6 +36,7 @@ struct MobileTextInputState {
 	Clay_ElementId focused_element{};
 	MobileTextInputBuffer *focused_value{};
 	Clay_BoundingBox focused_bounds{};
+	Size cursor_byte_offset{};
 	float scroll_offset_px{0.0f};
 	float cursor_offset_px{0.0f};
 	bool focused_bounds_valid{false};
