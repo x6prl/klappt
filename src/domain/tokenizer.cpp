@@ -394,41 +394,6 @@ bool starts_uppercase(StrView token) {
 	return is_upper_german(decode_utf8(token.data, token.size, &used));
 }
 
-bool is_ascii_outer_punctuation(char ch) {
-	switch (ch) {
-	case '"':
-	case '\'':
-	case '(':
-	case ')':
-	case '[':
-	case ']':
-	case '{':
-	case '}':
-	case '<':
-	case '>':
-	case '.':
-	case ',':
-	case ';':
-	case ':':
-	case '!':
-	case '?':
-		return true;
-	default:
-		return false;
-	}
-}
-
-StrView trim_word_punctuation(StrView word) {
-	word.mut_trim();
-	while (word.size > 0 && is_ascii_outer_punctuation(word.first())) {
-		word = word.slice(1);
-	}
-	while (word.size > 0 && is_ascii_outer_punctuation(word.last())) {
-		word = word.slice(0, word.size - 1);
-	}
-	return word;
-}
-
 Size codepoint_count(StrView token) {
 	Utf8Index index{};
 	if (!token || !build_utf8_index(token, &index)) {
@@ -836,8 +801,8 @@ bool has_known_suffix(StrView word, const Arr<StrView, N> &table,
 } // namespace
 
 namespace Tokenizer {
+
 Kind guess_kind(StrView word) {
-	word = trim_word_punctuation(word);
 	if (!word) {
 		return Kind::Verb;
 	}
@@ -967,4 +932,5 @@ DynArr<StrView> get_4_distractors_for_a_chunk(StrView token, uint32_t seed) {
 	match_distractor_case(token, out);
 	return DynArr<StrView>::from(out.data, 4);
 }
+
 } // namespace Tokenizer

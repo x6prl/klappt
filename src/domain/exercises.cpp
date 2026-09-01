@@ -8,49 +8,166 @@
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/shuffle.h"
+#include "base/str_builder.h"
 #include "base/str_view.h"
 #include "engine.h"
 #include "tokenizer.h"
 #include "words.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <ctime>
+#include <simdjson/simdjson.h>
 
 namespace Engine {
-constexpr Size SUB_TRANSLATIONS_COUNT_MAX = 3;
 
 namespace {
 
-static uint64_t rng_state{50987654321};
+static uint64_t rng_state{50987654321}; // TODO: just use ctx->ticks
+
 static Arr<StrView, 4> article_options_a = {"der"_v, "die"_v, "das"_v, "—"_v};
-static constexpr Arr<StrView, 8> plurals = {
-	  "-e"_v, "-en"_v, "-n"_v, "-er"_v, "-s"_v, "\"-e"_v, "\"-er"_v, "\"-"_v,
+// constexpr Arr<StrView, 8> plurals = {
+// 	  "-e"_v, "-en"_v, "-n"_v, "-er"_v, "-s"_v, "\"-e"_v, "\"-er"_v, "\"-"_v,
+// };
+constexpr Arr<StrView, 8> plurals = {
+	  "-e"_v, "-en"_v, "-n"_v, "-er"_v, "-s"_v, "¨-e"_v, "¨-er"_v, "¨-"_v,
 };
 
-// returns first translation
-StrView populate_prompt_sub_fields(Arena &a, StrView trs_raw,
-                                   ExerciseState *exercise) {
-	auto [ret, rest] = trs_raw.split_by(';');
-	auto translations =
-		  word_translations_discrete(a, rest);
-	if (!translations.is_empty()) {
-		StrBuilder strs{};
-		Size n{0};
-		for (auto &tr : translations) {
-			if (n < SUB_TRANSLATIONS_COUNT_MAX) {
-				if (!tr.is_contains('#') && tr.utf8_length() < 25) {
-					strs.push(a, tr);
-					++n;
+// strips explanatory parentheticals (), [] and extracts the top headwords
+StrView sanitize_prompt_headword(Arena &scratch, Arena &a, StrView raw) {
+	if (!raw) {
+		return {};
+	}
+
+	char *buf = scratch.pushN<char>(raw.size);
+	Size len = 0;
+	int paren_depth = 0;
+	int bracket_depth = 0;
+
+	for (Size i = 0; i < raw.size; ++i) {
+		char ch = raw[i];
+		if (ch == '(') {
+			paren_depth++;
+		} else if (ch == ')') {
+			if (paren_depth > 0) {
+				paren_depth--;
+			}
+		} else if (ch == '[') {
+			bracket_depth++;
+		} else if (ch == ']') {
+			if (bracket_depth > 0) {
+				bracket_depth--;
+			}
+		} else if (paren_depth == 0 && bracket_depth == 0) {
+			buf[len++] = ch;
+		}
+	}
+
+	StrView cleaned = StrView{buf, len}.trim();
+	if (!cleaned) {
+		return {};
+	}
+
+	// extract the first clean headword term
+	auto first_comma = cleaned.split_by(',').first.trim();
+	auto first_semi = first_comma.split_by(';').first.trim();
+	if (!first_semi) {
+		return {};
+	}
+
+	// optionally include a short second term if space permits (<= 35 chars)
+	auto after_comma = cleaned.split_by(',').second.trim();
+	if (after_comma) {
+		auto second_item = after_comma.split_by(',').first.trim();
+		second_item = second_item.split_by(';').first.trim();
+		if (second_item && first_semi.size + second_item.size + 2 <= 35) {
+			return StrBuilder::concat(a, first_semi, ", "_v, second_item);
+		}
+	}
+
+	return first_semi.copy(a);
+}
+
+// extracts primary prompt and sub-prompts
+StrView extract_exercise_prompts(Arena &a, Arena &scratch, const Word &word,
+                                 ExerciseState *exercise,
+                                 simdjson::dom::parser &parser) {
+	WordPayload payload{};
+	bool has_payload =
+		  word_json_parse(scratch, scratch, word.json_payload, payload, parser);
+
+	StrView primary_raw{};
+	DynArr<StrView> secondary_candidates{};
+	StrView valency{};
+
+	if (has_payload) {
+		for (Size i = 0; i < payload.senses.size; ++i) {
+			const auto &sense = payload.senses[i];
+			for (Size j = 0; j < sense.translations.size; ++j) {
+				if (sense.translations[j]) {
+					if (!primary_raw) {
+						primary_raw = sense.translations[j];
+						if (sense.valency) {
+							valency = sense.valency;
+						}
+					} else {
+						secondary_candidates.push(scratch,
+						                          sense.translations[j]);
+					}
 				}
-			} else {
-				break;
 			}
 		}
-		exercise->source_sub0 = strs.join(a, '\n');
-	}
-	// exercise->source_sub1 = grammar;
 
-	return ret;
+		for (Size i = 0;
+		     i < payload.synonyms.size && secondary_candidates.size < 4; ++i) {
+			secondary_candidates.push(scratch, payload.synonyms[i]);
+		}
+	}
+
+	if (!primary_raw) {
+		auto [first, rest] = word.translations_raw.split_by(';');
+		primary_raw = first ? first : word.translations_raw;
+		if (rest) {
+			secondary_candidates.push(scratch, rest);
+		}
+	}
+
+	StrView primary = sanitize_prompt_headword(scratch, a, primary_raw);
+	if (!primary) {
+		primary = primary_raw.trim().copy(a);
+	}
+
+	// source_sub0: alternative translations / synonyms as a single line
+	DynArr<StrView> clean_subs{};
+	for (Size i = 0; i < secondary_candidates.size && clean_subs.size < 2;
+	     ++i) {
+		auto clean = sanitize_prompt_headword(scratch, scratch,
+		                                      secondary_candidates[i]);
+		if (clean && clean != primary && !clean_subs.is_contains(clean)) {
+			clean_subs.push(scratch, clean);
+		}
+	}
+
+	if (!clean_subs.is_empty()) {
+		if (clean_subs.size == 1) {
+			exercise->source_sub0 =
+				  StrBuilder::concat(a, "also: "_v, clean_subs[0]);
+		} else {
+			exercise->source_sub0 = StrBuilder::concat(
+				  a, "also: "_v, clean_subs[0], ", "_v, clean_subs[1]);
+		}
+	} else {
+		exercise->source_sub0 = {};
+	}
+
+	// source_sub1: grammatical context / valency
+	if (valency) {
+		exercise->source_sub1 = valency.trim().copy(a);
+	} else {
+		exercise->source_sub1 = {};
+	}
+
+	return primary;
 }
 
 void append_article_stage(Arena &a, const Word &word, StrView source,
@@ -69,12 +186,14 @@ void append_article_stage(Arena &a, const Word &word, StrView source,
 	                                    article_options_a.size())};
 	exercise->stages.push(
 		  a, {.source = source,
+	          .form_type = FormType::Article,
 	          .substages = DynArr<ExerciseState::SubStage>::with(a, substage)});
 	exercise->points_max += points_reward_for_correct_article;
 }
 
 void append_common_stage_chunks(Arena &a, StrView str, Tokenizer::Kind kind,
-                                StrView source, ExerciseState *exercise) {
+                                FormType form_type, StrView source,
+                                ExerciseState *exercise) {
 	auto chunks = Tokenizer::to_chunks(a, str, kind);
 	DynArr<ExerciseState::SubStage> substages{};
 	for (auto &chunk : chunks) {
@@ -91,12 +210,14 @@ void append_common_stage_chunks(Arena &a, StrView str, Tokenizer::Kind kind,
 		                   .points_for_correct_answer = 1,
 		                   .opts = opts});
 	}
-	exercise->stages.push(a, {.source = source, .substages = substages});
+	exercise->stages.push(
+		  a,
+		  {.source = source, .form_type = form_type, .substages = substages});
 	exercise->points_max += chunks.size;
 }
 
-void append_common_stage_compose(Arena &a, StrView str, StrView source,
-                                 ExerciseState *exercise) {
+void append_common_stage_compose(Arena &a, StrView str, FormType form_type,
+                                 StrView source, ExerciseState *exercise) {
 	auto letters = Tokenizer::to_letters(a, str);
 	DynArr<ExerciseState::SubStage> substages{};
 	SDL_Log("Word: |" StrView_Fmt "|splitted to:", StrView_Arg(str));
@@ -115,7 +236,9 @@ void append_common_stage_compose(Arena &a, StrView str, StrView source,
 		                   .points_for_correct_answer = 1,
 		                   .opts = opts});
 	}
-	exercise->stages.push(a, {.source = source, .substages = substages});
+	exercise->stages.push(
+		  a,
+		  {.source = source, .form_type = form_type, .substages = substages});
 	exercise->points_max += letters.size;
 }
 
@@ -123,7 +246,8 @@ void append_common_stage_compose(Arena &a, StrView str, StrView source,
  * NOTE: str should not be empty
  */
 void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
-                              StrView source, ExerciseState *exercise) {
+                              FormType form_type, StrView source,
+                              ExerciseState *exercise) {
 	auto chunks = Tokenizer::to_chunks(a, str, kind);
 
 	Size rnd_idx{0};
@@ -213,46 +337,45 @@ void append_common_stage_gaps(Arena &a, StrView str, Tokenizer::Kind kind,
 		  a, {
 				   .source = source,
 				   .before_answer = answer_while_prompt_builder.join(a),
+				   .form_type = form_type,
 				   .substages = substages,
 				   .gap = {.left_part = left_part, .right_part = right_part},
 			 });
 	exercise->points_max += gap_len;
 }
 
-void append_common_stage_entire(Arena &a, const StrView correct_str,
-                                const DynArr<StrView> all_strs, StrView source,
+void append_common_stage_entire(Arena &a, Arena &scratch,
+                                const StrView correct_str_raw,
+                                const DynArr<StrView> all_strs,
+                                FormType form_type, StrView source,
                                 ExerciseState *exercise) {
 	constexpr Size OPTIONS_MAX = 5;
-
+	const StrView correct_str = correct_str_raw.trim();
 	auto points_reward_for_that_stage = correct_str.utf8_length();
 
-	Size opts_count =
-		  std::min(all_strs.size /* contains correct ref */, OPTIONS_MAX);
-	DynArr<Size> tried_idxs{};
-
-	auto opts = DynArr<StrView>::with<OPTIONS_MAX>(a, correct_str);
-	for (; opts.size < opts_count && tried_idxs.size < all_strs.size;) {
-		Size idxs_to_skip =
-			  random_num(0, all_strs.size - tried_idxs.size, &rng_state);
-		for (Size i{}; i < all_strs.size; ++i) {
-			if (tried_idxs.is_contains(i)) {
-				continue;
-			}
-			// skiping
-			if (idxs_to_skip != 0) {
-				--idxs_to_skip;
-				continue;
-			}
-			tried_idxs.push(a, i);
-			auto candidate = all_strs[i];
-			if (opts.is_contains(candidate) || correct_str == candidate) {
-				break;
-			}
-			opts.push(a, candidate);
-			break;
+	// 1. gather all candidates
+	DynArr<StrView> candidates{};
+	for (Size i = 0; i < all_strs.size; ++i) {
+		auto candidate = all_strs[i].trim();
+		if (candidate && candidate != correct_str &&
+		    !candidates.is_contains(candidate)) {
+			candidates.push(scratch, candidate);
 		}
 	}
 
+	// 2. shuffle candidates in-place
+	if (candidates.size > 1) {
+		shuffle_str_views(candidates.data, candidates.size, &rng_state);
+	}
+
+	// 3. take distractors
+	Size distractor_count = std::min<Size>(candidates.size, OPTIONS_MAX - 1);
+	DynArr<StrView> opts = DynArr<StrView>::with<OPTIONS_MAX>(a, correct_str);
+	for (Size i = 0; i < distractor_count; ++i) {
+		opts.push(a, candidates[i]);
+	}
+
+	// 4. shuffle options
 	auto correct_option_index =
 		  shuffle_str_views(opts.data, opts.size, &rng_state);
 
@@ -263,22 +386,25 @@ void append_common_stage_entire(Arena &a, const StrView correct_str,
 		  .opts = opts};
 	exercise->stages.push(
 		  a, {.source = source,
+	          .form_type = form_type,
 	          .substages = DynArr<ExerciseState::SubStage>::with(a, substage)});
 	exercise->points_max += points_reward_for_that_stage;
 }
 
 void append_stages_aux_and_past_participle(
-	  Arena &a, StrView aux_and_past_participle,
+	  Arena &a, Arena &scratch, StrView aux_and_past_participle,
 	  const DynArr<StrView> past_participle_list, StrView source_aux,
 	  StrView source_pp, ExerciseState *exercise, Mode mode) {
 	constexpr Size points_reward_for_aux_stage = 1;
 	static Arr<StrView, 2> aux_list = {"hat"_v, "ist"_v};
 	StrView aux{};
 	StrView past_participle{};
+
+	aux_and_past_participle = aux_and_past_participle.trim();
 	if (aux_and_past_participle.is_contains(' ')) {
 		auto split = aux_and_past_participle.split();
-		aux = split.first;
-		past_participle = split.second;
+		aux = split.first.trim();
+		past_participle = split.second.trim();
 		if (!aux_list.is_contains(aux)) {
 			SDL_LogError(
 				  SDL_LOG_CATEGORY_ERROR,
@@ -294,14 +420,7 @@ void append_stages_aux_and_past_participle(
 		}
 	}
 	if (aux) {
-		Size correct_option_index{0};
-		for (auto &opt : aux_list) {
-			if (opt == aux) {
-				break;
-			} else {
-				correct_option_index++;
-			}
-		}
+		Size correct_option_index = (aux == "ist"_v) ? 1 : 0;
 		ExerciseState::SubStage substage = {
 			  .is_keypad = false,
 			  .correct_option_index = correct_option_index,
@@ -311,34 +430,37 @@ void append_stages_aux_and_past_participle(
 		               .reserved = aux_list.size()}};
 		exercise->stages.push(
 			  a, {.source = source_aux,
+		          .form_type = FormType::Auxiliary,
 		          .substages =
 		                DynArr<ExerciseState::SubStage>::with(a, substage)});
 		exercise->points_max += points_reward_for_aux_stage;
 	}
 	if (past_participle) {
 		switch (mode) {
-			// TODO: IMPLEMENT
 		case Engine::Mode::Entire:
-			append_common_stage_entire(a, past_participle, past_participle_list,
-			                           source_pp, exercise);
+			append_common_stage_entire(
+				  a, scratch, past_participle, past_participle_list,
+				  FormType::Partizip2, source_pp, exercise);
 			break;
 		case Engine::Mode::Gaps:
 			append_common_stage_gaps(a, past_participle, Tokenizer::Kind::Verb,
-			                         source_pp, exercise);
+			                         FormType::Partizip2, source_pp, exercise);
 			break;
 		case Engine::Mode::Chunks:
-			append_common_stage_chunks(a, past_participle,
-			                           Tokenizer::Kind::Verb, source_pp,
-			                           exercise);
+			append_common_stage_chunks(
+				  a, past_participle, Tokenizer::Kind::Verb,
+				  FormType::Partizip2, source_pp, exercise);
 			break;
 		case Engine::Mode::Compose:
-			append_common_stage_compose(a, past_participle, source_pp,
-			                            exercise);
+			append_common_stage_compose(a, past_participle, FormType::Partizip2,
+			                            source_pp, exercise);
 			break;
-		default:;
+		default:
+			break;
 		}
 	}
 }
+
 template <class OptionIndexFn>
 StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
                                         const ExerciseState &e,
@@ -374,8 +496,9 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 			}
 		}
 		if (!stage_started && i - 1 == last_stage_index_with_content) {
-			SDL_Log("i %" PRSize ", cur sta %" PRSize ", total sta %" PRSize " ", i, e.current_stage,
-			        e.stages.size);
+			SDL_Log("i %" PRSize ", cur sta %" PRSize ", total sta %" PRSize
+			        " ",
+			        i, e.current_stage, e.stages.size);
 			parts.push(tmpa, " "_v);
 			parts.push(tmpa, e.stages[i].before_answer);
 		}
@@ -402,21 +525,30 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 	return parts.join(a);
 }
 
-void append_plural_stage(Arena &a, const Word &word, StrView source,
-                         ExerciseState *exercise) {
+void append_plural_stage(Arena &a, Arena &scratch, const Word &word,
+                         StrView source, ExerciseState *exercise) {
 	constexpr Size opts_count = 5;
 	constexpr int points_for_correct_plural = 2;
-	auto correct_option = word.n.plural_suffix;
+	auto raw_plural = word.n.plural_suffix.trim();
 
-	// we do not prompt users in these cases
-	if (correct_option == "(Sg.)"_v || correct_option == "(Pl.)"_v) {
+	if (!raw_plural || raw_plural == "(Sg.)"_v || raw_plural == "(Pl.)"_v) {
 		return;
 	}
 
+	// NOTE: normalize umlaut "-e -> ¨-e
+	StrView correct_option = raw_plural;
+	if (raw_plural == "\"-e"_v)
+		correct_option = "¨-e"_v;
+	else if (raw_plural == "\"-er"_v)
+		correct_option = "¨-er"_v;
+	else if (raw_plural == "\"-"_v)
+		correct_option = "¨-"_v;
+
 	DynArr<StrView> opts{};
 	opts.push(a, correct_option);
-	auto origin_perm = DynArr<Size>::with(a, 0, 1, 2, 3, 4);
-	auto used = DynArr<uint8_t>::filled_zero_or_default(a, plurals.size());
+	auto origin_perm = DynArr<Size>::with(scratch, 0, 1, 2, 3, 4);
+	auto used =
+		  DynArr<uint8_t>::filled_zero_or_default(scratch, plurals.size());
 	for (; opts.size != opts_count;) {
 		auto rndi = random_num(0, plurals.size(), &rng_state);
 		if (plurals[rndi] != correct_option && !used[rndi]) {
@@ -440,6 +572,7 @@ void append_plural_stage(Arena &a, const Word &word, StrView source,
 
 	exercise->stages.push(
 		  a, {.source = source,
+	          .form_type = FormType::Plural,
 	          .substages = DynArr<ExerciseState::SubStage>::with(a, substage)});
 	exercise->points_max += points_for_correct_plural;
 }
@@ -491,30 +624,27 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	KLAPPT_PROFILE_SCOPE_N("Exercises::generate_new_exercises");
 	Measure m{__FUNCTION__};
 	reset();
-	// big lists for spare words
-	DynArr<StrView> noun_lemma_list;
-	// DynArr<WordRef> noun_word_ref_list; // TODO: useless?
 
-	// DynArr<WordRef> verb_word_ref_list; // TODO: useless?
+	// TODO: investigate how big
+	// NOTE: we may need a big arena
+	auto &scratch = ctx->arena;
+	auto g = scratch.guard();
+
+	DynArr<StrView> noun_lemma_list;
 	DynArr<StrView> verb_infinitive_list;
 	DynArr<StrView> verb_third_person_list;
 	DynArr<StrView> verb_praeteritum_list;
 	DynArr<StrView> verb_past_participle_list;
-
-	// DynArr<WordRef> adjective_word_ref_list; // TODO: useless?
 	DynArr<StrView> adjective_lemma_list;
 	DynArr<StrView> adjective_cmp_list;
 	DynArr<StrView> adjective_sup_list;
-
-	// DynArr<WordRef> phrase_word_ref_list; // TODO: useless?
 	DynArr<StrView> phrase_words_list;
 
 	auto now = time(nullptr);
-	// due lists: by wordId and by WordRef
 	DynArr<WordId> due_id;
 	DynArr<WordRef> due_ref;
-	// collecting due
-	if (!ctx->states.collect_due(ctx->arena_frame, now, due_id)) {
+
+	if (!ctx->states.collect_due(scratch, now, due_id)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "LMDB error: cannot collect due");
 		ctx->app_status.push_error("Cannot collect due words"_v);
 		return 0;
@@ -522,15 +652,14 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	if (due_id.size == 0) {
 		return 0;
 	}
-	auto push_if_not_empty = [&a = ctx->arena_frame](DynArr<StrView> *list,
-	                                                 StrView str) {
-		if (str)
+
+	auto push_if_not_empty = [&a = scratch](DynArr<StrView> *list,
+	                                        StrView str) {
+		if (str) {
 			list->push(a, str);
+		}
 	};
-	// auto all_view = filter_view(&ctx->words, Words::MAX_WORDS,
-	//                             [](const Words &words, WordRef ref) {
-	// 	                             return words.is_used(ref);
-	//                             });
+
 	auto &words = *ctx->words;
 	SDL_Log("collected %" PRSize "", due_id.size);
 	SDL_Log("words list %" PRSize "", words.size);
@@ -538,11 +667,11 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	// and lists of spare words
 	// NOTE: big lists will contain due-words too
 	// NOTE: the order of due_ref and due_id is not the same!!!
-	// TODO: fix this shit, cause it iterates over all the list
+	// TODO: fix this?, cause it iterates over all the list
 	for (auto i = words.begin(); i < words.end(); i.advance(&words)) {
 		auto &word = words[i];
 		if (due_id.is_contains(word.word_id)) {
-			due_ref.push(ctx->arena_frame, i);
+			due_ref.push(scratch, i);
 		}
 		auto text = word.p.text; // hä...  TODO: be more elegant
 		switch (word.type) {
@@ -568,24 +697,24 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 			push_if_not_empty(&adjective_sup_list, word.a.superlative);
 			break;
 		case WordType::Phrase:
-			// TODO: fix
 			for (auto w = text.mut_split(); w; w = text.mut_split()) {
-				// phrase_word_ref_list.push(ctx->tmparena,
-				// i * 2 + w.size); // hä???
-				push_if_not_empty(&phrase_words_list, w);
+				auto trimmed_w = w.is_contains_punctuation_unicode()
+				                       ? w.utf8_strip_punctuation(scratch)
+				                       : w;
+				push_if_not_empty(&phrase_words_list, trimmed_w);
 			}
 			break;
 		default:
 			break;
 		}
 	}
-	// extend phrase words list
-	auto phrase_words_list_and_nouns = DynArr<StrView>::concat(
-		  ctx->arena_frame, phrase_words_list, noun_lemma_list);
+
+	auto phrase_words_list_and_nouns =
+		  DynArr<StrView>::concat(scratch, phrase_words_list, noun_lemma_list);
 	auto phrase_words_list_and_verbs = DynArr<StrView>::concat(
-		  ctx->arena_frame, phrase_words_list, verb_infinitive_list);
+		  scratch, phrase_words_list, verb_infinitive_list);
 	auto phrase_words_list_and_adjectives = DynArr<StrView>::concat(
-		  ctx->arena_frame, phrase_words_list, adjective_lemma_list);
+		  scratch, phrase_words_list, adjective_lemma_list);
 
 	SDL_Log("due in words list %" PRSize "", due_ref.size);
 	// TODO: check the sizes of the lists
@@ -595,21 +724,20 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 
 	const auto total_exercises = std::min(n, due_ref.size);
 	// the main list to generate exercises
-	auto exercise_words = DynArr<WordRef>::filled_zero_or_default(
-		  ctx->arena_frame, total_exercises);
+	auto exercise_words =
+		  DynArr<WordRef>::filled_zero_or_default(scratch, total_exercises);
 
 	// we fill it randomly
-	auto rng_state = ctx->ticks;
 	for (exercise_words.size = 0; exercise_words.size < total_exercises;) {
 		auto i = random_num(0, due_ref.size, &rng_state);
 		if (!exercise_words.is_contains(due_ref[i])) {
-			exercise_words.push(ctx->arena_frame, due_ref[i]);
+			exercise_words.push(scratch, due_ref[i]);
 		}
 	}
 
-	SDL_Log("preparing %" PRSize " exercises for:", exercise_words.size);
+	simdjson::dom::parser parser{};
+
 	for (auto &word_ref : exercise_words) {
-		// print_word(words[word_ref]);
 		auto &word = words[word_ref];
 		State state{};
 		auto [success, was_present] = ctx->states.get(word.word_id, state);
@@ -626,116 +754,120 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		                       .mode = state.mode,
 		                       .word_type = word.type};
 
-		auto append_common_stage = [&a = a, mode = state.mode, e = &exercise](
+		auto append_common_stage = [&a = a, &scratch = scratch,
+		                            mode = state.mode, e = &exercise](
 										 StrView str, Tokenizer::Kind kind,
 										 DynArr<StrView> spare_list,
-										 StrView source) {
+										 StrView source,
+										 FormType form_type = FormType::None) {
 			switch (mode) {
 			case Engine::Mode::Entire:
-				append_common_stage_entire(a, str, spare_list, source, e);
+				append_common_stage_entire(a, scratch, str, spare_list,
+				                           form_type, source, e);
 				break;
 			case Engine::Mode::Gaps:
-				append_common_stage_gaps(a, str, kind, source, e);
+				append_common_stage_gaps(a, str, kind, form_type, source, e);
 				break;
 			case Engine::Mode::Chunks:
-				append_common_stage_chunks(a, str, kind, source, e);
+				append_common_stage_chunks(a, str, kind, form_type, source, e);
 				break;
 			case Engine::Mode::Compose:
-				append_common_stage_compose(a, str, source, e);
+				append_common_stage_compose(a, str, form_type, source, e);
 				break;
-			default:;
+			default:
+				break;
 			}
 		};
 
 		if (word.type == WordType::Noun) {
-			auto source = populate_prompt_sub_fields(a, word.translations_raw,
-			                                         &exercise);
+			auto source =
+				  extract_exercise_prompts(a, scratch, word, &exercise, parser);
 			append_article_stage(a, word, source, &exercise);
 			append_common_stage(word.n.lemma, Tokenizer::Kind::Noun,
 			                    noun_lemma_list, source);
-			append_plural_stage(a, word, source, &exercise);
+			append_plural_stage(a, scratch, word, source, &exercise);
 		} else if (word.type == WordType::Verb) {
-			auto first_tr_raw = populate_prompt_sub_fields(
-				  a, word.translations_raw, &exercise);
-			StrView source_inf{};
-			StrView source_3p{};
-			StrView source_past{};
-			StrView source_aux{};
-			StrView source_pp{};
-			source_inf = first_tr_raw;
-			source_3p =
-				  StrView::concat_with(a, source_inf, "(er/sie/es)"_v, ' ');
-			source_past = StrView::concat_with(a, source_inf, "(Prät.)"_v, ' ');
-			source_aux = "haben oder sein?"_v;
-			source_pp = StrView::concat_with(a, source_inf, "(PII)"_v, ' ');
+			auto source_clean =
+				  extract_exercise_prompts(a, scratch, word, &exercise, parser);
 
-			{ // fill stages
+			{
 				append_common_stage(word.v.infinitive, Tokenizer::Kind::Verb,
-				                    verb_infinitive_list, source_inf);
-				if (word.v.third_person)
+				                    verb_infinitive_list, source_clean,
+				                    FormType::Infinitive);
+				if (word.v.third_person) {
 					append_common_stage(word.v.third_person,
 					                    Tokenizer::Kind::Verb,
-					                    verb_third_person_list, source_3p);
-				if (word.v.praeteritum)
+					                    verb_third_person_list, source_clean,
+					                    FormType::ThirdPerson);
+				}
+				if (word.v.praeteritum) {
 					append_common_stage(word.v.praeteritum,
 					                    Tokenizer::Kind::Verb,
-					                    verb_praeteritum_list, source_past);
-				if (word.v.auxv_and_past_participle)
+					                    verb_praeteritum_list, source_clean,
+					                    FormType::Praeteritum);
+				}
+				if (word.v.auxv_and_past_participle) {
 					append_stages_aux_and_past_participle(
-						  a, word.v.auxv_and_past_participle,
-						  verb_past_participle_list, source_aux, source_pp,
+						  a, scratch, word.v.auxv_and_past_participle,
+						  verb_past_participle_list, source_clean, source_clean,
 						  &exercise, state.mode);
+				}
 			}
 		} else if (word.type == WordType::Adj) {
-			auto first_tr_raw = populate_prompt_sub_fields(
-				  a, word.translations_raw, &exercise);
-			StrView source_lemma{};
-			StrView source_cmp{};
-			StrView source_sup{};
+			auto source_clean =
+				  extract_exercise_prompts(a, scratch, word, &exercise, parser);
 
-			source_lemma = first_tr_raw;
-			source_cmp =
-				  StrView::concat_with(a, source_lemma, "(comp.)"_v, ' ');
-			source_sup = StrView::concat_with(a, source_lemma, "(sup.)"_v, ' ');
-
-			{ // fill stages
+			{
 				append_common_stage(word.a.lemma, Tokenizer::Kind::Adjective,
-				                    adjective_lemma_list, source_lemma);
+				                    adjective_lemma_list, source_clean);
 				if (!word.a.is_indeclinable) {
-					if (word.a.comparative)
+					if (word.a.comparative) {
 						append_common_stage(word.a.comparative,
 						                    Tokenizer::Kind::Adjective,
-						                    adjective_cmp_list, source_cmp);
-					if (word.a.superlative)
+						                    adjective_cmp_list, source_clean,
+						                    FormType::Comparative);
+					}
+					if (word.a.superlative) {
 						append_common_stage(word.a.superlative,
 						                    Tokenizer::Kind::Adjective,
-						                    adjective_sup_list, source_sup);
+						                    adjective_sup_list, source_clean,
+						                    FormType::Superlative);
+					}
 				}
 			}
 		} else if (word.type == WordType::Phrase) {
-			auto source = populate_prompt_sub_fields(a, word.translations_raw,
-			                                         &exercise);
+			StrView source = word.translations_raw
+			                       ? word.translations_raw.trim().copy(a)
+			                       : extract_exercise_prompts(
+										   a, scratch, word, &exercise, parser);
 			auto text = word.p.text;
 			for (auto w = text.mut_split(); w; w = text.mut_split()) {
-				SDL_Log("stage " StrView_Fmt, StrView_Arg(w));
-				auto kind = Tokenizer::guess_kind(w);
+				auto trimmed_w = w.is_contains_punctuation_unicode()
+				                       ? w.utf8_strip_punctuation(scratch)
+				                       : w;
+				if (!trimmed_w) {
+					continue;
+				}
+				auto kind = Tokenizer::guess_kind(trimmed_w);
 				DynArr<StrView> spare_words_list =
 					  kind == Tokenizer::Kind::Noun
 							? phrase_words_list_and_nouns
 					  : kind == Tokenizer::Kind::Adjective
 							? phrase_words_list_and_adjectives
 							: phrase_words_list_and_verbs;
-				append_common_stage(w, kind, spare_words_list, source);
+				append_common_stage(trimmed_w, kind, spare_words_list, source);
 			}
 		}
 		Size i{0};
 		for (auto &stage : exercise.stages) {
 			SDL_Log(StrView_Fmt, StrView_Arg(word.n.lemma));
-			SDL_Log("stage %" PRSize " of %" PRSize "", i++, exercise.stages.size);
+			SDL_Log("stage %" PRSize " of %" PRSize "", i++,
+			        exercise.stages.size);
 			Size j{0};
 			for (auto &substage : stage.substages) {
-				SDL_Log("substage %" PRSize " of %" PRSize ", total opts: %" PRSize "", j++,
-				        stage.substages.size, substage.opts.size);
+				SDL_Log("substage %" PRSize " of %" PRSize
+				        ", total opts: %" PRSize "",
+				        j++, stage.substages.size, substage.opts.size);
 				for (auto &option : substage.opts) {
 					SDL_Log("opts " StrView_Fmt, StrView_Arg(option));
 				}
@@ -745,6 +877,8 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	}
 
 	m.lap().printus();
+	SDL_Log("Exercise arena usage stats after generatig:");
+	a.print_stats();
 	return due_id.size;
 }
 
@@ -768,7 +902,7 @@ StrView actual_response_from_exercise(Arena &tmpa, Arena &a,
 	return res;
 }
 
-bool Exercises::handler_back_pressed(AppContext *ctx) {
+bool Exercises::handler_back_pressed_ex(AppContext *ctx) {
 	if (!is_initialized()) {
 		return false;
 	}
@@ -785,6 +919,19 @@ bool Exercises::handler_back_pressed(AppContext *ctx) {
 	}
 	pending_selection_index = -1;
 	return true;
+}
+
+bool Exercises::handler_back_pressed_rv() {
+	if (!is_initialized()) {
+		return false;
+	}
+	SDL_Log("trying from %" PRSize, exercise_current_idx);
+	if (exercise_current_idx > 0) {
+		exercise_current_idx--;
+		return true;
+	} else {
+		return false;
+	}
 }
 
 Triple<DynArr<StrView>, DynArr<StrView>, DynArr<int>>
@@ -832,17 +979,16 @@ void Exercises::build_result_reviews(Arena &tmpa, bool is_only_failed) {
 		auto expected = expected_response_from_exercise(tmpa, a, exercise);
 		auto [actual_parts, expected_parts, is_right_actual_part] =
 			  find_diff(a, exercise);
-		results.push(a,
-		             {.expected = expected,
-		              .actual = exercise.response,
-		              .word_id = exercise.word_id,
-		              .word_ref = exercise.word_ref,
-		              .source = exercise.stages.first().source, // NOTE: ??? ok?
-		              .source_sub0 = exercise.source_sub0,
-		              // .source_sub1 = exercise.source_sub1,
-		              .expected_parts = expected_parts,
-		              .actual_parts = actual_parts,
-		              .is_right_actual_part = is_right_actual_part});
+		results.push(a, {.expected = expected,
+		                 .actual = exercise.response,
+		                 .word_id = exercise.word_id,
+		                 .word_ref = exercise.word_ref,
+		                 .source = exercise.stages.first().source,
+		                 .source_sub0 = exercise.source_sub0,
+		                 .source_sub1 = exercise.source_sub1,
+		                 .expected_parts = expected_parts,
+		                 .actual_parts = actual_parts,
+		                 .is_right_actual_part = is_right_actual_part});
 	}
 }
 
@@ -864,7 +1010,8 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 	}
 
 	SDL_Log("%s", __PRETTY_FUNCTION__);
-	SDL_Log("pending selection %" PRSize " |" StrView_Fmt "|", pending_selection_index,
+	SDL_Log("pending selection %" PRSize " |" StrView_Fmt "|",
+	        pending_selection_index,
 	        StrView_Arg(substage().opts[pending_selection_index]));
 	auto result = CommitResult::None;
 	auto &exercise = exercises[exercise_current_idx];
@@ -890,16 +1037,16 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 			SDL_Log("--- NO MORE EXERCISES ---");
 			// reset();
 			correct_exercise_count = 0;
-			for (auto &exercise : exercises) {
-				if (exercise.points_earned == exercise.points_max) {
+			for (auto &ex : exercises) {
+				if (ex.points_earned == ex.points_max) {
 					++correct_exercise_count;
 				}
 			}
 			exercise_current_idx = 0;
 			result = CommitResult::ShowSummary;
 		} else {
-			SDL_Log("--- Finished exercise %" PRSize " of %" PRSize " ---", exercise_current_idx,
-			        exercises.size);
+			SDL_Log("--- Finished exercise %" PRSize " of %" PRSize " ---",
+			        exercise_current_idx, exercises.size);
 			// we still have exercises
 		}
 	}
@@ -907,4 +1054,5 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 	pending_selection_index = -1;
 	return result;
 }
+
 } // namespace Engine

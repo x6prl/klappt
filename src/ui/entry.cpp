@@ -370,9 +370,10 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 		}
 	}
 
-	auto on_back_button_pressed = [](AppContext *ctx) {
-		if (ctx->screen() == Screen::Exercice) {
-			if (ctx->exercises.handler_back_pressed(ctx)) {
+	auto on_back_button_pressed = [](AppContext *ctx) -> void {
+		switch (ctx->screen()) {
+		case Screen::Exercice: {
+			if (ctx->exercises.handler_back_pressed_ex(ctx)) {
 				// NOTE: it wasn't the last substage of the current
 				// exercise
 				return;
@@ -381,6 +382,18 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 				// TODO: think more
 				return;
 			}
+		} break;
+		case Screen::ExerciceResultSummary: {
+			return; // skip ctx->pop()!
+		} break;
+		case Screen::ExerciseReview: {
+			if (ctx->exercises.handler_back_pressed_rv()) {
+				// skip ctx->pop()!
+				return;
+			}
+		} break;
+		default:
+			break;
 		}
 		if (!ctx->pop()) {
 			// TODO: ask user whether should exit
@@ -454,7 +467,8 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			// 				.copy(ctx->arena_screen());
 			// 	SDL_Log(" ->> " StrView_Fmt, StrView_Arg(asr_text));
 			// 	// memcpy(ctx->asr_result.data, asr_text.data,
-			// 	//        std::min(asr_text.size, ctx->asr_result.max_size));
+			// 	//        std::min(asr_text.size,
+			// ctx->asr_result.max_size));
 			// 	// ctx->asr_result.size = asr_text.size;
 			// 	ctx->asr_result = asr_text;
 			//

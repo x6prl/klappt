@@ -182,7 +182,6 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 
 inline bool seed_default_learning_list(AppContext &ctx) {
 	static constexpr LearningListSeedSpec DEFAULT_SEEDS[] = {
-		  // TODO: review and update
 		  {WordType::Verb, "sein"_v},
 		  {WordType::Verb, "kommen"_v},
 		  {WordType::Verb, "sehen"_v},

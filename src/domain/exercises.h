@@ -2,12 +2,50 @@
 
 #include "SDL3/SDL_log.h"
 #include "base/dyn_arr.h"
-#include "base/str_view.h"
 #include "base/str_builder.h"
+#include "base/str_view.h"
 #include "engine.h"
 #include "words.h"
 
 struct AppContext;
+
+enum class FormType : uint8_t {
+	None = 0,
+	Article,
+	Plural,
+	Infinitive,
+	ThirdPerson,
+	Praeteritum,
+	Auxiliary,
+	Partizip2,
+	Comparative,
+	Superlative,
+};
+
+inline StrView form_type_to_str(FormType type) {
+	switch (type) {
+	case FormType::Article:
+		return "Artikel"_v;
+	case FormType::Plural:
+		return "Plural"_v;
+	case FormType::Infinitive:
+		return "Infinitiv"_v;
+	case FormType::ThirdPerson:
+		return "er / sie / es"_v;
+	case FormType::Praeteritum:
+		return "Präteritum"_v;
+	case FormType::Auxiliary:
+		return "haben / sein"_v;
+	case FormType::Partizip2:
+		return "Partizip II"_v;
+	case FormType::Comparative:
+		return "Komparativ"_v;
+	case FormType::Superlative:
+		return "Superlativ"_v;
+	default:
+		return {};
+	}
+}
 
 struct ExerciseResult {
 	StrView expected{};
@@ -34,6 +72,8 @@ struct ExerciseState {
 		// prompt may differ for stages
 		StrView source{};
 		StrView before_answer = "_"_v;
+		FormType form_type{FormType::None};
+		StrView valency{};
 		DynArr<SubStage> substages{};
 		Size current_substage{0};
 		struct {
@@ -58,7 +98,7 @@ struct ExerciseState {
 	StrView response = EMPTY_ANSWER;
 	// sub prompts are common for all the stages
 	StrView source_sub0{};
-	// StrView source_sub1{};
+	StrView source_sub1{};
 	DynArr<Stage> stages{};
 	Size current_stage{0};
 	Size points_max{0};
@@ -127,7 +167,7 @@ struct ExerciseState {
 
 namespace Engine {
 struct Exercises {
-	Arena a{1 << 16}; // 64 KB
+	Arena a{1 << 20}; // 1 MB
 
 	DynArr<ExerciseState> exercises{};
 	DynArr<ExerciseResult> results{};
@@ -137,10 +177,8 @@ struct Exercises {
 	Size correct_exercise_count{};
 
 	bool is_initialized() const { return exercises.size > 0; }
-	bool handler_back_pressed(AppContext *ctx);
-	// bool is_finished() const {
-	// 	return is_initialized() && exercise_current_idx == exercise_total();
-	// }
+	bool handler_back_pressed_ex(AppContext *ctx);
+	bool handler_back_pressed_rv();
 
 	const ExerciseState::SubStage &substage() const {
 		return exercises[exercise_current_idx].ss();
@@ -148,12 +186,21 @@ struct Exercises {
 	const StrView source() const {
 		return exercises[exercise_current_idx].s().source;
 	}
+	FormType form_type() const {
+		return exercises[exercise_current_idx].s().form_type;
+	}
+	const StrView valency() const {
+		const auto &st = exercises[exercise_current_idx].s();
+		if (st.valency)
+			return st.valency;
+		return exercises[exercise_current_idx].source_sub1;
+	}
 	const StrView source_sub0() const {
 		return exercises[exercise_current_idx].source_sub0;
 	}
-	// const StrView source_sub1() const {
-	// 	return exercises[exercise_current_idx].source_sub1;
-	// }
+	const StrView source_sub1() const {
+		return exercises[exercise_current_idx].source_sub1;
+	}
 	const StrView response() const {
 		const auto &exercise = exercises[exercise_current_idx];
 		if (exercise.mode == Mode::Gaps &&
