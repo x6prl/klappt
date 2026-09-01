@@ -220,9 +220,9 @@ void append_common_stage_compose(Arena &a, StrView str, FormType form_type,
                                  StrView source, ExerciseState *exercise) {
 	auto letters = Tokenizer::to_letters(a, str);
 	DynArr<ExerciseState::SubStage> substages{};
-	SDL_Log("Word: |" StrView_Fmt "|splitted to:", StrView_Arg(str));
+	// SDL_Log("Word: |" StrView_Fmt "|splitted to:", StrView_Arg(str));
 	for (auto &letter : letters) {
-		SDL_Log("\tLetter: |" StrView_Fmt "|", StrView_Arg(letter));
+		// SDL_Log("\tLetter: |" StrView_Fmt "|", StrView_Arg(letter));
 		auto opts = DynArr<StrView>::with<5>(a, letter);
 		auto distractors = Tokenizer::get_4_distractors_for_a_chunk(
 			  letter, static_cast<uint32_t>(rng_state));
@@ -470,12 +470,12 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 	bool is_gaps_mode = e.mode == Mode::Gaps;
 	Size last_stage_index_with_content = 0;
 	for (Size i{0}; i < e.stages.size; ++i) {
-		SDL_Log("===stage %" PRSize "", i);
+		// SDL_Log("===stage %" PRSize "", i);
 		auto &stage = e.stages[i];
 		bool stage_started = false;
-		auto __debugj = 0;
+		// auto __debugj = 0;
 		for (auto &substage : stage.substages) {
-			SDL_Log("substage %d", __debugj++);
+			// SDL_Log("substage %d", __debugj++);
 			if (substage.selected_option_index < 0) {
 				continue;
 			}
@@ -488,7 +488,7 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 				last_stage_index_with_content = i;
 			}
 			auto str = substage.opts[option_index_for(substage)];
-			SDL_Log("Append from: " StrView_Fmt, StrView_Arg(str));
+			// SDL_Log("Append from: " StrView_Fmt, StrView_Arg(str));
 			if (!is_gaps_mode) {
 				parts.push(tmpa, str);
 			} else { // gaps mode
@@ -496,9 +496,9 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 			}
 		}
 		if (!stage_started && i - 1 == last_stage_index_with_content) {
-			SDL_Log("i %" PRSize ", cur sta %" PRSize ", total sta %" PRSize
-			        " ",
-			        i, e.current_stage, e.stages.size);
+			// SDL_Log("i %" PRSize ", cur sta %" PRSize ", total sta %" PRSize
+			        // " ",
+			        // i, e.current_stage, e.stages.size);
 			parts.push(tmpa, " "_v);
 			parts.push(tmpa, e.stages[i].before_answer);
 		}
@@ -520,8 +520,8 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 	// 	}
 	// }
 
-	auto r = parts.join(tmpa, '|');
-	SDL_Log("res: " StrView_Fmt, StrView_Arg(r));
+	// auto r = parts.join(tmpa, '|');
+	// SDL_Log("res: " StrView_Fmt, StrView_Arg(r));
 	return parts.join(a);
 }
 
@@ -661,8 +661,8 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	};
 
 	auto &words = *ctx->words;
-	SDL_Log("collected %" PRSize "", due_id.size);
-	SDL_Log("words list %" PRSize "", words.size);
+	// SDL_Log("collected %" PRSize "", due_id.size);
+	// SDL_Log("words list %" PRSize "", words.size);
 	// searching for them in learning list and setting due_ref
 	// and lists of spare words
 	// NOTE: big lists will contain due-words too
@@ -716,7 +716,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	auto phrase_words_list_and_adjectives = DynArr<StrView>::concat(
 		  scratch, phrase_words_list, adjective_lemma_list);
 
-	SDL_Log("due in words list %" PRSize "", due_ref.size);
+	// SDL_Log("due in words list %" PRSize "", due_ref.size);
 	// TODO: check the sizes of the lists
 	if (noun_lemma_list.size < 5) {
 		// TODO: add more nouns from words store if too little of them present
@@ -858,26 +858,26 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 				append_common_stage(trimmed_w, kind, spare_words_list, source);
 			}
 		}
-		Size i{0};
-		for (auto &stage : exercise.stages) {
-			SDL_Log(StrView_Fmt, StrView_Arg(word.n.lemma));
-			SDL_Log("stage %" PRSize " of %" PRSize "", i++,
-			        exercise.stages.size);
-			Size j{0};
-			for (auto &substage : stage.substages) {
-				SDL_Log("substage %" PRSize " of %" PRSize
-				        ", total opts: %" PRSize "",
-				        j++, stage.substages.size, substage.opts.size);
-				for (auto &option : substage.opts) {
-					SDL_Log("opts " StrView_Fmt, StrView_Arg(option));
-				}
-			}
-		}
+		// Size i{0};
+		// for (auto &stage : exercise.stages) {
+		// 	SDL_Log(StrView_Fmt, StrView_Arg(word.n.lemma));
+		// 	SDL_Log("stage %" PRSize " of %" PRSize "", i++,
+		// 	        exercise.stages.size);
+		// 	Size j{0};
+		// 	for (auto &substage : stage.substages) {
+		// 		SDL_Log("substage %" PRSize " of %" PRSize
+		// 		        ", total opts: %" PRSize "",
+		// 		        j++, stage.substages.size, substage.opts.size);
+		// 		for (auto &option : substage.opts) {
+		// 			SDL_Log("opts " StrView_Fmt, StrView_Arg(option));
+		// 		}
+		// 	}
+		// }
 		exercises.push(a, exercise);
 	}
 
 	m.lap().printus();
-	SDL_Log("Exercise arena usage stats after generatig:");
+	// SDL_Log("Exercise arena usage stats after generatig:");
 	a.print_stats();
 	return due_id.size;
 }
@@ -888,7 +888,7 @@ StrView expected_response_from_exercise(Arena &tmpa, Arena &a,
 		  tmpa, a, e, [](const ExerciseState::SubStage &substage) {
 			  return substage.correct_option_index;
 		  });
-	SDL_Log(StrView_Fmt, StrView_Arg(res));
+	// SDL_Log(StrView_Fmt, StrView_Arg(res));
 	return res;
 }
 
@@ -898,7 +898,7 @@ StrView actual_response_from_exercise(Arena &tmpa, Arena &a,
 		  tmpa, a, e, [](const ExerciseState::SubStage &substage) {
 			  return substage.selected_option_index;
 		  });
-	SDL_Log(StrView_Fmt, StrView_Arg(res));
+	// SDL_Log(StrView_Fmt, StrView_Arg(res));
 	return res;
 }
 
@@ -925,7 +925,7 @@ bool Exercises::handler_back_pressed_rv() {
 	if (!is_initialized()) {
 		return false;
 	}
-	SDL_Log("trying from %" PRSize, exercise_current_idx);
+	// SDL_Log("trying from %" PRSize, exercise_current_idx);
 	if (exercise_current_idx > 0) {
 		exercise_current_idx--;
 		return true;
@@ -1009,10 +1009,10 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 		return CommitResult::None;
 	}
 
-	SDL_Log("%s", __PRETTY_FUNCTION__);
-	SDL_Log("pending selection %" PRSize " |" StrView_Fmt "|",
-	        pending_selection_index,
-	        StrView_Arg(substage().opts[pending_selection_index]));
+	// SDL_Log("%s", __PRETTY_FUNCTION__);
+	// SDL_Log("pending selection %" PRSize " |" StrView_Fmt "|",
+	//         pending_selection_index,
+	//         StrView_Arg(substage().opts[pending_selection_index]));
 	auto result = CommitResult::None;
 	auto &exercise = exercises[exercise_current_idx];
 	auto has_more_stages = exercise.submit(pending_selection_index);
@@ -1045,12 +1045,12 @@ Exercises::CommitResult Exercises::commit(AppContext *ctx) {
 			exercise_current_idx = 0;
 			result = CommitResult::ShowSummary;
 		} else {
-			SDL_Log("--- Finished exercise %" PRSize " of %" PRSize " ---",
-			        exercise_current_idx, exercises.size);
+			// SDL_Log("--- Finished exercise %" PRSize " of %" PRSize " ---",
+			//         exercise_current_idx, exercises.size);
 			// we still have exercises
 		}
 	}
-	SDL_Log("--- resetting pending selection ---");
+	// SDL_Log("--- resetting pending selection ---");
 	pending_selection_index = -1;
 	return result;
 }
