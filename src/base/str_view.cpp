@@ -1,10 +1,8 @@
 #include "str_view.h"
-#include "SDL3/SDL_log.h"
 
 #include <cctype>
 #include <charconv>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -50,6 +48,76 @@ StrView from_number_impl(Arena &a, auto val) {
 		return from_numberf_impl(a, val, 2);
 	}
 }
+
+uint32_t decode_utf8_at(const char *data, Size size, Size i, Size &char_len) {
+	uint8_t b0 = static_cast<uint8_t>(data[i]);
+	char_len = bytes_for_utf8[b0];
+
+	if (char_len <= 0 || i + char_len > size) {
+		char_len = 1;
+		return b0;
+	}
+
+	if (char_len == 1) {
+		return b0;
+	} else if (char_len == 2) {
+		return ((b0 & 0x1F) << 6) |
+		       (static_cast<uint8_t>(data[i + 1]) & 0x3F);
+	} else if (char_len == 3) {
+		return ((b0 & 0x0F) << 12) |
+		       ((static_cast<uint8_t>(data[i + 1]) & 0x3F) << 6) |
+		       (static_cast<uint8_t>(data[i + 2]) & 0x3F);
+	} else if (char_len == 4) {
+		return ((b0 & 0x07) << 18) |
+		       ((static_cast<uint8_t>(data[i + 1]) & 0x3F) << 12) |
+		       ((static_cast<uint8_t>(data[i + 2]) & 0x3F) << 6) |
+		       (static_cast<uint8_t>(data[i + 3]) & 0x3F);
+	}
+	char_len = 1;
+	return b0;
+}
+
+bool is_unicode_punctuation(uint32_t cp) {
+	// standard ASCII punctuation: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+	if (cp < 0x80) {
+		return std::ispunct(static_cast<unsigned char>(cp)) != 0;
+	}
+
+	// latin-1 Supplement punctuation (¡, §, «, ¶, ·, », ¿)
+	if (cp == 0x00A1 || cp == 0x00A7 || cp == 0x00AB || cp == 0x00B6 ||
+	    cp == 0x00B7 || cp == 0x00BB || cp == 0x00BF) {
+		return true;
+	}
+
+	// general (dashes –, —, quotes “”, ‘’, „, ellipses …, bullets •, etc.)
+	if (cp >= 0x2010 && cp <= 0x205E) {
+		return true;
+	}
+
+	// supplemental
+	if (cp >= 0x2E00 && cp <= 0x2E7F) {
+		return true;
+	}
+
+	// CJK symbols and punctuation (、, 。, 「, 」, 《, 》, etc.)
+	if (cp >= 0x3001 && cp <= 0x303F) {
+		return true;
+	}
+
+	// small form variants
+	if (cp >= 0xFE50 && cp <= 0xFE6F) {
+		return true;
+	}
+
+	// fullwidth and halfwidth forms punctuation
+	if ((cp >= 0xFF01 && cp <= 0xFF0F) || (cp >= 0xFF1A && cp <= 0xFF20) ||
+	    (cp >= 0xFF3B && cp <= 0xFF40) || (cp >= 0xFF5B && cp <= 0xFF65)) {
+		return true;
+	}
+
+	return false;
+}
+
 } // namespace
 
 StrView::operator bool() const { return !!size; }
@@ -236,6 +304,30 @@ StrView StrView::utf8_to_lowercase(Arena &a) const {
 	return ret;
 }
 
+StrView StrView::utf8_strip_punctuation(Arena &a) const {
+	if (!size) {
+		return {};
+	}
+
+	char *out = a.pushN<char>(size);
+	Size out_size = 0;
+
+	for (Size i = 0; i < size;) {
+		Size char_len = 0;
+		uint32_t cp = decode_utf8_at(data, size, i, char_len);
+
+		if (!is_unicode_punctuation(cp)) {
+			for (Size j = 0; j < char_len; ++j) {
+				out[out_size++] = data[i + j];
+			}
+		}
+
+		i += char_len;
+	}
+
+	return {out, out_size};
+}
+
 StrView StrView::copy(Arena &a) const {
 	if (!size) {
 		return {};
@@ -266,6 +358,27 @@ bool StrView::is_contains_substr(StrView substr) const {
 		}
 	}
 
+	return false;
+}
+
+bool StrView::is_contains_punctuation() const {
+	for (Size i = 0; i < size; ++i) {
+		if (std::ispunct(static_cast<unsigned char>(data[i]))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool StrView::is_contains_punctuation_unicode() const {
+	for (Size i = 0; i < size;) {
+		Size char_len = 0;
+		uint32_t cp = decode_utf8_at(data, size, i, char_len);
+		if (is_unicode_punctuation(cp)) {
+			return true;
+		}
+		i += char_len;
+	}
 	return false;
 }
 

@@ -41,6 +41,8 @@ struct StrView {
 	StrView utf8_to_lowercase_german(Arena &a) const;
 	[[nodiscard]]
 	StrView utf8_to_lowercase(Arena &a) const;
+	[[nodiscard]]
+	StrView utf8_strip_punctuation(Arena &a) const;
 
 	[[nodiscard]]
 	StrView copy(Arena &a) const;
@@ -93,6 +95,8 @@ struct StrView {
 
 	bool is_contains(char ch) const;
 	bool is_contains_substr(StrView substr) const;
+	bool is_contains_punctuation() const;
+	bool is_contains_punctuation_unicode() const;
 	const char *find(char ch) const;
 
 	Clay_String to_clay_string() const;
