@@ -11,8 +11,8 @@
 #include "domain/words.h"
 #include "ui/textcache.h"
 
-void screen_start_go(AppContext *ctx);
-void screen_start_draw(AppContext *ctx);
+void screen_trainer_go(AppContext *ctx);
+void screen_trainer_draw(AppContext *ctx);
 
 void screen_exercise_go(AppContext *ctx, bool reset_stack);
 void screen_exercise_draw(AppContext *ctx);
@@ -23,8 +23,8 @@ void screen_exercise_summary_draw(AppContext *ctx);
 void screen_exercise_review_push(AppContext *ctx);
 void screen_exercise_review_draw(AppContext *ctx);
 
-void screen_words_list_go(AppContext *ctx);
-void screen_words_list_draw(AppContext *ctx);
+void screen_dictionary_go(AppContext *ctx);
+void screen_dictionary_draw(AppContext *ctx);
 
 void screen_learning_list_go(AppContext *ctx);
 void screen_learning_list_draw(AppContext *ctx);

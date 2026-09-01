@@ -471,7 +471,7 @@ void screen_onboarding_draw(AppContext *const ctx) {
 				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 				             "Seeding default learning list failed");
 			}
-			screen_start_go(ctx);
+			screen_trainer_go(ctx);
 		}
 	}
 }

@@ -12,13 +12,13 @@
 #include "ui/dpi.h"
 #include "ui/tslt.h"
 
-void screen_words_list_go(AppContext *ctx) {
+void screen_dictionary_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
 	ctx->go(Screen::Dictionary);
 	ctx->push_one_frame();
 }
 
-void screen_words_list_draw(AppContext *ctx) {
+void screen_dictionary_draw(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE();
 	auto floating_button_clear_id = CLAY_ID("FloatingButtonClear");
 	{ // floating buttons

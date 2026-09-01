@@ -252,7 +252,7 @@ void bottom_bar_layout(AppContext *ctx) {
 
 					if (is_activated) {
 						if (menu[i].second == Screen::Dictionary) {
-							screen_words_list_go(ctx);
+							screen_dictionary_go(ctx);
 						} else if (menu[i].second == Screen::LearningList) {
 							screen_learning_list_go(ctx);
 						} else if (menu[i].second == Screen::TTS_ASR) {
@@ -260,7 +260,7 @@ void bottom_bar_layout(AppContext *ctx) {
 							screen_tts_asr_go(ctx);
 #endif
 						} else {
-							screen_start_go(ctx);
+							screen_trainer_go(ctx);
 						}
 					}
 					draw_text(screen_to_screen_name(menu[i].second), style.text,
@@ -547,7 +547,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			case Screen::Trainer: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Start");
 				app_bar_layout(ctx, ""_v);
-				screen_start_draw(ctx);
+				screen_trainer_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
 			}
@@ -574,7 +574,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			case Screen::Dictionary: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordsList");
 				app_bar_layout(ctx, "Words"_v);
-				screen_words_list_draw(ctx);
+				screen_dictionary_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
 			}
@@ -625,7 +625,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				bottom_bar_layout(ctx);
 #else
 				ctx->app_status.push_error("TTS/ASR features are disabled"_v);
-				screen_start_go(ctx);
+				screen_trainer_go(ctx);
 #endif
 				break;
 			}
