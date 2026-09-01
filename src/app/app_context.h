@@ -28,11 +28,11 @@
 #include "ui/tslt.h"
 
 enum class Screen {
-	Start = 0,
+	Trainer = 0,
 	Exercice,
 	ExerciceResultSummary,
 	ExerciseReview,
-	WordsList,
+	Dictionary,
 	LearningList,
 	WordSuggestions,
 	Settings,
@@ -44,7 +44,7 @@ enum class Screen {
 
 inline const char *screen_name(Screen s) {
 	switch (s) {
-	case Screen::Start:
+	case Screen::Trainer:
 		return "Start";
 	case Screen::Exercice:
 		return "Exercise";
@@ -52,7 +52,7 @@ inline const char *screen_name(Screen s) {
 		return "ExerciseSummary";
 	case Screen::ExerciseReview:
 		return "ExerciseReview";
-	case Screen::WordsList:
+	case Screen::Dictionary:
 		return "WordsList";
 	case Screen::LearningList:
 		return "LearningList";
@@ -144,6 +144,12 @@ struct AppContext {
 		anim(); // TODO: just push one frame
 	}
 	Screen screen() const { return stack[current]; }
+	Screen screen_prev() const {
+		if (current >0) {
+			return stack[current-1];
+		} 
+		return Screen::Trainer;
+	}
 	void on_screen_change(Screen from, Screen to) {
 		(void)from;
 		(void)to;
@@ -190,9 +196,9 @@ struct AppContext {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::go");
 		KLAPPT_PROFILE_NAME_F("AppContext::go -> %s", screen_name(s));
 		const auto was = screen();
-		if (s != Screen::Start) {
+		if (s != Screen::Trainer) {
 			current = 1;
-			stack[0] = Screen::Start;
+			stack[0] = Screen::Trainer;
 			stack[1] = s;
 		} else {
 			current = 0;

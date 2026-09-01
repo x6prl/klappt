@@ -2,10 +2,11 @@
 
 #include <SDL3/SDL_log.h>
 
-#include "base/arena.h"
-#include "base/shuffle.h"
 #include "app/app_context.h"
 #include "app/app_status.h"
+#include "app/words_init.h"
+#include "base/arena.h"
+#include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
 #include "ui/textcache.h"
@@ -118,6 +119,21 @@ inline void remove_word_from_learning_list(Arena &tmparena, Word *word,
 	word->in_learning_list = 0;
 	words->remove_by_id(word->word_id);
 	word_store->save(tmparena, *word);
+}
+
+inline void toggle_word_from_learning_list_and_save_words_dat(AppContext *ctx, Arena &tmparena,
+                                           Word *word) {
+	word->in_learning_list = word->in_learning_list ^ 1u;
+	auto w_copy = word_clone(ctx->arena, *word);
+	if (0 != word->in_learning_list) {
+		add_word_to_learning_list(ctx->arena_frame, word, ctx->words,
+		                          &ctx->word_store, &ctx->states,
+		                          &ctx->app_status);
+	} else {
+		remove_word_from_learning_list(ctx->arena_frame, word, ctx->words,
+		                               &ctx->word_store);
+	}
+	save_words_dat(ctx->arena_frame, ctx->settings, *ctx->words);
 }
 
 template <class F>

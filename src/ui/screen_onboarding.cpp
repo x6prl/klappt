@@ -291,8 +291,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 				auto current_default_screen =
 					  static_cast<Screen>(ctx->settings.default_screen);
 				Arr<Pair<Screen, StrView>, 2> options{{
-					  {Screen::Start, "Word trainer"_v},
-					  {Screen::WordsList, "Dictionary with search"_v},
+					  {Screen::Trainer, "Word trainer"_v},
+					  {Screen::Dictionary, "Dictionary with search"_v},
 				}};
 				int option_counter = 0;
 				for (auto &[screen, label] : options) {

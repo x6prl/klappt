@@ -220,8 +220,8 @@ void screen_settings_draw(AppContext *ctx) {
 						  auto current_default_screen = static_cast<Screen>(
 								ctx->settings.default_screen);
 						  Arr<Pair<Screen, StrView>, 2> options{
-								{{Screen::WordsList, "Wortschatz"_v},
-					             {Screen::Start, "Trainer"_v}}};
+								{{Screen::Dictionary, "Wortschatz"_v},
+					             {Screen::Trainer, "Trainer"_v}}};
 						  int option_counter = 0;
 						  for (auto &[screen, label] : options) {
 							  auto style = screen == current_default_screen

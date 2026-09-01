@@ -174,19 +174,19 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 void bottom_bar_layout(AppContext *ctx) {
 	constexpr auto bottom_bar_size{60.f};
 	constexpr Arr<Triple<StrView, Screen, StrView>, 4> menu{{
-		  {""_v, Screen::Start},
+		  {""_v, Screen::Trainer},
 		  {"T"_v, Screen::TTS_ASR},
-		  {""_v, Screen::WordsList},
+		  {""_v, Screen::Dictionary},
 		  {""_v, Screen::LearningList},
 	}};
 
 	auto screen_to_screen_name = [](Screen s) -> StrView {
 		switch (s) {
-		case Screen::Start:
+		case Screen::Trainer:
 			return "Trainer"_v;
 		case Screen::TTS_ASR:
 			return "Neuro"_v;
-		case Screen::WordsList:
+		case Screen::Dictionary:
 			return "Wortschatz"_v;
 		case Screen::LearningList:
 			return "My Words"_v;
@@ -251,7 +251,7 @@ void bottom_bar_layout(AppContext *ctx) {
 					                    menu[i].first, style);
 
 					if (is_activated) {
-						if (menu[i].second == Screen::WordsList) {
+						if (menu[i].second == Screen::Dictionary) {
 							screen_words_list_go(ctx);
 						} else if (menu[i].second == Screen::LearningList) {
 							screen_learning_list_go(ctx);
@@ -544,7 +544,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 						 },
 			 }) {
 			switch (ctx->screen()) {
-			case Screen::Start: {
+			case Screen::Trainer: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Start");
 				app_bar_layout(ctx, ""_v);
 				screen_start_draw(ctx);
@@ -571,7 +571,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				bottom_bar_layout(ctx);
 				break;
 			}
-			case Screen::WordsList: {
+			case Screen::Dictionary: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordsList");
 				app_bar_layout(ctx, "Words"_v);
 				screen_words_list_draw(ctx);

@@ -14,7 +14,7 @@
 
 void screen_words_list_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
-	ctx->go(Screen::WordsList);
+	ctx->go(Screen::Dictionary);
 	ctx->push_one_frame();
 }
 
@@ -95,29 +95,11 @@ void screen_words_list_draw(AppContext *ctx) {
 													CLAY_IDI("Word", index), w);
 										if (tap_state ==
 							                TapSwipeLongTap::LongTap) {
-											SDL_Log(StrView_Fmt,
-								                    StrView_Arg(
-														  w.translations_raw));
-											w.in_learning_list =
-												  w.in_learning_list ^ 1u;
-											auto word =
-												  word_clone(ctx->arena, w);
-											if (0 != w.in_learning_list) {
-												add_word_to_learning_list(
-													  ctx->arena_frame, &word,
-													  ctx->words,
-													  &ctx->word_store,
-													  &ctx->states,
-													  &ctx->app_status);
-											} else {
-												remove_word_from_learning_list(
-													  ctx->arena_frame, &word,
-													  ctx->words,
-													  &ctx->word_store);
-											}
-											save_words_dat(ctx->arena_frame,
-								                           ctx->settings,
-								                           *ctx->words);
+											// SDL_Log(StrView_Fmt,
+											//                  StrView_Arg(
+											// 			  w.translations_raw));
+											toggle_word_from_learning_list_and_save_words_dat(
+												  ctx, ctx->arena_frame, &w);
 										} else if (tap_state ==
 							                       TapSwipeLongTap::Tap) {
 											screen_word_view_push(ctx,

@@ -9,7 +9,7 @@
 #include "ui/themes.h"
 
 void screen_start_go(AppContext *ctx) {
-	ctx->go(Screen::Start);
+	ctx->go(Screen::Trainer);
 
 	// TODO: purge
 	// if (ctx->words->size == 0 && !seed_default_learning_list(*ctx)) {

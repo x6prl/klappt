@@ -4,6 +4,7 @@
 #include <simdjson/simdjson.h>
 
 #include "app/app_context.h"
+#include "app/words_init.h"
 #include "base/dyn_arr.h"
 #include "base/pair.h"
 #include "base/profiler.h"
@@ -964,7 +965,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 				due_bg = theme()->surfaceContainer;
 				due_fg = theme()->onSurfaceContainer;
 			} else if (is_overdue) {
-				due_str = "Ready to review"_v;
+				due_str = "Ready to repeat"_v;
 				due_bg = theme()->wrongContainer;
 				due_fg = theme()->onWrongContainer;
 			} else {
@@ -1182,7 +1183,15 @@ void screen_word_view_draw(AppContext *ctx) {
 		           //    .width = {0, 0, udpi(1.f), 0},
 		           // },
 			 }) {
-
+			auto word_ref = state.word_ref;
+			auto add_or_remove_btn = mobile_icon_button<false>(
+				  ctx, CLAY_ID("RemoveButton"),
+				  state.word_copy.in_learning_list ? Icons::REMOVE
+												   : Icons::SAVE);
+			if (add_or_remove_btn.activated()) {
+				toggle_word_from_learning_list_and_save_words_dat(
+					  ctx, ctx->arena_frame, &state.word_copy);
+			}
 			auto back_button = mobile_icon_button<false>(
 				  ctx, CLAY_ID_LOCAL("BackButton"), Icons::BACK);
 			if (back_button.activated()) {
@@ -1201,12 +1210,15 @@ void screen_word_view_draw(AppContext *ctx) {
 			}
 #endif // NEURO
 
-			auto back_and_clear_and_focus = mobile_icon_button<false>(
-				  ctx, CLAY_ID_LOCAL("BackClearFocusButton"), Icons::ROTATE);
-			if (back_and_clear_and_focus.activated()) {
-				ctx->words_search.clear();
-				ctx->mobile_text_input.activate_text_input = true;
-				ctx->pop();
+			if (ctx->screen_prev() == Screen::Dictionary) {
+				auto back_and_clear_and_focus = mobile_icon_button<false>(
+					  ctx, CLAY_ID_LOCAL("BackClearFocusButton"),
+					  Icons::ROTATE);
+				if (back_and_clear_and_focus.activated()) {
+					ctx->words_search.clear();
+					ctx->mobile_text_input.activate_text_input = true;
+					ctx->pop();
+				}
 			}
 		}
 	}
