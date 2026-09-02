@@ -57,7 +57,7 @@ get_fetch_chunk_buffer(int slotIndex, size_t chunkSize) {
 			return out.data + out.size;
 		}
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "Callback memory buffer overflow! Buffer size: %d",
+		             "Callback memory buffer overflow! Buffer size: %" PRSize,
 		             out.reserved);
 		return nullptr;
 	}
@@ -300,14 +300,19 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 
 	if (!is_enough_space) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "request %d: Bufffer size (%ld) is too small!",
+		             "request %d: Buffer size (%" PRSize ") is too small!",
 		             slot->req.request_id, out.reserved);
 		slot->req.error.copy_from("buffer size is too small"_v);
 	}
 
-	auto bytes_to_copy = is_enough_space ? realsize : out.reserved - out.size;
-	memcpy(out.data + out.size, data, bytes_to_copy);
-	out.size += bytes_to_copy;
+	auto bytes_to_copy =
+		  is_enough_space
+				? realsize
+				: (out.reserved > out.size ? out.reserved - out.size : 0);
+	if (bytes_to_copy > 0) {
+		memcpy(out.data + out.size, data, bytes_to_copy);
+		out.size += bytes_to_copy;
+	}
 	return bytes_to_copy;
 }
 } // namespace
@@ -347,8 +352,6 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	}
 
 	FixedSet<Size, NetContext::MAX_REQUESTS> pending_requests{};
-	bool is_queue_empty = false;
-	uint64_t queue_touched_last_time_ticks_ms = 0;
 
 	MT::run_with_payload(&netctx, [](AppContext *ctx, void *ptr) {
 		ctx->net = static_cast<NetContext *>(ptr);
@@ -356,65 +359,36 @@ int SDLCALL NetWorkerThread(void *userdata) {
 
 	FixedStr<256> cacert_pem_path{};
 
-	constexpr auto TOUCH_QUEUE_NOT_FASTER_THAN_MS = 16;
 	for (;;) {
-		bool is_still_have_enough_work =
-			  (netctx.active_requests_indices.size >=
-		       netctx.active_requests_indices.capacity()) //
-			  ||                                          //
-
-			  (pending_requests.size + netctx.active_requests_indices.size >=
-		       NetContext::MAX_REQUESTS);
-
-		auto queue_touch_throtler =
-			  [&queue_touched_last_time_ticks_ms]() -> bool {
-			auto now = SDL_GetTicks();
-			if (now - queue_touched_last_time_ticks_ms >
-			    TOUCH_QUEUE_NOT_FASTER_THAN_MS) {
-				queue_touched_last_time_ticks_ms = now;
-				return true;
-			}
-			return false;
-		};
-
-		if (!is_still_have_enough_work && queue_touch_throtler() &&
-		    SDL_TryLockMutex(job_queue.mutex)) {
-			size_t job_queue_size = job_queue.queue.size();
-			is_queue_empty = 0 == job_queue_size;
-
-			size_t awailable_space =
-				  std::min(pending_requests.capacity() - pending_requests.size,
-			               netctx.active_requests_indices.capacity() -
-			                     netctx.active_requests_indices.size);
-			if (job_queue_size > awailable_space) {
-				SDL_Log("net requests queue is too big: %zu, but we can "
-				        "add only %zu",
-				        job_queue_size, awailable_space);
-				job_queue_size = awailable_space;
-			}
-
-			Size i = pending_requests.size + job_queue_size - 1;
-			for (; i >= pending_requests.size; --i) {
+		{ // reading incoming requests from job queue
+			SDL_LockMutex(job_queue.mutex);
+			while (
+				  !job_queue.queue.empty() &&
+				  (pending_requests.size + netctx.active_requests_indices.size <
+			       NetContext::MAX_REQUESTS)) {
 				Size index = job_queue.queue.front();
 				job_queue.queue.pop();
-				pending_requests[i] = index;
+				pending_requests.push_one(index);
 			}
-			pending_requests.size += job_queue_size;
 
+			if (pending_requests.is_empty() &&
+			    netctx.active_requests_indices.size == 0 &&
+			    job_queue.queue.empty()) {
+				SDL_Log("NET: going to sleep: no pending or active requests");
+				SDL_WaitCondition(job_queue.cond, job_queue.mutex);
+
+				while (!job_queue.queue.empty() &&
+				       (pending_requests.size +
+				              netctx.active_requests_indices.size <
+				        NetContext::MAX_REQUESTS)) {
+					Size index = job_queue.queue.front();
+					job_queue.queue.pop();
+					pending_requests.push_one(index);
+				}
+			}
 			SDL_UnlockMutex(job_queue.mutex);
 		}
 
-		if (is_queue_empty && netctx.active_requests_indices.size == 0) {
-			SDL_Log("NET: going to sleep: no pending or active requests");
-			SDL_LockMutex(job_queue.mutex);
-			SDL_WaitCondition(job_queue.cond, job_queue.mutex);
-
-			// **************************
-			// NOTE: replace for goto?..
-			SDL_UnlockMutex(job_queue.mutex);
-			continue;
-			// **************************
-		}
 		for (auto req_index = pending_requests.top_value(); //
 		     !pending_requests.is_empty();                  //
 		     pending_requests.pop_top(),
@@ -425,7 +399,7 @@ int SDLCALL NetWorkerThread(void *userdata) {
 			pool_slot.int_data = {};
 
 			SDL_Log("Net Thread: Processing Net Request %d (URL: " StrView_Fmt
-			        ", FNAME \"%s\", BUF %ldB)",
+			        ", FNAME \"%s\", BUF %" PRSize "B)",
 			        req.request_id, StrView_Arg(req.url.view()),
 			        req.file_name.mutable_to_cstr(),
 			        req.memory_buffer.reserved);
