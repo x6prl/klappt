@@ -739,9 +739,9 @@ inline void mobile_text_input_sync(AppContext *ctx) {
 #ifdef __EMSCRIPTEN__
 	if (mobile_text_input_web_should_use()) {
 		mobile_text_input_web_update_rect(rect);
-		char web_value[MobileTextInputBuffer::max_size]{};
+		char web_value[MobileTextInputBuffer::MAX_SIZE]{};
 		mobile_text_input_web_copy_value(web_value,
-		                                 MobileTextInputBuffer::max_size);
+		                                 MobileTextInputBuffer::MAX_SIZE);
 		if (std::strcmp(runtime.focused_value->data, web_value) != 0) {
 			runtime.focused_value->clear();
 			Size offset = 0;
