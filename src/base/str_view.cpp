@@ -61,8 +61,7 @@ uint32_t decode_utf8_at(const char *data, Size size, Size i, Size &char_len) {
 	if (char_len == 1) {
 		return b0;
 	} else if (char_len == 2) {
-		return ((b0 & 0x1F) << 6) |
-		       (static_cast<uint8_t>(data[i + 1]) & 0x3F);
+		return ((b0 & 0x1F) << 6) | (static_cast<uint8_t>(data[i + 1]) & 0x3F);
 	} else if (char_len == 3) {
 		return ((b0 & 0x0F) << 12) |
 		       ((static_cast<uint8_t>(data[i + 1]) & 0x3F) << 6) |
@@ -378,6 +377,25 @@ bool StrView::is_contains_punctuation_unicode() const {
 			return true;
 		}
 		i += char_len;
+	}
+	return false;
+}
+
+bool StrView::is_starts_with(char ch) const {
+	return size > 0 && first() == ch;
+}
+
+bool StrView::is_starts_with(StrView pref) const {
+	if (!pref) {
+		return size == 0;
+	}
+	if (size >= pref.size) {
+		for (Size i{0}; i < pref.size; ++i) {
+			if (pref[i] != data[i]) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }

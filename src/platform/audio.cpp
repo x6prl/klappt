@@ -126,7 +126,7 @@ template <bool RUN_ASR_ON_FINISH> void push_rec_stop_job(AppContext *ctx) {
 
 				  Atomic::set(&actx->rec_audio_buffer.size_bytes,
 			                  bytes_recorded);
-				  SDL_Log("run_asr buffer usage: %d of %d", bytes_recorded,
+				  SDL_Log("run_asr buffer usage: %" PRSize " of %" PRSize, bytes_recorded,
 			              actx->rec_audio_buffer.capacity_bytes);
 			  }
 			  constexpr auto _50ms = AudioContext::FREQUENCY * 4 / 20;

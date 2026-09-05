@@ -15,12 +15,12 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include "app/app_context.h"
-#include "app/assets_dl.h"
 #include "app/event_codes.h"
 #include "app/net_context.h"
 #include "app/words_init.h"
 #include "app/worker.h"
 #include "base/dyn_arr.h"
+#include "base/stats.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
@@ -421,9 +421,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 	m.lap().printus("ui settings init");
 
-	bool is_gen_dbs = argc > 1 && 0 == strncmp(argv[1], "xapian", 7);
-
-	if (!is_gen_dbs && ctx->settings.onboarding_stage < 0) {
+	if (ctx->settings.onboarding_stage < 0) {
 		if (!init_runtime_data(*ctx)) {
 			return SDL_APP_FAILURE;
 		}
@@ -475,48 +473,48 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		// net_worker_job_push(ctx, {.type = NetJob::Type::INIT});
 	}
 
-	if (is_gen_dbs) {
-		auto timestamp = SDL_GetTicks();
-		ctx->ticks = timestamp;
-		Worker::job_push(
-			  ctx, {.func = []() {
-				  {
-					  auto rs_path = "/home/x/src/klappt-resources/"_v;
-					  SDL_Log("===> ru");
-					  WordStore ws{};
-					  auto word_store_path =
-							StrView::concat(tctx()->a, rs_path,
-				                            AssetsDL::word_store_leaf(lang_ru));
-					  ws.open(word_store_path, "ru"_v);
-					  txt_to_xapian(ws, "/home/x/downloads/wiki/e0/ru.txt"_v,
-				                    tctx()->app_ctx->ticks);
-					  SDL_Log(" <===> ru FINISHED <===>");
-				  }
-			  }});
-
-		auto rs_path = "/home/x/src/klappt-resources/"_v;
-		{
-			SDL_Log("===> en");
-			WordStore ws{};
-			auto word_store_path =
-				  StrView::concat(ctx->arena_frame, rs_path,
-			                      AssetsDL::word_store_leaf(lang_en));
-			ws.open(word_store_path, "en"_v);
-			txt_to_xapian(ws, "/home/x/downloads/wiki/e0/en.txt"_v, timestamp);
-		}
-		// TODO:
-		if (false) {
-			WordStore ws{};
-			SDL_Log("tr");
-			auto word_store_path =
-				  StrView::concat(ctx->arena_frame, rs_path,
-			                      AssetsDL::word_store_leaf(lang_tr));
-			ws.open(word_store_path, "tr"_v);
-			txt_to_xapian(ws, "/home/x/downloads/wiki/e0/tr.txt"_v, timestamp);
-		}
-		SDL_Log("finished");
-		exit(0);
-	}
+	// if (is_gen_dbs) {
+	// 	auto timestamp = SDL_GetTicks();
+	// 	ctx->ticks = timestamp;
+	// 	Worker::job_push(
+	// 		  ctx, {.func = []() {
+	// 			  {
+	// 				  auto rs_path = "/home/x/src/klappt-resources/"_v;
+	// 				  SDL_Log("===> ru");
+	// 				  WordStore ws{};
+	// 				  auto word_store_path =
+	// 						StrView::concat(tctx()->a, rs_path,
+	// 			                            AssetsDL::word_store_leaf(lang_ru));
+	// 				  ws.open(word_store_path, "ru"_v);
+	// 				  txt_to_xapian(ws, "/home/x/downloads/wiki/e0/ru.txt"_v,
+	// 			                    tctx()->app_ctx->ticks);
+	// 				  SDL_Log(" <===> ru FINISHED <===>");
+	// 			  }
+	// 		  }});
+	//
+	// 	auto rs_path = "/home/x/src/klappt-resources/"_v;
+	// 	{
+	// 		SDL_Log("===> en");
+	// 		WordStore ws{};
+	// 		auto word_store_path =
+	// 			  StrView::concat(ctx->arena_frame, rs_path,
+	// 		                      AssetsDL::word_store_leaf(lang_en));
+	// 		ws.open(word_store_path, "en"_v);
+	// 		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/en.txt"_v, timestamp);
+	// 	}
+	// 	// TODO:
+	// 	if (false) {
+	// 		WordStore ws{};
+	// 		SDL_Log("tr");
+	// 		auto word_store_path =
+	// 			  StrView::concat(ctx->arena_frame, rs_path,
+	// 		                      AssetsDL::word_store_leaf(lang_tr));
+	// 		ws.open(word_store_path, "tr"_v);
+	// 		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/tr.txt"_v, timestamp);
+	// 	}
+	// 	SDL_Log("finished");
+	// 	exit(0);
+	// }
 
 	SDL_Log("Application started successfully!");
 	m.lap().printus("total");

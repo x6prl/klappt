@@ -719,21 +719,21 @@ void run_tts(AppContext *ctx, StrView tts_text) {
 					 num_samples * static_cast<Size>(sizeof(float));
 			   auto on_playback_finished = [](AudioContext *actx,
 		                                      AudioJob::Payload *payload) {
-				   SDL_Log("Playback filished, slot %d",
+				   SDL_Log("Playback filished, slot %" PRSize,
 			               payload->playback_payload_ptr->pp_index);
 				   (void)actx;
 				   NeuroJob::Payload nn_payload = {
-						 .int32 = payload->playback_payload_ptr->pp_index};
+						 .int64 = payload->playback_payload_ptr->pp_index};
 				   Worker::neuro_job_push(
 						 tctx()->app_ctx,
 						 {.func =
 			                    [](NeuroContext *nnctx,
 			                       NeuroJob::Payload *payload) {
-									SDL_Log("FREEING POOL SLOT %d",
-				                            payload->int32);
+									SDL_Log("FREEING POOL SLOT %" PRId64,
+				                            payload->int64);
 
 									nnctx->release_payload_and_free_generated_audio_if_needed(
-										  payload->int32);
+										  payload->int64);
 								},
 			              .payload = nn_payload});
 			   };

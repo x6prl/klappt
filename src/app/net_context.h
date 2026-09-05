@@ -60,7 +60,7 @@ struct NetContext {
 				return idx;
 			}
 		}
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "net requests_pool is full! size: %d", requests_pool.size);
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "net requests_pool is full! size: %" PRSize, requests_pool.size);
 		return -1;
 	}
 

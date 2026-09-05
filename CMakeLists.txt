@@ -407,7 +407,7 @@ set(APP_DOMAIN_FILES
     src/domain/grammar.cpp
     src/domain/engine.cpp
     src/domain/exercises.cpp
-    src/domain/wparser.cpp
+    # src/domain/wparser.cpp
     src/domain/word_store.cpp
     src/domain/tokenizer.cpp
 )
@@ -946,3 +946,23 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(CPACK_GENERATOR "DragNDrop")
     include(CPack)
 endif()
+
+add_executable(xdbuilder
+    xdbuilder/xdbuilder.cpp
+    src/base/hash.cpp
+    src/base/str_view.cpp
+    src/base/shuffle.cpp
+    src/domain/word.cpp
+    src/domain/word_store.cpp
+    src/domain/grammar.cpp
+    src/ui/clay_impl.cpp
+)
+
+target_include_directories(xdbuilder PRIVATE src)
+target_include_directories(xdbuilder PRIVATE "src/vendor")
+target_include_directories(xdbuilder PRIVATE xxHash)
+target_link_libraries(xdbuilder PRIVATE
+    xapian
+    sqlite3
+    SDL3::SDL3
+)

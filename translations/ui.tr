@@ -1,15 +1,15 @@
 @create
 en: create
-ar: إنشاء
 ru: создать
 tr: oluştur
+ar: إنشاء
 @delete
 en: delete
-ar: حذف
 ru: удалить
 tr: sil
+ar: حذف
 @edit
 en: edit
-ar: تعديل
 ru: редактировать
 tr: düzenle
+ar: تعديل

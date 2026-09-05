@@ -48,7 +48,7 @@ struct Word {
     int8_t in_learning_list{0};
     int8_t was_learned{0};
     uint8_t popularity{0};
-    uint8_t reserved{0};
+    uint8_t lang_id{0}; // -1 for `de`, others — like in Lang
 
     union {
         Verb v;

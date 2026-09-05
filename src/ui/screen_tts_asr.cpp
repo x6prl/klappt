@@ -116,7 +116,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 						if (push_text_to_tts_field_btn.activated()) {
 							memcpy(ctx->tts_input.data, ctx->asr_result.data,
 							       SDL_min(ctx->asr_result.size,
-							               ctx->tts_input.max_size));
+							               ctx->tts_input.MAX_SIZE));
 							ctx->tts_input.size = ctx->asr_result.size;
 							ctx->tts_input.data[ctx->asr_result.size] = '\0';
 						}

@@ -347,7 +347,7 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 		if (pool_index >= 0) {
 			download_update_tracking(ctx, dl, pool_index);
 		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "retry: unxepected index %d",
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "retry: unxepected index %" PRSize,
 			             pool_index);
 		}
 	}

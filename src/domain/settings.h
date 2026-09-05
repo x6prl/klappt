@@ -15,10 +15,11 @@ struct Settings {
 	Lang tr_language = lang_ru;
 	int32_t onboarding_stage{0};
 	AssetsDL assets;
-	bool is_using_also_de{true};
+	bool is_using_also_de{false};
 	bool is_using_tts{true};
 	bool is_using_asr{false};
 	bool is_using_suggestions{true};
+	bool is_using_also_subdict_en{true};
 	int32_t default_screen{0};
 
 	static void for_every_lang(auto f) {

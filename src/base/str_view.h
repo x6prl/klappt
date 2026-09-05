@@ -97,6 +97,8 @@ struct StrView {
 	bool is_contains_substr(StrView substr) const;
 	bool is_contains_punctuation() const;
 	bool is_contains_punctuation_unicode() const;
+	bool is_starts_with(char ch) const;
+	bool is_starts_with(StrView pref) const;
 	const char *find(char ch) const;
 
 	Clay_String to_clay_string() const;

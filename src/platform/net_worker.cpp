@@ -923,7 +923,8 @@ template <AType... Types> struct AssetsCallbacksTables {
 // };
 using AssetsCbs =
 	  AssetsCallbacksTables<AType::XAPIAN_TR, AType::OPTIONAL_XAPIAN_DE,
-                            AType::OPTIONAL_TTS, AType::OPTIONAL_ASR>;
+                            AType::OPTIONAL_XAPIAN_EN, AType::OPTIONAL_TTS,
+                            AType::OPTIONAL_ASR>;
 
 } // namespace
 

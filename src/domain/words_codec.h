@@ -150,8 +150,14 @@ inline bool encode_entry_payload(unsigned char *&cursor,
 	*cursor++ = flags;
 
 	// WordID
-	if (!write_varint(cursor, end, word.word_id.value))
+	if (!write_varint(cursor, end, word.word_id.value)) {
 		return false;
+	}
+
+	// lang_id
+	if (cursor >= end)
+		return false;
+	*cursor++ = word.lang_id;
 
 	// timestamp if != 0
 	if (word.timestamp != 0) {
@@ -163,7 +169,7 @@ inline bool encode_entry_payload(unsigned char *&cursor,
 	if (word.popularity != 0) {
 		if (cursor >= end)
 			return false;
-		*cursor++ = word.popularity; // <-- Запись 1 байта
+		*cursor++ = word.popularity;
 	}
 
 	// then strings
@@ -190,6 +196,11 @@ inline bool decode_entry_payload(const unsigned char *&cursor,
 	if (!read_varint(cursor, end, raw_word_id))
 		return false;
 
+	uint8_t lang_id = 0;
+	if (cursor >= end)
+		return false;
+	lang_id = *cursor++;
+
 	uint64_t timestamp = 0;
 	if (flags & (1 << 6)) {
 		if (!read_varint(cursor, end, timestamp))
@@ -210,6 +221,7 @@ inline bool decode_entry_payload(const unsigned char *&cursor,
 	word.in_learning_list = (flags & (1 << 5)) ? 1 : 0;
 	word.timestamp = timestamp;
 	word.popularity = popularity;
+	word.lang_id = lang_id;
 
 	switch (word.type) {
 	case WordType::Noun:
@@ -272,7 +284,8 @@ inline bool word_decode(Arena &a, const void *data, Size size, Word &word) {
 	const unsigned char *cursor = blob;
 	const unsigned char *end = blob + size;
 
-	if (!codec_detail::decode_entry_payload(cursor, end, word) || cursor != end) {
+	if (!codec_detail::decode_entry_payload(cursor, end, word) ||
+	    cursor != end) {
 		a.offset = offset_before;
 		return false;
 	}
@@ -309,7 +322,7 @@ inline StrView words_encode(Arena &a, const Words &words) {
 	if (!codec_detail::write_varint(cursor, end, static_cast<uint64_t>(count)))
 		return {};
 	if (!codec_detail::write_varint(cursor, end,
-	                          static_cast<uint64_t>(words.next_free)))
+	                                static_cast<uint64_t>(words.next_free)))
 		return {};
 
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
@@ -318,7 +331,7 @@ inline StrView words_encode(Arena &a, const Words &words) {
 			continue;
 
 		if (!codec_detail::write_varint(cursor, end,
-		                          static_cast<uint64_t>(ref.value)))
+		                                static_cast<uint64_t>(ref.value)))
 			return {};
 		if (!codec_detail::encode_entry_payload(cursor, end, w))
 			return {};

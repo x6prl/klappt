@@ -36,11 +36,13 @@ struct Arena {
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
 		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-		SDL_Log("Created arena of size %ld KiB", arena_size / 1024);
+		SDL_Log("Created arena of size %" PRSize " KiB", arena_size / 1024);
 	}
 	~Arena() {
 		munmap(data, allocated_size);
-		SDL_Log("Destroyed arena of size %ld KiB", allocated_size / 1024);
+		SDL_Log("Destroyed arena of size %" PRSize " KiB, used: %" PRSize
+		        " KiB",
+		        allocated_size / 1024, size_objects / 1024);
 	}
 	Arena(Arena const &) = delete;
 	void operator=(Arena const &) = delete;
@@ -58,7 +60,7 @@ struct Arena {
 		if (offset > allocated_size) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Arena: cannot allocate memory"
-			             " (request=%lld aligned_used=%lld capacity=%lld)\n",
+			             " (request=%" PRSize " aligned_used=%" PRSize " capacity=%" PRSize ")\n",
 			             size, offset, allocated_size);
 			exit(-5);
 		}

@@ -22,7 +22,7 @@ struct NeuroContext {
 		for (Size i = 0; i < playback_payload_pool.size; ++i) {
 			if (!playback_payload_pool[i].is_used) {
 				playback_payload_pool[i].is_used = true;
-				SDL_Log("pool idx %d", i);
+				SDL_Log("pool idx %" PRSize, i);
 				return i;
 			}
 		}

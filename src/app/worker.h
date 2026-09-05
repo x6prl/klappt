@@ -79,7 +79,7 @@ struct NeuroJob {
 		union {
 			StrView tts_text{};
 			void *data_ptr;
-			int32_t int32;
+			int64_t int64;
 		};
 	};
 	using JobFunction = void (*)(NeuroContext *, Payload *);

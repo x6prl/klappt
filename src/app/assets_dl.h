@@ -22,6 +22,7 @@ struct AssetsDL {
 	enum class Type : int32_t {
 		XAPIAN_TR = 0,
 		OPTIONAL_XAPIAN_DE = 1,
+		OPTIONAL_XAPIAN_EN,
 		OPTIONAL_TTS,
 		OPTIONAL_ASR,
 		_COUNT
@@ -54,6 +55,9 @@ struct AssetsDL {
 		case Type::OPTIONAL_XAPIAN_DE:
 			return get_writable_file_path_for(a, word_store_leaf_de(),
 			                                  ".zip"_v);
+		case Type::OPTIONAL_XAPIAN_EN:
+			return get_writable_file_path_for(a, word_store_leaf(lang_en),
+			                                  ".zip"_v);
 			break;
 		case Type::OPTIONAL_ASR:
 			return get_writable_file_path_for(a, ASR_WHISPER_BASE_ZIP);
@@ -74,6 +78,9 @@ struct AssetsDL {
 		case Type::OPTIONAL_XAPIAN_DE:
 			return get_url_for(a, word_store_leaf_de(), ".zip"_v);
 			break;
+		case Type::OPTIONAL_XAPIAN_EN:
+			return get_url_for(a, word_store_leaf(lang_en), ".zip"_v);
+			break;
 		case Type::OPTIONAL_TTS:
 			return get_url_for(a, TTS_ESPEAKNG_DATA_AND_PIPER_ZIP, {});
 			break;
@@ -90,6 +97,8 @@ struct AssetsDL {
 		switch (type) {
 		case Type::XAPIAN_TR:
 			return xapian_trs[std::to_underlying(tr_language)];
+		case Type::OPTIONAL_XAPIAN_EN:
+			return xapian_trs[std::to_underlying(lang_en)];
 		case Type::OPTIONAL_XAPIAN_DE:
 		case Type::OPTIONAL_TTS:
 		case Type::OPTIONAL_ASR:

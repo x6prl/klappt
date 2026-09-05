@@ -4,10 +4,10 @@
 #include <xapian.h>
 
 #include "base/arena.h"
-#include "base/fixed_str.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "domain/word.h"
+#include "ui/translations/langs.h"
 #include "words_codec.h"
 
 inline bool word_matches_query(Arena &a, const Word &word, StrView query);
@@ -17,11 +17,14 @@ inline bool match_translation_query_cs(StrView translations_raw, StrView query);
 
 struct WordStore {
 	Xapian::WritableDatabase *db{nullptr};
-	FixedStr<8> lang{};
+	Xapian::Database *sub0{nullptr};
+	Xapian::Database *sub1{nullptr};
 
 	~WordStore();
 
-	bool open(StrView path, StrView lang);
+	bool open(StrView path);
+	bool open_sub0(StrView path);
+	bool open_sub1(StrView path);
 	void close();
 	bool is_open() const { return db != nullptr; }
 
@@ -30,15 +33,24 @@ struct WordStore {
 
 	/*
 	 * Ensure the word exists in Xapian. If it already exists, word_id is filled
-	 * from the stored copy. If it is new, a fresh immutable word_id is
-	 * assigned, NOTE: not LOCAL ID, but server one.
+	 * from the stored copy.
 	 */
-	bool ensure_word(Arena &scratch, Word &word,
-	                 uint64_t creation_timestamp = 0,
-	                 bool *was_new = nullptr); // TODO: move creation_timestamp
-	                                           // out, add another arena param
+	bool find_and_fill_word_id(Arena &scratch, Word &word);
 
 	bool get_by_id(Arena &scratch, WordId word_id, Word &word) const;
+	bool get_by_id_for_lang(Arena &scratch, WordId word_id, Word &word,
+	                        int8_t lang_id, uint8_t app_lang_id) const;
+
+	bool get_by_id_for_lang(Arena &scratch, WordId word_id, Word &word,
+	                        Lang lang, Lang app_lang) const {
+		return get_by_id_for_lang(scratch, word_id, word,
+		                          static_cast<int8_t>(lang),
+		                          static_cast<int8_t>(app_lang));
+	}
+
+	// NOTE: used for db gen
+	void save_direct(Arena &scratch, const Word &word,
+	                 bool is_mark_dirty_or_new = false);
 
 	// NOTE: not used yet: is_mark_dirty_or_new if non-user layer changed or it
 	// is a new word
