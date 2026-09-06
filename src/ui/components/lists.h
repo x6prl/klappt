@@ -182,7 +182,7 @@ void vertical_fixed(AppContext *ctx, Clay_ElementId list_id, Size item_count,
 	      .clip = {.vertical = true, .childOffset = Clay_GetScrollOffset()}}) {
 		auto scd = Clay_GetScrollContainerData(list_id);
 		if (!scd.found) {
-			return;
+			break;
 		}
 
 		// log_clay_scroll_container_data(">", scd);
@@ -252,7 +252,7 @@ void vertical_fixed_rich(AppContext *ctx, Clay_ElementId list_id, uint16_t gap,
 	      .clip = {.vertical = true, .childOffset = Clay_GetScrollOffset()}}) {
 		auto scd = Clay_GetScrollContainerData(list_id);
 		if (!scd.found) {
-			return;
+			break;
 		}
 
 		// log_clay_scroll_container_data(">", scd);
