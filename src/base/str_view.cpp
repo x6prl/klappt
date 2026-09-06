@@ -303,7 +303,7 @@ StrView StrView::utf8_to_lowercase(Arena &a) const {
 	return ret;
 }
 
-StrView StrView::utf8_strip_punctuation(Arena &a) const {
+StrView StrView::utf8_remove_punctuation(Arena &a) const {
 	if (!size) {
 		return {};
 	}
@@ -418,24 +418,28 @@ StrView StrView::concat_with(Arena &arena, const StrView left,
 	return {new_mem, new_size};
 }
 
-StrView &StrView::mut_triml() {
+StrView &StrView::mut_triml() { return mut_triml_by(&std::isspace); }
+StrView &StrView::mut_trimr() { return mut_trimr_by(&std::isspace); }
+StrView &StrView::mut_trim() { return mut_trim_by(&std::isspace); }
+
+StrView &StrView::mut_triml_by(int (*handler)(int ch)) {
 	Size i{0};
-	for (; i < size && std::isspace(static_cast<unsigned char>(data[i])); ++i) {
+	for (; i < size && handler(static_cast<unsigned char>(data[i])); ++i) {
 	}
 	size -= i;
 	data += i;
 
 	return *this;
 }
-
-StrView &StrView::mut_trimr() {
-	for (; size > 0 && std::isspace(static_cast<unsigned char>(data[size - 1]));
+StrView &StrView::mut_trimr_by(int (*handler)(int ch)) {
+	for (; size > 0 && handler(static_cast<unsigned char>(data[size - 1]));
 	     --size) {
 	}
 	return *this;
 }
-
-StrView &StrView::mut_trim() { return mut_triml().mut_trimr(); }
+StrView &StrView::mut_trim_by(int (*handler)(int ch)) {
+	return mut_triml_by(handler).mut_trimr_by(handler);
+}
 
 StrView &StrView::mut_chopl() {
 	data += 1;

@@ -42,7 +42,7 @@ struct StrView {
 	[[nodiscard]]
 	StrView utf8_to_lowercase(Arena &a) const;
 	[[nodiscard]]
-	StrView utf8_strip_punctuation(Arena &a) const;
+	StrView utf8_remove_punctuation(Arena &a) const;
 
 	[[nodiscard]]
 	StrView copy(Arena &a) const;
@@ -59,6 +59,10 @@ struct StrView {
 	StrView &mut_triml();
 	StrView &mut_trimr();
 	StrView &mut_trim();
+
+	StrView &mut_triml_by(int (*handler)(int ch));
+	StrView &mut_trimr_by(int (*handler)(int ch));
+	StrView &mut_trim_by(int (*handler)(int ch));
 
 	StrView &mut_chopl();
 	StrView &mut_chopr();
