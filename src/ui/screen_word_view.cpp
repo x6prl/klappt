@@ -4,8 +4,7 @@
 #include <simdjson/simdjson.h>
 
 #include "app/app_context.h"
-#include "app/words_init.h"
-#include "base/dyn_arr.h"
+
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
@@ -258,21 +257,6 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 	} break;
 	case WordType::Verb: {
 		word_class_name = verb_word_class_to_badge(word_payload.word_class);
-
-		auto wstr = word_to_str(ctx->arena_frame, ctx->arena_frame, w);
-		SDL_Log(StrView_Fmt, StrView_Arg(wstr));
-
-		Verb v{.infinitive = "drucken"_v,
-		       .third_person = ""_v,
-		       .praeteritum = ""_v,
-		       .auxv_and_past_participle = "hat"_v,
-		       .separable_prefix_size = 0};
-		SDL_Log(" >> " StrView_Fmt " %" PRSize, StrView_Arg(w.v.third_person), w.v.third_person.size);
-		SDL_Log(" >> sep pr size %d", w.v.separable_prefix_size);
-		// forms.push(ctx->arena_frame, {"stem:"_v, grammar::verb_stem(v)});
-		// forms.push(ctx->arena_frame,
-		//            {"infw:"_v,
-		//             grammar::verb_infinitive_without_separable_prefix(v)});
 		forms.push(ctx->arena_frame,
 		           {"er/sie/es:"_v,
 		            grammar::verb_third_person_full(ctx->arena_frame, w.v)});
