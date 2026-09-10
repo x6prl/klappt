@@ -39,7 +39,7 @@ StrView from_number_impl(Arena &a, auto val) {
 	static_assert(std::is_arithmetic_v<decltype(val)>,
 	              "from_number is only for arithmetic types");
 	constexpr Size BUF_SIZE = 32;
-	auto strbuf = a.pushN<char>(BUF_SIZE);
+	auto strbuf = a.pushN<char>(BUF_SIZE); // TODO: then rewind?..
 	std::to_chars_result res;
 	if constexpr (std::is_integral_v<decltype(val)>) {
 		res = std::to_chars(strbuf, strbuf + BUF_SIZE, val);
@@ -158,9 +158,15 @@ bool StrView::operator!=(const StrView &other) const {
 	return !(*this == other);
 }
 
-char StrView::first() const { return data[0]; }
+char StrView::first() const {
+	assert(size);
+	return data[0];
+}
 
-char StrView::last() const { return data[size - 1]; }
+char StrView::last() const {
+	assert(size);
+	return data[size - 1];
+}
 
 Size StrView::utf8_length() const {
 	Size length{0};
@@ -384,20 +390,26 @@ bool StrView::is_contains_punctuation_unicode() const {
 bool StrView::is_starts_with(char ch) const {
 	return size > 0 && first() == ch;
 }
-
 bool StrView::is_starts_with(StrView pref) const {
-	if (!pref) {
-		return size == 0;
-	}
-	if (size >= pref.size) {
-		for (Size i{0}; i < pref.size; ++i) {
-			if (pref[i] != data[i]) {
-				return false;
-			}
-		}
+	if (!pref) [[unlikely]] {
 		return true;
 	}
-	return false;
+	if (size < pref.size) [[unlikely]] {
+		return false;
+	}
+	return 0 == memcmp(data, pref.data, pref.size);
+}
+
+bool StrView::is_ends_with(char ch) const { return size > 0 && last() == ch; }
+bool StrView::is_ends_with(StrView suff) const {
+	if (!suff) [[unlikely]] {
+		return true;
+	}
+	if (size < suff.size) [[unlikely]] {
+		return false;
+	}
+	auto offset = (size - suff.size);
+	return 0 == memcmp(data + offset, suff.data, suff.size);
 }
 
 StrView StrView::concat(Arena &arena, const StrView left, const StrView right) {
@@ -443,6 +455,7 @@ StrView &StrView::mut_trim_by(int (*handler)(int ch)) {
 
 StrView &StrView::mut_chopl() {
 	data += 1;
+	size -= 1;
 	return *this;
 }
 StrView &StrView::mut_chopr() {
@@ -531,6 +544,9 @@ DynArr<StrView> StrView::split_all_by(Arena &a, char delimiter) const {
 	return ret;
 }
 
+/*
+ * [from, to)
+ */
 StrView StrView::slice(Size from, Size to) const {
 	auto start = from < 0 ? 0 : from;
 	auto end = (to < 0 || to > size) ? size : to;
@@ -555,7 +571,7 @@ const char *StrView::find(char ch) const {
 			return data + i;
 		}
 	}
-	return end();
+	return nullptr;
 }
 
 Clay_String StrView::to_clay_string() const {
@@ -574,9 +590,8 @@ const char *StrView::begin() const { return data; }
 const char *StrView::end() const { return data + size; }
 
 StrView StrView::from_chars(Arena &a, const char *data, int size) {
-	auto allocated = static_cast<char *>(a.push(size + 1));
+	auto allocated = static_cast<char *>(a.push(size));
 	memcpy(allocated, data, size);
-	allocated[size] = '\0';
 	return {allocated, size};
 }
 

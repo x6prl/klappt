@@ -12,6 +12,10 @@
 #define StrView_Fmt "%.*s"
 #define StrView_Arg(str_view) (int)((str_view).size), ((str_view).data)
 
+/*
+ * not a string view, actually!
+ * can mutate data, be carefull with string literals
+ */
 struct StrView {
 	const char *data{nullptr};
 	Size size{0};
@@ -94,6 +98,7 @@ struct StrView {
 	[[nodiscard]]
 	DynArr<StrView> split_all_by(Arena &a, char delimiter) const;
 
+	// [from, to)
 	[[nodiscard]]
 	StrView slice(Size from = 0, Size to = -1) const;
 
@@ -103,6 +108,9 @@ struct StrView {
 	bool is_contains_punctuation_unicode() const;
 	bool is_starts_with(char ch) const;
 	bool is_starts_with(StrView pref) const;
+	bool is_ends_with(char ch) const;
+	bool is_ends_with(StrView suff) const;
+	// returns nullptr if notfound
 	const char *find(char ch) const;
 
 	Clay_String to_clay_string() const;
