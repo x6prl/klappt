@@ -99,21 +99,16 @@ bool parse_line(Arena &a, StrView line, Word &word) {
 
 	case WordType::Verb: {
 		line = line.slice(2);
-		auto present_tense = line.mut_split_by('/');
+		auto present_tense = line.mut_split_by('/').trimr();
 		auto [inf, exception] = present_tense.split_by('-');
 
-		constexpr char STRESS_CHAR = '\'';
-		if (inf && STRESS_CHAR == inf.mut_trimr().first()) {
-			inf.mut_chopl();
-			word.v.is_separable_prefix = true;
-			word.v.infinitive = inf.copy(a);
+		constexpr char SEPARABLE_PREFIX_SEPARATOR = '|';
+		if (inf.is_contains(SEPARABLE_PREFIX_SEPARATOR)) {
+			auto [h, t] = inf.split_by(SEPARABLE_PREFIX_SEPARATOR);
+			word.v.infinitive = StrView::concat(a, h, t);
+			word.v.separable_prefix_size = h.size;
 		} else {
-			if (inf.is_contains(STRESS_CHAR)) {
-				auto [h, t] = inf.split_by(STRESS_CHAR);
-				word.v.infinitive = StrView::concat(a, h, t);
-			} else {
-				word.v.infinitive = inf.copy(a);
-			}
+			word.v.infinitive = inf.copy(a);
 		}
 
 		word.v.third_person = exception.triml().copy(a);

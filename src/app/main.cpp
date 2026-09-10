@@ -20,9 +20,9 @@
 #include "app/words_init.h"
 #include "app/worker.h"
 #include "base/dyn_arr.h"
-#include "base/stats.h"
 #include "base/measure.h"
 #include "base/profiler.h"
+#include "base/stats.h"
 #include "base/str_view.h"
 #include "domain/settings.h"
 #include "platform/files.h"
@@ -96,7 +96,7 @@ static const char *EventTypeName(Uint32 type) {
 #if defined(TRACY_ENABLE)
 static const char *FrameName(Screen screen) {
 	switch (screen) {
-	case Screen::Start:
+	case Screen::Trainer:
 		return "Frame/Start";
 	case Screen::Exercice:
 		return "Frame/Exercise";
@@ -104,7 +104,7 @@ static const char *FrameName(Screen screen) {
 		return "Frame/ExerciseSummary";
 	case Screen::ExerciseReview:
 		return "Frame/ExerciseReview";
-	case Screen::WordsList:
+	case Screen::Dictionary:
 		return "Frame/WordsList";
 	case Screen::LearningList:
 		return "Frame/LearningList";
@@ -161,6 +161,52 @@ static void WaitForProfilerConnection() {
 }
 #endif
 
+SDL_Renderer *create_renderer(SDL_Window *window) {
+
+	const int num_drivers = SDL_GetNumRenderDrivers();
+	SDL_Log("Found %d renderers", num_drivers);
+	for (int i = 0; i < num_drivers; ++i) {
+		const char *driver = SDL_GetRenderDriver(i);
+		SDL_Log("\t%d: [%s]", i, driver);
+	}
+
+	constexpr const char *preferred_drivers[] = {
+#ifdef __ANDROID__ // vulkan gives a crash on re-opening
+		  "opengles2", "gpu",
+#endif
+		  "vulkan",    "gpu", "opengles2", "opengl",
+	};
+
+	constexpr int num_preferred =
+		  sizeof(preferred_drivers) / sizeof(preferred_drivers[0]);
+
+	for (int i = 0; i < num_preferred; ++i) {
+		const char *driver = preferred_drivers[i];
+
+		SDL_Log("Trying renderer: [%s]", driver);
+
+		SDL_Renderer *renderer = SDL_CreateRenderer(window, driver);
+		if (renderer) {
+			SDL_Log("Successfully created renderer: [%s]",
+			        SDL_GetRendererName(renderer));
+			return renderer;
+		}
+
+		SDL_Log("Failed to create renderer [%s]: %s", driver, SDL_GetError());
+	}
+
+	SDL_Log("All preferred renderers failed; trying SDL default");
+
+	SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
+
+	if (renderer) {
+		SDL_Log("Created default renderer: [%s]",
+		        SDL_GetRendererName(renderer));
+	}
+
+	return renderer;
+}
+
 static SDL_AppResult SDL_Fail() {
 	SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "Error %s", SDL_GetError());
 	return SDL_APP_FAILURE;
@@ -188,6 +234,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	// init the library, here we make a window so we only need the Video
 	// capabilities.
 	{
+		SDL_SetHint(SDL_HINT_ORIENTATIONS, "Portrait");
 		KLAPPT_PROFILE_SCOPE_N("SDL_Init");
 		if (not SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
 			return SDL_Fail();
@@ -213,7 +260,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	// init Mixer
 	// if (not MIX_Init()) {
-	// 	return SDL_Fail();
+	//	return SDL_Fail();
 	// }
 
 	// create a window
@@ -243,10 +290,17 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 #endif // __EMSCRIPTEN__
 
 	// create a renderer
-	SDL_Renderer *renderer{};
+	SDL_Renderer *renderer = nullptr;
 	{
 		KLAPPT_PROFILE_SCOPE_N("CreateRenderer");
-		renderer = SDL_CreateRenderer(window, NULL);
+		renderer = create_renderer(window);
+
+		if (!renderer) {
+			SDL_LogCritical(SDL_LOG_CATEGORY_RENDER,
+			                "Failed to create any SDL_Renderer: %s",
+			                SDL_GetError());
+			exit(-1);
+		}
 	}
 	if (not renderer) {
 		return SDL_Fail();
@@ -258,7 +312,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	auto base_path =
 		  std::filesystem::path({base_pathv.data, (size_t)base_pathv.size});
 
-	const auto ui_font_path = base_path / "Inter-VariableFont.ttf";
+	const auto ui_font_path = base_path / "Inter-Regular.ttf";
 	const auto arabic_ui_font_path = base_path / "ReadexPro-Regular.ttf";
 	const auto icons_font_path =
 		  base_path / "Font-Awesome-7-Free-Solid-900.otf";
@@ -285,21 +339,32 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		return SDL_Fail();
 	}
 	m.lap().printus("load fonts");
-	TTF_TextEngine *text_engine{};
+	TTF_TextEngine *text_engine = nullptr;
 	{
 		KLAPPT_PROFILE_SCOPE_N("CreateTextEngine");
-		text_engine = TTF_CreateRendererTextEngine(renderer);
-	}
-	if (!text_engine) {
-		return SDL_Fail();
+
+		SDL_PropertiesID props = SDL_CreateProperties();
+		SDL_SetPointerProperty(
+			  props, TTF_PROP_RENDERER_TEXT_ENGINE_RENDERER_POINTER, renderer);
+		SDL_SetNumberProperty(
+			  props, TTF_PROP_RENDERER_TEXT_ENGINE_ATLAS_TEXTURE_SIZE_NUMBER,
+			  2048);
+		text_engine = TTF_CreateRendererTextEngineWithProperties(props);
+		SDL_DestroyProperties(props);
+		if (!text_engine) {
+			SDL_Log("TTF_CreateRendererTextEngine FALLBACK");
+			text_engine = TTF_CreateRendererTextEngine(renderer); // Fallback
+		} else {
+			SDL_Log("TTF_CreateRendererTextEngine SUPER");
+		}
 	}
 	m.lap().printus("create text engine");
 
 	// init SDL Mixer
 	// MIX_Mixer *mixer =
-	// 	  MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+	//	  MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
 	// if (mixer == nullptr) {
-	// 	return SDL_Fail();
+	//	return SDL_Fail();
 	// }
 
 	// auto mixerTrack = MIX_CreateTrack(mixer);
@@ -308,7 +373,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	// auto musicPath = basePath / "the_entertainer.ogg";
 	// auto music = MIX_LoadAudio(mixer, musicPath.string().c_str(), false);
 	// if (not music) {
-	// 	return SDL_Fail();
+	//	return SDL_Fail();
 	// }
 
 	// play the music (does not loop)
@@ -349,9 +414,12 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
 	};
-	// ctx->tts_input.data = ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
-	// ctx->dictionary_search.data = ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
-	// ctx->learning_search.data = ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
+	// ctx->tts_input.data =
+	// ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
+	// ctx->dictionary_search.data =
+	// ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
+	// ctx->learning_search.data =
+	// ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
 	ctx->downloads = DynArr<DownloadData>{
 		  .data = ctx->arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
 		  .size = 0,
@@ -359,7 +427,11 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	};
 	*appstate = ctx;
 	m.lap().printus("create app context");
-
+	// {
+	// KLAPPT_PROFILE_SCOPE_N("PrewarmTextCache");
+	// ctx->text->prewarm(ctx->scale, renderer);
+	// }
+	// m.lap().printus("prewarm fonts");
 // load app_hotreload
 #if HOTRELOAD
 #if __ANDROID__
@@ -474,46 +546,46 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 
 	// if (is_gen_dbs) {
-	// 	auto timestamp = SDL_GetTicks();
-	// 	ctx->ticks = timestamp;
-	// 	Worker::job_push(
-	// 		  ctx, {.func = []() {
-	// 			  {
-	// 				  auto rs_path = "/home/x/src/klappt-resources/"_v;
-	// 				  SDL_Log("===> ru");
-	// 				  WordStore ws{};
-	// 				  auto word_store_path =
-	// 						StrView::concat(tctx()->a, rs_path,
-	// 			                            AssetsDL::word_store_leaf(lang_ru));
-	// 				  ws.open(word_store_path, "ru"_v);
-	// 				  txt_to_xapian(ws, "/home/x/downloads/wiki/e0/ru.txt"_v,
-	// 			                    tctx()->app_ctx->ticks);
-	// 				  SDL_Log(" <===> ru FINISHED <===>");
-	// 			  }
-	// 		  }});
+	//	auto timestamp = SDL_GetTicks();
+	//	ctx->ticks = timestamp;
+	//	Worker::job_push(
+	//		  ctx, {.func = []() {
+	//			  {
+	//				  auto rs_path = "/home/x/src/klappt-resources/"_v;
+	//				  SDL_Log("===> ru");
+	//				  WordStore ws{};
+	//				  auto word_store_path =
+	//						StrView::concat(tctx()->a, rs_path,
+	//										AssetsDL::word_store_leaf(lang_ru));
+	//				  ws.open(word_store_path, "ru"_v);
+	//				  txt_to_xapian(ws, "/home/x/downloads/wiki/e0/ru.txt"_v,
+	//								tctx()->app_ctx->ticks);
+	//				  SDL_Log(" <===> ru FINISHED <===>");
+	//			  }
+	//		  }});
 	//
-	// 	auto rs_path = "/home/x/src/klappt-resources/"_v;
-	// 	{
-	// 		SDL_Log("===> en");
-	// 		WordStore ws{};
-	// 		auto word_store_path =
-	// 			  StrView::concat(ctx->arena_frame, rs_path,
-	// 		                      AssetsDL::word_store_leaf(lang_en));
-	// 		ws.open(word_store_path, "en"_v);
-	// 		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/en.txt"_v, timestamp);
-	// 	}
-	// 	// TODO:
-	// 	if (false) {
-	// 		WordStore ws{};
-	// 		SDL_Log("tr");
-	// 		auto word_store_path =
-	// 			  StrView::concat(ctx->arena_frame, rs_path,
-	// 		                      AssetsDL::word_store_leaf(lang_tr));
-	// 		ws.open(word_store_path, "tr"_v);
-	// 		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/tr.txt"_v, timestamp);
-	// 	}
-	// 	SDL_Log("finished");
-	// 	exit(0);
+	//	auto rs_path = "/home/x/src/klappt-resources/"_v;
+	//	{
+	//		SDL_Log("===> en");
+	//		WordStore ws{};
+	//		auto word_store_path =
+	//			  StrView::concat(ctx->arena_frame, rs_path,
+	//							  AssetsDL::word_store_leaf(lang_en));
+	//		ws.open(word_store_path, "en"_v);
+	//		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/en.txt"_v, timestamp);
+	//	}
+	//	// TODO:
+	//	if (false) {
+	//		WordStore ws{};
+	//		SDL_Log("tr");
+	//		auto word_store_path =
+	//			  StrView::concat(ctx->arena_frame, rs_path,
+	//							  AssetsDL::word_store_leaf(lang_tr));
+	//		ws.open(word_store_path, "tr"_v);
+	//		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/tr.txt"_v, timestamp);
+	//	}
+	//	SDL_Log("finished");
+	//	exit(0);
 	// }
 
 	SDL_Log("Application started successfully!");
@@ -565,10 +637,10 @@ extern "C" SDL_AppResult SDLCALL SDL_AppEvent(void *appstate,
 }
 
 // void update_ticks_array(uint64_t (*ts)[10], uint64_t t) {
-// 	for (int i{}; i < 9; ++i) {
-// 		(*ts)[i] = (*ts)[i + 1];
-// 	}
-// 	(*ts)[9] = t;
+//	for (int i{}; i < 9; ++i) {
+//		(*ts)[i] = (*ts)[i + 1];
+//	}
+//	(*ts)[9] = t;
 // }
 //
 // NOTE: When "waitevent" is set, this callback is only called _after_

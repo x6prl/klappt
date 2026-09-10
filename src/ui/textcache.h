@@ -1,46 +1,15 @@
 #pragma once
 
-#include <cstdint>
-
-#include "SDL3/SDL_pixels.h"
-#include "SDL3_ttf/SDL_ttf.h"
-
-#include "base/arena.h"
 #include "base/arr.h"
 #include "base/hash.h"
 #include "base/pair.h"
 #include "base/str_view.h"
-#include <clay/clay.h>
+#include <cstdint>
 
-constexpr uint32_t rgba_u32(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	return (uint32_t(r) << 24) | (uint32_t(g) << 16) | (uint32_t(b) << 8) |
-	       uint32_t(a);
-}
-constexpr uint32_t clay_color_to_u32(Clay_Color c) {
-	return (uint32_t(c.r) << 24) | (uint32_t(c.g) << 16) |
-	       (uint32_t(c.b) << 8) | uint32_t(c.a);
-}
-constexpr Clay_Color clay_color_normalize(Clay_Color c) {
-	return {
-		  (float)c.r / 255.0f,
-		  (float)c.g / 255.0f,
-		  (float)c.b / 255.0f,
-		  (float)c.a / 255.0f,
-	};
-}
-constexpr SDL_FColor clay_color_to_SDL_FColor_norm(Clay_Color c) {
-	return {
-		  (float)c.r / 255.0f,
-		  (float)c.g / 255.0f,
-		  (float)c.b / 255.0f,
-		  (float)c.a / 255.0f,
-	};
-}
-#define U32_R(x) ((uint8_t)(((uint32_t)(x) >> 24) & 0xFF))
-#define U32_G(x) ((uint8_t)(((uint32_t)(x) >> 16) & 0xFF))
-#define U32_B(x) ((uint8_t)(((uint32_t)(x) >> 8) & 0xFF))
-#define U32_A(x) ((uint8_t)((uint32_t)(x) & 0xFF))
-#define U32_RGBA(x) U32_R(x), U32_G(x), U32_B(x), U32_A(x),
+struct SDL_Renderer;
+struct TTF_Text;
+struct TTF_TextEngine;
+struct TTF_Font;
 
 namespace FontID {
 constexpr uint16_t MAIN{0u};
@@ -59,17 +28,23 @@ struct TextCache {
 	static TimestampSec tss_from_ticks(uint64_t t) {
 		return {static_cast<uint32_t>(t / 1000)};
 	}
-	constexpr static Idx MAP_SIZE = 1u << 11;
+
+	// -------------------------------------------------------------------------
+	// TTF Text Cache
+	// -------------------------------------------------------------------------
+	constexpr static Idx TEXT_CACHE_HASHMAP_SIZE = 1u << 11;
+	constexpr static Idx MAX_OCCUPIED =
+		  (TEXT_CACHE_HASHMAP_SIZE * 3) / 4; // 75% load cap
 	constexpr static TimestampSec TEXT_TTL = {8u};
 
-	struct Data {
-		Hash hash;
-		Size text_size;
-		uint16_t font_id;
-		uint16_t font_size;
-		uint32_t color;
-		TimestampSec timestamp;
-		TTF_Text *text;
+	struct TextEntry {
+		Hash hash;              // 8B
+		uint32_t text_size;     // 12B
+		uint16_t font_id;       // 14B
+		uint16_t font_size;     // 16B
+		uint32_t color;         // 20B
+		TimestampSec timestamp; // 24B
+		TTF_Text *text;         // 32B
 
 		bool is_obsolete(TimestampSec t) const {
 			if (t.tss <= TEXT_TTL.tss) {
@@ -79,15 +54,47 @@ struct TextCache {
 		}
 	};
 
-	TTF_TextEngine *engine;
+	// -------------------------------------------------------------------------
+	// Measurement Cache
+	// -------------------------------------------------------------------------
+	constexpr static Idx MEASURE_CACHE_SIZE = 1u << 10;
+	constexpr static Idx MEASURE_CACHE_FAST_PROBE = 4u;
+	// TODO: gather stats and maybe move out .text from MeasureEntry
+	struct MeasureEntry {
+		Hash hash{0};                     // 8B
+		uint16_t font_id{0};              // 10B
+		uint16_t font_size{0};            // 12B
+		uint16_t text_size{0};            // 14B
+		                                  // padding 2B
+		Clay_Dimensions dims{0.0f, 0.0f}; // 24B
+		char text[40]{};                  // 64
+	};
+
+	// -------------------------------------------------------------------------
+	// State
+	// -------------------------------------------------------------------------
+	TTF_TextEngine *engine{nullptr};
 	struct FontKey {
 		uint16_t font_id;
 		uint16_t font_size;
 	};
-	using Font = Pair<FontKey, TTF_Font *>;
+	using FontEntry = Pair<FontKey, TTF_Font *>;
 	TTF_Font *base_fonts[FontID::COUNT]{};
-	Arr<Font, 96> fonts{};
-	Data data[MAP_SIZE]{};
+	Arr<FontEntry, 96> fonts{};
+
+	// TODO: gather fontsize statistics and add a shift?
+	constexpr static uint16_t FAST_FONT_MAX = 1u << 7;
+	TTF_Font *fast_fonts[FontID::COUNT][FAST_FONT_MAX]{};
+
+	TextEntry text_cache_data[TEXT_CACHE_HASHMAP_SIZE]{};
+	MeasureEntry measure_cache_data[MEASURE_CACHE_SIZE]{};
+
+	TimestampSec current_time{0};
+	uint16_t active_count{0};
+
+	void set_time(uint64_t ticks_ms) {
+		current_time = tss_from_ticks(ticks_ms);
+	}
 
 	TTF_Font *get_font(uint16_t font_id, uint16_t font_size);
 
@@ -98,7 +105,8 @@ struct TextCache {
 	void htable_swap(Idx a, Idx b);
 
 	TTF_Text *get(StrView str, uint16_t font_id, uint16_t font_size,
-	              Clay_Color color, uint64_t t);
+	              Clay_Color color);
 	Clay_Dimensions measure_text(Clay_StringSlice slice,
 	                             Clay_TextElementConfig *config);
+	void prewarm(float scale, SDL_Renderer *renderer);
 };

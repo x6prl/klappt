@@ -128,7 +128,7 @@ inline bool encode_entry_payload(unsigned char *&cursor,
 		         0x07;
 		break;
 	case WordType::Verb:
-		if (word.v.is_separable_prefix)
+		if (word.v.separable_prefix_size)
 			flags |= (1 << 3);
 		break;
 	case WordType::Adj:
@@ -139,14 +139,12 @@ inline bool encode_entry_payload(unsigned char *&cursor,
 		break;
 	}
 
-	if (word.was_learned)
-		flags |= (1 << 4);
 	if (word.in_learning_list)
+		flags |= (1 << 4);
+	if (word.was_learned)
 		flags |= (1 << 5);
-	if (word.timestamp != 0)
-		flags |= (1 << 6); // has timestamp
 	if (word.popularity != 0)
-		flags |= (1 << 7); // has popularity
+		flags |= (1 << 6);
 	*cursor++ = flags;
 
 	// WordID
@@ -159,17 +157,17 @@ inline bool encode_entry_payload(unsigned char *&cursor,
 		return false;
 	*cursor++ = word.lang_id;
 
-	// timestamp if != 0
-	if (word.timestamp != 0) {
-		if (!write_varint(cursor, end, word.timestamp))
-			return false;
-	}
-
 	// popularity if != 0
 	if (word.popularity != 0) {
 		if (cursor >= end)
 			return false;
 		*cursor++ = word.popularity;
+	}
+	// separable_prefix_size if != 0
+	if (word.v.separable_prefix_size != 0) {
+		if (cursor >= end)
+			return false;
+		*cursor++ = word.v.separable_prefix_size;
 	}
 
 	// then strings
@@ -201,27 +199,28 @@ inline bool decode_entry_payload(const unsigned char *&cursor,
 		return false;
 	lang_id = *cursor++;
 
-	uint64_t timestamp = 0;
-	if (flags & (1 << 6)) {
-		if (!read_varint(cursor, end, timestamp))
-			return false;
-	}
-
 	uint8_t popularity = 0;
-	if (flags & (1 << 7)) {
+	if (flags & (1 << 6)) {
 		if (cursor >= end)
 			return false;
 		popularity = *cursor++;
 	}
 
+	uint8_t separable_prefix_size = 0;
+	if (flags & (1 << 3)) {
+		if (cursor >= end)
+			return false;
+		separable_prefix_size = *cursor++;
+	}
+
 	word = {};
 	word.word_id = WordId{raw_word_id};
 	word.type = type;
-	word.was_learned = (flags & (1 << 4)) ? 1 : 0;
-	word.in_learning_list = (flags & (1 << 5)) ? 1 : 0;
-	word.timestamp = timestamp;
+	word.was_learned = (flags & (1 << 5)) ? 1 : 0;
+	word.in_learning_list = (flags & (1 << 4)) ? 1 : 0;
 	word.popularity = popularity;
 	word.lang_id = lang_id;
+	word.v.separable_prefix_size = separable_prefix_size;
 
 	switch (word.type) {
 	case WordType::Noun:
@@ -229,7 +228,6 @@ inline bool decode_entry_payload(const unsigned char *&cursor,
 			  static_cast<Gender>(static_cast<int32_t>(flags & 0x07) - 1);
 		break;
 	case WordType::Verb:
-		word.v.is_separable_prefix = (flags & (1 << 3)) != 0;
 		break;
 	case WordType::Adj:
 		word.a.is_indeclinable = (flags & (1 << 0)) != 0;

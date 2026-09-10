@@ -212,7 +212,7 @@ uint64_t word_hash(Arena &scratch, const Word &word) {
 	put_char(static_cast<char>(word.type));
 	put_char('\0');
 
-	// NOTE: we are not hashing json and plain translations
+	// NOTE: we are not hashing json, popularity and plain translations
 	switch (word.type) {
 	case WordType::Nil:
 		break;
@@ -227,7 +227,7 @@ uint64_t word_hash(Arena &scratch, const Word &word) {
 		feed(word.v.third_person);
 		feed(word.v.praeteritum);
 		feed(word.v.auxv_and_past_participle);
-		put_char(static_cast<char>(word.v.is_separable_prefix));
+		put_char(static_cast<char>(word.v.separable_prefix_size));
 		put_char('\0');
 		break;
 	case WordType::Adj:

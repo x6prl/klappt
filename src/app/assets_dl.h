@@ -9,10 +9,24 @@
 #include "ui/translations/langs.h"
 
 struct AssetsDL {
-
-	// static constexpr auto HOST = "http://0.0.0.0:8000/"_v;
+#ifdef __EMSCRIPTEN__
+    static constexpr auto HOST = "./"_v;
+	// static constexpr auto HOST =
+	// 	  "https://github.com/x6prl/klappt-resources/releases/latest/download/"_v;
+	// static constexpr auto HOST = "https://0.0.0.0:1234/"_v;
+#elif __ANDROID__
+#ifndef TRACY_ENABLE
+	// static constexpr auto HOST = "http://172.25.16.46:8000/"_v;
 	static constexpr auto HOST =
-		  "https://github.com/x6prl/klappt-resources/raw/refs/heads/main/"_v;
+		  "https://github.com/x6prl/klappt-resources/releases/latest/download/"_v;
+#else
+	static constexpr auto HOST = "http://10.42.0.1:8000/"_v;
+#endif
+#else
+	static constexpr auto HOST = "http://0.0.0.0:8000/"_v;
+	// static constexpr auto HOST = "http://10.224.66.46:8000/"_v;
+#endif
+
 	static constexpr auto TTS_ESPEAKNG_DATA_AND_PIPER_ZIP =
 		  "espeak-ng-data-and-piper.zip"_v;
 	static constexpr auto ASR_WHISPER_BASE_ZIP =

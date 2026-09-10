@@ -1,4 +1,4 @@
-package org.viktorfilinkov.klappt;
+package org.libsdl.app;
 
 import java.util.ArrayList;
 import java.util.Collections;

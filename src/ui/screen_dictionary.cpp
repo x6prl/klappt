@@ -1,7 +1,6 @@
 #include <SDL3/SDL_log.h>
 
 #include "app/app_context.h"
-#include "app/words_init.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "screen_helpers.h"

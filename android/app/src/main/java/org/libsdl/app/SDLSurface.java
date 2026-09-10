@@ -1,4 +1,4 @@
-package org.viktorfilinkov.klappt;
+package org.libsdl.app;
 
 
 import android.content.Context;

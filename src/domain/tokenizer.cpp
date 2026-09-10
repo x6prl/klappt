@@ -2,6 +2,7 @@
 
 #include "base/arr.h"
 
+#include <cctype>
 #include <type_traits>
 
 // TODO: rewrite

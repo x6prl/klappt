@@ -5,6 +5,7 @@
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
+#include "domain/grammar.h"
 #include "domain/word.h"
 #include "ui/components/button.h"
 #include "ui/translations/langs.h"
@@ -73,11 +74,8 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 					 },
 			   .clip = {.horizontal = true},
 		 }) {
-		auto trs =
-			  StrBuilder{
-					word_translations_discrete(
-						  a, translations_plain)}
-					.join(a, ", "_v);
+		auto trs = StrBuilder{word_translations_discrete(a, translations_plain)}
+		                 .join(a, ", "_v);
 		CLAY_TEXT(trs.to_clay_string(), CLAY_TEXT_CONFIG({
 											  .textColor = color,
 											  .fontId = font_id,
@@ -127,6 +125,10 @@ word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 			break;
 		case WordType::Verb:
 			main = w.v.infinitive;
+			if (grammar::is_aux_sein(w.v)) {
+				post_main = "*"_v;
+			}
+			// TODO: mark unregular verbs
 			break;
 		case WordType::Adj:
 			main = w.a.lemma;

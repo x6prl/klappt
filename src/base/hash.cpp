@@ -1,6 +1,6 @@
 #include "hash.h"
 
-#define XXH_NO_INLINE_HINTS 1 // NOTE: got troubles inlining
+// #define XXH_NO_INLINE_HINTS 1 // NOTE: (not) got troubles inlining
 
 #include <xxh3.h>
 

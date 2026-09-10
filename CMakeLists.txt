@@ -794,7 +794,7 @@ if (APPLE)
         target_sources(${EXECUTABLE_NAME} PRIVATE ${FILE})
         set_property(SOURCE ${FILE} PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${relpath}")
     endmacro()
-    add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Inter-VariableFont.ttf")
+    add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Inter-Regular.ttf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/ReadexPro-Regular.ttf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Font-Awesome-7-Free-Solid-900.otf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf")
@@ -808,7 +808,7 @@ if (APPLE)
 elseif(EMSCRIPTEN)
     # on the web, we pack files into the webassembly virtual filesystem
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Inter-VariableFont.ttf@/\""
+        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Inter-Regular.ttf@/\""
         "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/ReadexPro-Regular.ttf@/\""
         "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Font-Awesome-7-Free-Solid-900.otf@/\""
         "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf@/\""
@@ -842,7 +842,7 @@ else()
         )
     endmacro()
 
-    copy_helper("fonts/Inter-VariableFont.ttf" "Inter-VariableFont.ttf")
+    copy_helper("fonts/Inter-Regular.ttf" "Inter-Regular.ttf")
     copy_helper("fonts/ReadexPro-Regular.ttf" "ReadexPro-Regular.ttf")
     copy_helper("fonts/Font-Awesome-7-Free-Solid-900.otf" "Font-Awesome-7-Free-Solid-900.otf")
     copy_helper("fonts/JetBrainsMono-Regular.ttf" "JetBrainsMono-Regular.ttf")
@@ -931,6 +931,21 @@ if(NOT ANDROID)
     target_link_libraries(tokenizer_tests PRIVATE SDL3::SDL3)
     add_test(NAME tokenizer_tests COMMAND tokenizer_tests)
 
+    add_executable(grammar_tests
+        tests/grammar_test.cpp
+        src/domain/word.cpp
+        src/domain/grammar.cpp
+        src/base/str_view.cpp
+    )
+    target_compile_features(grammar_tests PUBLIC cxx_std_23)
+    target_include_directories(grammar_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_include_directories(grammar_tests SYSTEM PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
+    )
+    target_link_libraries(grammar_tests PRIVATE SDL3::SDL3)
+    add_test(NAME grammar_tests COMMAND grammar_tests)
 endif()
 
 # on Visual Studio, set our app as the default project
@@ -956,22 +971,24 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     include(CPack)
 endif()
 
-add_executable(xdbuilder
-    xdbuilder/xdbuilder.cpp
-    src/base/hash.cpp
-    src/base/str_view.cpp
-    src/base/shuffle.cpp
-    src/domain/word.cpp
-    src/domain/word_store.cpp
-    src/domain/grammar.cpp
-    src/ui/clay_impl.cpp
-)
+if (NOT (ANDROID OR EMSCRIPTEN OR APPLE))
+    add_executable(xdbuilder
+        xdbuilder/xdbuilder.cpp
+        src/base/hash.cpp
+        src/base/str_view.cpp
+        src/base/shuffle.cpp
+        src/domain/word.cpp
+        src/domain/word_store.cpp
+        src/domain/grammar.cpp
+        src/ui/clay_impl.cpp
+    )
 
-target_include_directories(xdbuilder PRIVATE src)
-target_include_directories(xdbuilder PRIVATE "src/vendor")
-target_include_directories(xdbuilder PRIVATE xxHash)
-target_link_libraries(xdbuilder PRIVATE
-    xapian
-    sqlite3
-    SDL3::SDL3
-)
+    target_include_directories(xdbuilder PRIVATE src)
+    target_include_directories(xdbuilder PRIVATE "src/vendor")
+    target_include_directories(xdbuilder PRIVATE xxHash)
+    target_link_libraries(xdbuilder PRIVATE
+        xapian
+        sqlite3
+        SDL3::SDL3
+    )
+endif()

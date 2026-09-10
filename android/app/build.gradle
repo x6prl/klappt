@@ -2,65 +2,95 @@ def buildAsLibrary = project.hasProperty('BUILD_AS_LIBRARY');
 def buildAsApplication = !buildAsLibrary
 if (buildAsApplication) {
     apply plugin: 'com.android.application'
-}
-else {
+} else {
     apply plugin: 'com.android.library'
 }
 
 android {
-    compileSdkVersion 34
+    // Target API requirement for Google Play (API 35+)
+    compileSdk 36
+
     if (buildAsApplication) {
         namespace "org.viktorfilinkov.klappt"
     }
-    splits {
-        abi {
-            enable true
-            reset()
-            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            universalApk false
-        }
-    }
+
     defaultConfig {
         applicationId "org.viktorfilinkov.klappt"
-        minSdkVersion 21
-        targetSdkVersion 34
+        minSdk 21
+        targetSdk 36
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
+
         externalNativeBuild {
             cmake {
-                arguments "-DANDROID_APP_PLATFORM=android-16", "-DANDROID_STL=c++_static", "-DCMAKE_VERBOSE_MAKEFILE=ON", "-DMOBILE_ASSETS_DIR=${System.getProperty("user.dir")}/app/src/main/assets", "-DENABLE_HOTRELOAD=OFF", "-DENABLE_TRACY=OFF", "-DENABLE_NEURO=ON"
-                // abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-                abiFilters 'arm64-v8a'
+                arguments "-DANDROID_APP_PLATFORM=android-21",
+                          "-DANDROID_STL=c++_static",
+                          "-DCMAKE_VERBOSE_MAKEFILE=ON",
+                          "-DMOBILE_ASSETS_DIR=${System.getProperty("user.dir")}/app/src/main/assets",
+                          "-DENABLE_HOTRELOAD=OFF",
+                          "-DENABLE_TRACY=OFF",
+                          "-DENABLE_NEURO=OFF",
+                          "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+
+                // If building a bundle (:app:bundleRelease), build arm64 + x86_64
+                // For local APK assemble (:app:assembleRelease), build ONLY arm64-v8a
+                def isBundle = project.gradle.startParameter.taskNames.any { it.contains("bundle") }
+                if (isBundle) {
+                    abiFilters 'arm64-v8a', 'x86_64'
+                } else {
+                    abiFilters 'arm64-v8a'
+                }
             }
         }
     }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Default: unsigned (signingConfig is not set here)
+        }
+        debug {
+            // Uses standard debug key
         }
     }
+
+    // ONLY create and assign the release signing config if a password was passed!
+    def ksPass = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+    def ksFile = file("${System.getProperty('user.home')}/.android/klappt-release.jks")
+
+    if (ksPass && ksFile.exists()) {
+        signingConfigs {
+            release {
+                storeType "PKCS12"
+                storeFile ksFile
+                storePassword ksPass
+                keyAlias "klappt"
+                keyPassword ksPass
+            }
+        }
+        buildTypes.release.signingConfig = signingConfigs.release
+    }
+
     applicationVariants.all { variant ->
         tasks["merge${variant.name.capitalize()}Assets"]
                 .dependsOn("externalNativeBuild${variant.name.capitalize()}")
     }
+
     if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
         sourceSets.main {
             jniLibs.srcDir 'libs'
         }
         externalNativeBuild {
-            // ndkBuild {
-            //     path 'jni/Android.mk'
-            // }
             cmake {
                 path "../../CMakeLists.txt"
                 version "3.22.1"
             }
         }
-
     }
-    lintOptions {
-        abortOnError false
+
+    lint {
+        abortOnError = false
     }
 
     if (buildAsLibrary) {
@@ -68,8 +98,8 @@ android {
             variant.outputs.each { output ->
                 def outputFile = output.outputFile
                 if (outputFile != null && outputFile.name.endsWith(".aar")) {
-                    def fileName = "org.viktorfilinkov.klappt.aar";
-                    output.outputFile = new File(outputFile.parent, fileName);
+                    def fileName = "org.viktorfilinkov.klappt.aar"
+                    output.outputFile = new File(outputFile.parent, fileName)
                 }
             }
         }

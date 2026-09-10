@@ -1,6 +1,7 @@
 #!/usr/bin/python3
-from pathlib import Path
 import re
+import sys
+from pathlib import Path
 
 in_dir = Path("translations")
 out_dir = Path("src/ui/translations")
@@ -19,7 +20,7 @@ def str_literal(value):
 
 languages = {}
 entries = {}
-out_path = str()
+out_path = ""
 
 
 def wl(str):
@@ -33,8 +34,8 @@ for file in in_dir.glob("*.tr"):
     out_path = str(out_dir) + "/" + module_name + ".h"
     print("handling", file, "writing to", out_path)
 
-    entry_key = str()
-    entry = str()
+    entry_key = ""
+    entry = ""
 
     lc = -1
     for raw_line in file.open(encoding="utf-8"):
@@ -51,7 +52,7 @@ for file in in_dir.glob("*.tr"):
                 print(
                     f"line {lc} ERROR: allowed only alphabetical symbols and underscore, got '{entry_key}'"
                 )
-                quit(-1)
+                sys.exit(-1)
         elif len(line) > 4 and line[2:4] == ": ":
             lang = line[0:2]
             if not (lang.isalpha() and lang.islower()):
@@ -59,7 +60,7 @@ for file in in_dir.glob("*.tr"):
                     f"line {lc} ERROR: expected lowercase language, got '{lang}'",
                     lang,
                 )
-                quit(-1)
+                sys.exit(-1)
 
             translation = line[4:]
             print(f"{entry} TR for {lang}: {translation}")
@@ -70,9 +71,9 @@ for file in in_dir.glob("*.tr"):
 
             entries[entry].append((lang, translation))
 
-        elif not len(line) == 1 and line[0] == "\n":
+        elif len(line) != 1 and line[0] == "\n":
             print(f"line {lc} ERROR: bad line '{line[:-1]}'")
-            quit(-1)
+            sys.exit(-1)
         else:
             print("empty")
 
@@ -96,7 +97,7 @@ for file in in_dir.glob("*.tr"):
         for key in entries.values():
             j += 1
             found = next((t for t in key if t[0] == lang), None)
-            translation = found[1] if not found == None else key[0][1]
+            translation = found[1] if found != None else key[0][1]
             comma = "" if j == len(entries) - 1 else ","
             wl("\t" + str_literal(translation) + comma)
         comma = "" if i == len(languages) - 1 else ","
@@ -112,7 +113,7 @@ out = open(out_path, "w", encoding="utf-8")
 
 wl("#pragma once\n")
 wl('#include "base/str_view.h"\n')
-wl("enum Lang {")
+wl("enum Lang : int8_t {")
 for lang in languages:
     wl(f"\tlang_{lang},")
 wl("\tlang_COUNT")

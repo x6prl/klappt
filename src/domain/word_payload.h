@@ -20,7 +20,7 @@ struct WordExampleItem {
 };
 
 struct WordPayload {
-	StrView pos{};
+	StrView word_class{}; // "cls" in JSON
 	StrView etymology{};
 
 	DynArr<StrView> tags{};
@@ -60,9 +60,9 @@ inline bool word_json_parse(Arena &scratch, Arena &a, StrView json_sv,
 		return false;
 	}
 
-	// 1. pos
-	if (auto val = doc["pos"].get_string(); !val.error()) {
-		out.pos = copy_to_arena(a, val.value());
+	// 1. cls (word class)
+	if (auto val = doc["cls"].get_string(); !val.error()) {
+		out.word_class = copy_to_arena(a, val.value());
 	}
 
 	// 2. etymology
@@ -191,9 +191,9 @@ inline bool word_json_parse(Arena &scratch, Arena &a, StrView json_sv,
 inline void log_word_payload(const WordPayload &p) {
 	SDL_Log("=== WORD JSON PAYLOAD ===");
 
-	// 1. pos
-	if (p.pos) {
-		SDL_Log("  pos: " StrView_Fmt, StrView_Arg(p.pos));
+	// 1. cls
+	if (p.word_class) {
+		SDL_Log("  cls: " StrView_Fmt, StrView_Arg(p.word_class));
 	}
 
 	// 2. tags

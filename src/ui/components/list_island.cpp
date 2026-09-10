@@ -218,7 +218,7 @@ void list_island_commit(AppContext *ctx) {
 			{
 				KLAPPT_PROFILE_SCOPE_N("list_island.text_cache_get");
 				text = ctx->text->get(pending.labels[i], FontID::MAIN,
-				                      font_size, pending.style.text, ticks);
+				                      font_size, pending.style.text);
 			}
 			int width = 0;
 			int height = 0;

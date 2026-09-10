@@ -361,7 +361,7 @@ void keypad_island_commit(AppContext *ctx) {
 			{
 				KLAPPT_PROFILE_SCOPE_N("keypad_island.text_cache_get");
 				text = ctx->text->get(label, FontID::MAIN, font_size,
-				                      color_text, ticks);
+				                      color_text);
 			}
 			sample_lap(commit_stats.text_cache_get);
 			int width = 0;

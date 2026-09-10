@@ -48,7 +48,8 @@ Uint32 SDLCALL animation_timer_cb(void *userdata, SDL_TimerID,
 	SDL_PushEvent(&event);
 
 	return (ctx->ticks - ctx->animation_ticks_start <
-	        interaction_animation_duration_ms)
+	        interaction_animation_duration_ms) ||
+	                   ctx->tslt.is_swipe()
 	             ? interval
 	             : 0;
 }
@@ -78,8 +79,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mobile_text_input_web_wakeup() {
 Clay_Dimensions measure_text_sdl(Clay_StringSlice text,
                                  Clay_TextElementConfig *config,
                                  void *userData) {
-	AppContext *ctx = static_cast<AppContext *>(userData);
-	return ctx->text->measure_text(text, config);
+	auto tc = static_cast<TextCache *>(userData);
+	return tc->measure_text(text, config);
 }
 
 void app_bar_layout(AppContext *ctx, StrView title) {
@@ -304,7 +305,7 @@ StrView review_x_of_n(AppContext *ctx) {
 extern "C" void ui_clay_init(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_clay_init");
 	clay_init(ctx);
-	Clay_SetMeasureTextFunction(measure_text_sdl, ctx);
+	Clay_SetMeasureTextFunction(measure_text_sdl, ctx->text);
 }
 
 extern "C" void ui_settings_init(AppContext *ctx) {
@@ -413,6 +414,10 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			int height = 0;
 			SDL_GetWindowSizeInPixels(ctx->window, &width, &height);
 
+			// SDL_Rect safe_area{};
+			// SDL_GetWindowSafeArea(ctx->window, &safe_area);
+			// width = safe_area.w;
+			// height = safe_area.h;
 			Clay_SetLayoutDimensions(Clay_Dimensions{
 				  static_cast<float>(width), static_cast<float>(height)});
 			ctx->display_width = width;
@@ -508,6 +513,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 	KLAPPT_PROFILE_NAME_F("ui_iterate:%s", screen_name(ctx->screen()));
 	auto _tmp_arena_guard = ctx->arena_frame.guard();
 	auto g = ctx->arena_frame.guard();
+	ctx->text->set_time(ctx->ticks);
 	static Uint64 frame_ticks_last = ctx->ticks;
 	const Uint64 frame_ticks = ctx->ticks;
 	const float frame_delta_time_seconds =
@@ -527,22 +533,37 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 		KLAPPT_PROFILE_SCOPE_N("Clay_BeginLayout");
 		Clay_BeginLayout();
 	}
+	int win_w = 0, win_h = 0;
+	SDL_GetWindowSize(ctx->window, &win_w, &win_h);
+
+	SDL_Rect safe_area{};
+	SDL_GetWindowSafeArea(ctx->window, &safe_area);
+
+	uint16_t pad_top = (uint16_t)safe_area.y;
+	uint16_t pad_bottom = (uint16_t)(win_h - (safe_area.y + safe_area.h));
+
 	CLAY(CLAY_ID("OuterContainer"),
-	     {.layout =
-	            {
-					  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-					  .layoutDirection = CLAY_TOP_TO_BOTTOM,
-				},
-	      .backgroundColor = theme()->surface}) {
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
+						   .padding =
+								 {
+									   .top = pad_top, // Pushes icons safely
+	                                                   // below the clock
+									   // .bottom = pad_bottom,
+								 },
+						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					 },
+			   .backgroundColor = theme()->surfaceContainerLow,
+		 }) {
 		CLAY(CLAY_ID("Content"),
-		     {
-				   .layout =
-						 {
-							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_GROW(0)},
-							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-						 },
-			 }) {
+		     {.layout =
+		            {
+						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
+						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					},
+		      .backgroundColor = theme()->surface}) {
 			switch (ctx->screen()) {
 			case Screen::Trainer: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Start");
@@ -630,6 +651,13 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				break;
 			}
 			}
+			CLAY(CLAY_ID("BottomNotsafeFiller"),
+			     {.layout =
+			            {
+							  .sizing = {CLAY_SIZING_GROW(0),
+			                             CLAY_SIZING_FIXED((float)pad_bottom)},
+						},
+			      .backgroundColor = Clay_Color{0.f, 0.f, 0.f, 255u}}) {}
 		}
 	}
 

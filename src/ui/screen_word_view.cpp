@@ -23,6 +23,90 @@
 #include "screen_helpers.h"
 
 namespace {
+
+// // NOTE: unused
+static inline StrView word_to_str(Arena &scratch, Arena &a, const Word &w) {
+	StrBuilder strs{};
+	auto word_str = word_to_lexeme_str(scratch, a, w);
+	strs.push(scratch, word_str);
+	strs.push(scratch, w.translations_raw);
+
+	SDL_Log("translations_raw: " StrView_Fmt, StrView_Arg(w.translations_raw));
+	// SDL_Log("grammar: " StrView_Fmt, StrView_Arg(w.grammar));
+	SDL_Log("in_learning_list: %d", static_cast<int>(w.in_learning_list));
+	SDL_Log("was_learned: %d", static_cast<int>(w.was_learned));
+	SDL_Log("ID: %llu\n______________________________",
+	        static_cast<unsigned long long>(w.word_id.value));
+	return strs.join(a, '\n');
+}
+
+static StrView noun_word_class_to_badge(StrView cls) {
+	if (cls == "noun"_v) {
+		return "Substantiv"_v;
+	}
+	if (cls == "name"_v || cls == "proper_noun"_v) {
+		return "Eigenname"_v;
+	}
+	return cls;
+}
+static StrView verb_word_class_to_badge(StrView cls) {
+	if (cls == "verb"_v) {
+		return "Verb"_v;
+	}
+	return cls;
+}
+static StrView adj_word_class_to_badge(StrView cls) {
+	if (cls == "adj"_v) {
+		return "Adjektiv"_v;
+	}
+	if (cls == "adv"_v) {
+		return "Adverb"_v;
+	}
+	if (cls == "adv,adj"_v || cls == "adj,adv"_v) {
+		return "Adjektiv / Adverb"_v;
+	}
+	return cls;
+}
+static StrView phrase_word_class_to_badge(StrView cls) {
+	if (cls == "pron"_v) {
+		return "Pronomen"_v;
+	}
+	if (cls == "prep"_v) {
+		return "Präposition"_v;
+	}
+	if (cls == "postp"_v) {
+		return "Postposition"_v;
+	}
+	if (cls == "conj"_v) {
+		return "Konjunktion"_v;
+	}
+	if (cls == "det"_v || cls == "art"_v) {
+		return "Artikel"_v;
+	}
+	if (cls == "num"_v) {
+		return "Numerale"_v; // or "Zahlwort"_v
+	}
+	if (cls == "particle"_v) {
+		return "Partikel"_v;
+	}
+	if (cls == "intj"_v || cls == "interjection"_v) {
+		return "Interjektion"_v;
+	}
+	if (cls == "phrase"_v) {
+		return "Redewendung"_v; // or "Phrase"_v
+	}
+	if (cls == "affix"_v) {
+		return "Affix"_v;
+	}
+	if (cls == "prefix"_v) {
+		return "Präfix"_v;
+	}
+	if (cls == "suffix"_v) {
+		return "Suffix"_v;
+	}
+	return cls;
+}
+
 static StrView format_due_delta(Arena &a, Engine::Timestamp now,
                                 Engine::Timestamp due) {
 	const auto delta = static_cast<long long>(due - now);
@@ -118,8 +202,8 @@ static void draw_noun_title(AppContext *ctx, const Noun &n) {
 		// bool has_plural_suffix = n.plural_suffix;
 		// if (has_plural_suffix) {
 		// 	draw_text(
-		// 		  StrView::concat(ctx->arena_frame, ", "_v, n.plural_suffix),
-		// 		  theme()->secondary, title_font_size);
+		// 		  StrView::concat(ctx->arena_frame, ", "_v,
+		// n.plural_suffix), 		  theme()->secondary, title_font_size);
 		// }
 	}
 }
@@ -157,11 +241,11 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 
 	DynArr<Pair<StrView, StrView>> forms{};
 	DynArr<StrView> badges{};
-	StrView type{};
+	StrView word_class_name{};
 
 	switch (w.type) {
 	case WordType::Noun: {
-		type = "Noun"_v;
+		word_class_name = noun_word_class_to_badge(word_payload.word_class);
 		if (grammar::is_singular_only(w.n)) {
 			badges.push(ctx->arena_frame, "Singular only"_v);
 		} else if (grammar::is_plural_only(w.n)) {
@@ -173,7 +257,22 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		}
 	} break;
 	case WordType::Verb: {
-		type = "Verb"_v;
+		word_class_name = verb_word_class_to_badge(word_payload.word_class);
+
+		auto wstr = word_to_str(ctx->arena_frame, ctx->arena_frame, w);
+		SDL_Log(StrView_Fmt, StrView_Arg(wstr));
+
+		Verb v{.infinitive = "drucken"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+		SDL_Log(" >> " StrView_Fmt " %" PRSize, StrView_Arg(w.v.third_person), w.v.third_person.size);
+		SDL_Log(" >> sep pr size %d", w.v.separable_prefix_size);
+		// forms.push(ctx->arena_frame, {"stem:"_v, grammar::verb_stem(v)});
+		// forms.push(ctx->arena_frame,
+		//            {"infw:"_v,
+		//             grammar::verb_infinitive_without_separable_prefix(v)});
 		forms.push(ctx->arena_frame,
 		           {"er/sie/es:"_v,
 		            grammar::verb_third_person_full(ctx->arena_frame, w.v)});
@@ -185,7 +284,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		            grammar::verb_perfect_full(ctx->arena_frame, w.v)});
 	} break;
 	case WordType::Adj: {
-		type = "Adjective"_v;
+		word_class_name = adj_word_class_to_badge(word_payload.word_class);
 		if (w.a.is_indeclinable) {
 			badges.push(ctx->arena_frame, "Indeclinable"_v);
 		} else if ((w.a.comparative || w.a.superlative)) {
@@ -198,7 +297,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		}
 	} break;
 	case WordType::Phrase: {
-		type = "Phrase"_v;
+		word_class_name = phrase_word_class_to_badge(word_payload.word_class);
 	} break;
 	default:
 		break;
@@ -243,7 +342,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 						 },
 			 }) {
-			CLAY(CLAY_ID("WordTypeBadge"),
+			CLAY(CLAY_ID("WordClassBadge"),
 			     {
 					   .layout =
 							 {
@@ -253,7 +352,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					   .backgroundColor = theme()->secondary,
 					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
 				 }) {
-				draw_text(type, theme()->onSecondary,
+				draw_text(word_class_name, theme()->onSecondary,
 				          static_cast<uint16_t>(udpi(12.f)));
 			}
 
@@ -366,14 +465,13 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					// 	     {
 					// 			   .layout =
 					// 					 {
-					// 						   .padding = {udpi(6.f), udpi(8.f),
-					// 	                                   udpi(2.f),
-					// udpi(2.f)}, 						   .childAlignment =
+					// 						   .padding = {udpi(6.f),
+					// udpi(8.f), udpi(2.f), udpi(2.f)}, .childAlignment =
 					// {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
 					// 					 },
 					// 			   .backgroundColor =
-					// theme()->surfaceContainerHigh, 			   .cornerRadius
-					// = CLAY_CORNER_RADIUS(dpi(12.f)),
+					// theme()->surfaceContainerHigh, .cornerRadius =
+					// CLAY_CORNER_RADIUS(dpi(12.f)),
 					// 		 }) {
 					// 		// "🔊" ?
 					// 		draw_text(Icons::PLAY, theme()->primary,
@@ -893,9 +991,10 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		// 		draw_text("Origin"_v, theme()->secondary,
 		// 		          static_cast<uint16_t>(udpi(11.f)));
 		//
-		// 		draw_text(word_payload.etymology, theme()->onSurfaceContainer,
-		// 		          static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
-		// 		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+		// 		draw_text(word_payload.etymology,
+		// theme()->onSurfaceContainer,
+		// static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
+		// CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 		// 	}
 		// }
 	}
@@ -1030,23 +1129,6 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 }
 
 } // namespace
-
-// // NOTE: unused
-// static inline StrView word_to_str(Arena &scratch, Arena &a, const Word &w) {
-// 	StrBuilder strs{};
-// 	auto word_str = word_to_lexemme_str(scratch, a, w);
-// 	strs.push(scratch, word_str);
-// 	strs.push(scratch, w.translations_raw);
-// 	strs.push(scratch, w.grammar);
-//
-// 	SDL_Log("translations_raw: " StrView_Fmt, StrView_Arg(w.translations_raw));
-// 	SDL_Log("grammar: " StrView_Fmt, StrView_Arg(w.grammar));
-// 	SDL_Log("in_learning_list: %d", static_cast<int>(w.in_learning_list));
-// 	SDL_Log("was_learned: %d", static_cast<int>(w.was_learned));
-// 	SDL_Log("ID: %llu\n______________________________",
-// 	        static_cast<unsigned long long>(w.word_id.value));
-// 	return strs.join(a, '\n');
-// }
 
 void screen_word_view_push(AppContext *ctx, WordId word_id) {
 	KLAPPT_PROFILE_SCOPE_N("screen_word_view_push");

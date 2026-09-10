@@ -49,8 +49,7 @@ StrView gender_to_article_nominative_strview(Gender g) {
 	return " "_v;
 }
 
-DynArr<StrView> word_translations_split(Arena &a,
-                                               StrView translations_raw) {
+DynArr<StrView> word_translations_split(Arena &a, StrView translations_raw) {
 	DynArr<StrView> ret{};
 	for (; translations_raw;) {
 		auto tr_item = translations_raw.mut_split_by(';').trim();
@@ -59,8 +58,7 @@ DynArr<StrView> word_translations_split(Arena &a,
 	return ret;
 }
 
-DynArr<StrView> word_translations_discrete(Arena &a,
-                                                  StrView translations_raw) {
+DynArr<StrView> word_translations_discrete(Arena &a, StrView translations_raw) {
 	DynArr<StrView> ret{};
 	for (; translations_raw;) {
 		auto tr_item = translations_raw.mut_split_by(';').trim();
@@ -80,8 +78,7 @@ StrView word_tts_full(Arena &a, const Word &word) {
 	switch (word.type) {
 	case WordType::Noun: {
 		StrBuilder builder{};
-		builder.push(a,
-		             gender_to_article_nominative_strview(word.n.gender));
+		builder.push(a, gender_to_article_nominative_strview(word.n.gender));
 		builder.push(a, word.n.lemma);
 		builder.push(a, ".\n"_v);
 		builder.push(a, grammar::noun_plural_with_article(a, word.n));
@@ -163,7 +160,7 @@ bool word_has_same_lexeme(const Word &lhs, const Word &rhs) {
 		       lhs.v.praeteritum == rhs.v.praeteritum &&
 		       lhs.v.auxv_and_past_participle ==
 		             rhs.v.auxv_and_past_participle &&
-		       lhs.v.is_separable_prefix == rhs.v.is_separable_prefix;
+		       lhs.v.separable_prefix_size == rhs.v.separable_prefix_size;
 	case WordType::Adj:
 		return lhs.a.lemma == rhs.a.lemma &&
 		       lhs.a.comparative == rhs.a.comparative &&
@@ -191,7 +188,7 @@ Word word_clone(Arena &a, const Word &src) {
 	dst.in_learning_list = src.in_learning_list;
 	dst.was_learned = src.was_learned;
 	dst.popularity = src.popularity;
-	dst.timestamp = src.timestamp;
+	dst.lang_id = src.lang_id;
 	dst.translations_raw = src.translations_raw.copy(a);
 	dst.json_payload = src.json_payload.copy(a);
 
@@ -208,7 +205,7 @@ Word word_clone(Arena &a, const Word &src) {
 		dst.v.third_person = src.v.third_person.copy(a);
 		dst.v.praeteritum = src.v.praeteritum.copy(a);
 		dst.v.auxv_and_past_participle = src.v.auxv_and_past_participle.copy(a);
-		dst.v.is_separable_prefix = src.v.is_separable_prefix;
+		dst.v.separable_prefix_size = src.v.separable_prefix_size;
 		break;
 	case WordType::Adj:
 		dst.a.lemma = src.a.lemma.copy(a);
@@ -225,8 +222,7 @@ Word word_clone(Arena &a, const Word &src) {
 }
 
 // NOTE: unused
-StrView word_to_lexeme_str(Arena &scratch, Arena &a,
-                                         const Word &w) {
+StrView word_to_lexeme_str(Arena &scratch, Arena &a, const Word &w) {
 	StrBuilder strs{};
 	switch (w.type) {
 	case WordType::Nil:

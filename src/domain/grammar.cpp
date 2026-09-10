@@ -7,51 +7,10 @@
 #include "word.h"
 
 namespace {
-static constexpr Arr<StrView, 34> separable_prefixes = {
-	  "ab"_v,
-	  "an"_v,
-	  "auf"_v,
-	  "aus"_v,
-	  "bei"_v,
-	  "dar"_v,
-	  "ein"_v,
-	  "empor"_v,
-	  "fest"_v,
-	  "fort"_v,
-	  "her"_v,
-	  "heraus"_v,
-	  "herein"_v,
-	  "hin"_v,
-	  "los"_v,
-	  "nieder"_v,
-	  "mit"_v,
-	  "nach"_v,
-	  "raus"_v,
-	  "rein"_v,
-	  "rüber"_v,
-	  "teil"_v,
-	  "vor"_v,
-	  "weg"_v,
-	  "weiter"_v,
-	  "zu"_v,
-	  "zurück"_v,
-	  "zusammen"_v,
 
-	  // separable parts, but not prefixes
-	  "statt"_v,
-	  "frei"_v,
-	  "bloß"_v,
-	  "gut"_v,
-	  "tot"_v,
-	  "fern"_v,
-};
-static constexpr Arr<StrView, 7> dual_prefixes = {
-	  "durch"_v, "hinter"_v, "um"_v,  "unter"_v,
-	  "wider"_v, "wieder"_v, "über"_v};
 static constexpr Arr<StrView, 8> inseparable_prefixes = {
 	  "be"_v, "emp"_v, "ent"_v, "er"_v, "ge"_v, "miss"_v, "ver"_v, "zer"_v};
 static constexpr Arr<StrView, 2> no_ge_suffixes = {"ieren"_v, "eien"_v};
-// ====================================
 
 template <Size N>
 StrView starts_with_one_of(StrView str, Arr<StrView, N> arr,
@@ -74,120 +33,71 @@ template <Size N> StrView ends_with_one_of(StrView str, Arr<StrView, N> arr) {
 	return {};
 }
 
-/*
- * is_separable to treat dual suffixes as separable
- *  NOTE: result may be in scratch arena
- */
-StrView verb_form_pp(Arena &scratch, StrView inf, bool is_separable) {
+inline bool needs_intercalary_e(StrView base) {
+	if (base.size < 2)
+		return false;
+	char last = base.last();
+	char prev = base[base.size - 2];
+
 	auto is_consonant = [](char ch) {
-		char lower_ch = std::tolower(static_cast<unsigned char>(ch));
-
-		if (!std::isalpha(static_cast<unsigned char>(ch))) {
-			return false;
-		}
-
-		return !(lower_ch == 'a' || lower_ch == 'e' || lower_ch == 'i' ||
-		         lower_ch == 'o' || lower_ch == 'u');
+		char lower = std::tolower(static_cast<unsigned char>(ch));
+		return std::isalpha(static_cast<unsigned char>(ch)) &&
+		       !(lower == 'a' || lower == 'e' || lower == 'i' || lower == 'o' ||
+		         lower == 'u');
 	};
 
-	auto pref = starts_with_one_of(inf, separable_prefixes);
-	{
-		if (!pref && is_separable) {
-			pref = starts_with_one_of(inf, dual_prefixes);
-		}
-		inf = inf.slice(pref.size);
-	}
+	bool is_d_or_t = (last == 'd' || last == 't');
+	bool is_hard_nasal = (last == 'm' || last == 'n') && is_consonant(prev) &&
+	                     (prev != 'l' && prev != 'r' && prev != 'm' &&
+	                      prev != 'n' && prev != 'h');
 
-	bool is_ending_en = (inf[inf.size - 2] == 'e');
-	auto base = inf.slice(0, is_ending_en ? inf.size - 2 : inf.size - 1);
+	return is_d_or_t || is_hard_nasal;
+}
+
+StrView verb_form_pp(Arena &scratch, const Verb &v) {
+	StrView pref = grammar::verb_separable_prefix(v);
+	StrView stem = grammar::verb_stem(v); // infinitive without separable prefix
+
 	StrBuilder builder{};
-
 	if (pref) {
 		builder.push(scratch, pref);
 	}
 
-	auto inseparable_prefix = starts_with_one_of(inf, inseparable_prefixes);
-	bool do_not_add_ge = ends_with_one_of(inf, no_ge_suffixes) ||
-	                     (inf.size > 6 && inseparable_prefix);
+	bool do_not_add_ge = ends_with_one_of(stem, no_ge_suffixes) ||
+	                     (starts_with_one_of(stem, inseparable_prefixes));
 	if (!do_not_add_ge) {
 		builder.push(scratch, "ge"_v);
 	}
 
-	builder.push(scratch, base);
-
-	if (base.size >= 2) {
-		char last = base.last();
-		char prev = base[base.size - 2];
-
-		bool is_d_or_t = (last == 'd' || last == 't');
-
-		// we need -e- for -tm, -dm, -fn, -chn, -gn, -kn, etc.
-		// and not for -mm, -nn, -lm, -rm, -hm:
-		bool is_m_or_n_with_hard_cons =
-			  (last == 'm' || last == 'n') && is_consonant(prev) &&
-			  (prev != 'l' && prev != 'r' && prev != 'm' && prev != 'n' &&
-		       prev != 'h');
-
-		if (is_d_or_t || is_m_or_n_with_hard_cons) {
-			builder.push(scratch, "e"_v);
-		}
+	builder.push(scratch, stem);
+	if (needs_intercalary_e(stem)) {
+		builder.push(scratch, "e"_v);
 	}
 	builder.push(scratch, "t"_v);
+
 	return builder.join(scratch);
 }
 
-/*
- * is_separable to treat dual suffixes as separable
- *  NOTE: result may be in scratch arena
- */
-StrView verb_form_with_ending(Arena &scratch, StrView inf, StrView ending,
-                              bool is_separable) {
-	auto is_consonant = [](char ch) {
-		char lower_ch = std::tolower(static_cast<unsigned char>(ch));
+StrView verb_form_with_ending(Arena &scratch, const Verb &v, StrView ending) {
+	StrView pref = grammar::verb_separable_prefix(v);
+	StrView stem = grammar::verb_infinitive_without_separable_prefix(v);
 
-		if (!std::isalpha(static_cast<unsigned char>(ch))) {
-			return false;
-		}
+	bool is_ending_en = (stem.size >= 2 && stem[stem.size - 2] == 'e');
+	StrView base = stem.slice(0, is_ending_en ? stem.size - 2 : stem.size - 1);
 
-		return !(lower_ch == 'a' || lower_ch == 'e' || lower_ch == 'i' ||
-		         lower_ch == 'o' || lower_ch == 'u');
-	};
-
-	auto pref = starts_with_one_of(inf, separable_prefixes);
-	{
-		if (!pref && is_separable) {
-			pref = starts_with_one_of(inf, dual_prefixes);
-		}
-		inf = inf.slice(pref.size);
-	}
-
-	bool is_ending_en = (inf[inf.size - 2] == 'e');
-	auto base = inf.slice(0, is_ending_en ? inf.size - 2 : inf.size - 1);
 	StrBuilder builder{};
 	builder.push(scratch, base);
 
-	if (base.size >= 2) {
-		char last = base.last();
-		char prev = base[base.size - 2];
-
-		bool is_d_or_t = (last == 'd' || last == 't');
-
-		// we need -e- for -tm, -dm, -fn, -chn, -gn, -kn, etc.
-		// and not for -mm, -nn, -lm, -rm, -hm:
-		bool is_m_or_n_with_hard_cons =
-			  (last == 'm' || last == 'n') && is_consonant(prev) &&
-			  (prev != 'l' && prev != 'r' && prev != 'm' && prev != 'n' &&
-		       prev != 'h');
-
-		if (is_d_or_t || is_m_or_n_with_hard_cons) {
-			builder.push(scratch, "e"_v);
-		}
+	if (needs_intercalary_e(base)) {
+		builder.push(scratch, "e"_v);
 	}
 	builder.push(scratch, ending);
+
 	if (pref) {
 		builder.push(scratch, " "_v);
 		builder.push(scratch, pref);
 	}
+
 	return builder.join(scratch);
 }
 
@@ -195,8 +105,15 @@ StrView verb_form_with_ending(Arena &scratch, StrView inf, StrView ending,
 
 namespace grammar {
 
-bool is_plural_only(const Noun &n) { return n.plural_suffix == "(pl.)"; }
-bool is_singular_only(const Noun &n) { return n.plural_suffix == "(sg.)"; }
+bool is_plural_only(const Noun &n) { return n.plural_suffix == "(pl.)"_v; }
+bool is_singular_only(const Noun &n) { return n.plural_suffix == "(sg.)"_v; }
+bool is_aux_sein(const Verb &v) {
+	return v.auxv_and_past_participle.is_starts_with("ist"_v);
+}
+
+bool is_regular(const Verb &v) {
+	return !v.third_person && (!v.praeteritum || v.praeteritum == "-"_v);
+}
 
 StrView noun_singular_with_article(Arena &scratch, const Noun &n) {
 	if (is_plural_only(n)) {
@@ -395,12 +312,32 @@ StrView noun_plural_with_article(Arena &scratch, const Noun &n) {
 	return {};
 }
 
+bool verb_is_separable_prefix(const Verb &v) { return v.separable_prefix_size; }
+
+StrView verb_separable_prefix(const Verb &v) {
+	return v.infinitive.slice(0, v.separable_prefix_size);
+}
+
+StrView verb_stem(const Verb &v) {
+	auto ret = verb_infinitive_without_separable_prefix(v);
+	if ('e' == ret[ret.size - 2]) {
+		return ret.slice(0, ret.size - 2);
+	}
+	--ret.size;
+	return ret;
+}
+
+StrView verb_infinitive_without_separable_prefix(const Verb &v) {
+	auto ret = v.infinitive.slice(v.separable_prefix_size);
+	return ret;
+}
+
 StrView verb_past_participle(Arena &scratch, const Verb &v) {
 	auto [aux, pp] = v.auxv_and_past_participle.split();
 	if (aux && pp) {
 		return pp;
 	}
-	return verb_form_pp(scratch, v.infinitive, true);
+	return verb_form_pp(scratch, v);
 }
 
 StrView verb_perfect_full(Arena &scratch, const Verb &v) {
@@ -411,24 +348,30 @@ StrView verb_perfect_full(Arena &scratch, const Verb &v) {
 
 	StrBuilder builder{};
 	builder.push(scratch, aux ? aux : "hat"_v);
-	builder.push(scratch, pp ? pp : verb_form_pp(scratch, v.infinitive, true));
+	builder.push(scratch, pp ? pp : verb_form_pp(scratch, v));
 	return builder.join(scratch, ' ');
 }
 
 StrView verb_praeteritum_full(Arena &scratch, const Verb &v) {
-	if (v.praeteritum) {
+	if (v.praeteritum && v.praeteritum != "-"_v) {
+		if (verb_is_separable_prefix(v)) {
+			return StrView::concat_with(scratch, v.praeteritum,
+			                            verb_separable_prefix(v), ' ');
+		}
 		return v.praeteritum;
-	} else {
-		return verb_form_with_ending(scratch, v.infinitive, "te"_v, true);
 	}
+	return verb_form_with_ending(scratch, v, "te"_v);
 }
 
 StrView verb_third_person_full(Arena &scratch, const Verb &v) {
 	if (v.third_person) {
+		if (verb_is_separable_prefix(v)) {
+			return StrView::concat_with(scratch, v.third_person,
+			                            verb_separable_prefix(v), ' ');
+		}
 		return v.third_person;
-	} else {
-		return verb_form_with_ending(scratch, v.infinitive, "t"_v, true);
 	}
+	return verb_form_with_ending(scratch, v, "t"_v);
 }
 
 } // namespace grammar
