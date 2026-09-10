@@ -415,8 +415,12 @@ bool StrView::is_ends_with(StrView suff) const {
 StrView StrView::concat(Arena &arena, const StrView left, const StrView right) {
 	auto new_size = left.size + right.size;
 	auto new_mem = arena.pushN<char>(new_size);
-	memcpy(new_mem, left.data, left.size);
-	memcpy(new_mem + left.size, right.data, right.size);
+	if (left.size) {
+		memcpy(new_mem, left.data, left.size);
+	}
+	if (right.size) {
+		memcpy(new_mem + left.size, right.data, right.size);
+	}
 	return {new_mem, new_size};
 }
 
@@ -424,9 +428,13 @@ StrView StrView::concat_with(Arena &arena, const StrView left,
                              const StrView right, char delimiter) {
 	auto new_size = left.size + right.size + 1;
 	auto new_mem = arena.pushN<char>(new_size);
-	memcpy(new_mem, left.data, left.size);
+	if (left.size) {
+		memcpy(new_mem, left.data, left.size);
+	}
 	new_mem[left.size] = delimiter;
-	memcpy(new_mem + left.size + 1, right.data, right.size);
+	if (right.size) {
+		memcpy(new_mem + left.size + 1, right.data, right.size);
+	}
 	return {new_mem, new_size};
 }
 
