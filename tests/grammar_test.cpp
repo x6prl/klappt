@@ -323,6 +323,18 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "macht"_v);
 	}
 	{
+		Verb v{.infinitive = "betteln"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebettelt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebettelt"_v);
+	}
+	{
 		Verb v{.infinitive = "drucken"_v,
 		       .third_person = ""_v,
 		       .praeteritum = ""_v,

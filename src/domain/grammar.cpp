@@ -65,6 +65,11 @@ StrView verb_form_pp(Arena &scratch, const Verb &v) {
 
 	bool do_not_add_ge = ends_with_one_of(stem, no_ge_suffixes) ||
 	                     (starts_with_one_of(stem, inseparable_prefixes));
+	// there are words like bessern and betten;
+	if (stem.is_starts_with("be"_v)) {
+		auto str = stem.slice(2);
+		do_not_add_ge = do_not_add_ge && str.size > 2 && str[1] != str.first();
+	}
 	if (!do_not_add_ge) {
 		builder.push(scratch, "ge"_v);
 	}
@@ -80,15 +85,12 @@ StrView verb_form_pp(Arena &scratch, const Verb &v) {
 
 StrView verb_form_with_ending(Arena &scratch, const Verb &v, StrView ending) {
 	StrView pref = grammar::verb_separable_prefix(v);
-	StrView stem = grammar::verb_infinitive_without_separable_prefix(v);
-
-	bool is_ending_en = (stem.size >= 2 && stem[stem.size - 2] == 'e');
-	StrView base = stem.slice(0, is_ending_en ? stem.size - 2 : stem.size - 1);
+	StrView stem = grammar::verb_stem(v);
 
 	StrBuilder builder{};
-	builder.push(scratch, base);
+	builder.push(scratch, stem);
 
-	if (needs_intercalary_e(base)) {
+	if (needs_intercalary_e(stem)) {
 		builder.push(scratch, "e"_v);
 	}
 	builder.push(scratch, ending);
