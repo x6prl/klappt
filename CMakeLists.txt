@@ -11,6 +11,15 @@ set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE INTERNAL "")
 # Declare the project
 project(klappt)
 
+# Use mold if present
+find_program(MOLD_PROGRAM mold)
+if (MOLD_PROGRAM)
+    set(CMAKE_LINKER_TYPE MOLD)
+    message(STATUS "mold found: ${MOLD_PROGRAM}")
+else ()
+    message(STATUS "mold not found")
+endif ()
+
 include(CTest)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Og")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fwrapv -fsanitize=address,undefined,thread ")
