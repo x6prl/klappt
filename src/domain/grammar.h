@@ -15,6 +15,8 @@ bool is_singular_only(const Noun &n);
 [[nodiscard]]
 bool is_aux_sein(const Verb &v);
 [[nodiscard]]
+bool is_irrregular(const Verb &v);
+[[nodiscard]]
 bool is_regular(const Verb &v);
 
 /*
@@ -34,11 +36,14 @@ StrView noun_plural_with_article(Arena &scratch, const Noun &n);
 [[nodiscard]]
 bool verb_is_separable_prefix(const Verb &v);
 [[nodiscard]]
+StrView verb_infinitive_without_separable_prefix(const Verb &v);
+[[nodiscard]]
 StrView verb_stem(const Verb &v);
+// [stem, inf_without_pref]
+[[nodiscard]]
+Pair<StrView, StrView> verb_stem_and_infinitive_without_separable_prefix(const Verb &v);
 [[nodiscard]]
 StrView verb_separable_prefix(const Verb &v);
-[[nodiscard]]
-StrView verb_infinitive_without_separable_prefix(const Verb &v);
 [[nodiscard]]
 StrView verb_past_participle(Arena &scratch, const Verb &v);
 [[nodiscard]]

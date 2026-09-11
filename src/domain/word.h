@@ -78,5 +78,5 @@ StrView word_primary_lemma(const Word &word);
 Word word_clone(Arena &a, const Word &src);
 StrView word_tts_full(Arena &a, const Word &word);
 
-// NOTE: unused
+[[maybe_unused]]
 StrView word_to_lexeme_str(Arena &scratch, Arena &a, const Word &w);

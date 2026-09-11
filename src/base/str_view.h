@@ -110,6 +110,8 @@ struct StrView {
 	bool is_contains_substr(StrView substr) const;
 	bool is_contains_punctuation() const;
 	bool is_contains_punctuation_unicode() const;
+	// excluding 'y' and 'Y'
+	bool is_contains_vowels_german() const;
 	bool is_starts_with(char ch) const;
 	bool is_starts_with(StrView pref) const;
 	bool is_ends_with(char ch) const;
@@ -136,6 +138,8 @@ struct StrView {
 
 	static StrView from_chars(Arena &a, const char *data, int size);
 	static StrView from_chars(Arena &a, const char *data);
+
+	static int8_t utf8_codepoint_size(uint8_t b);
 
 	const char *begin() const;
 	const char *end() const;

@@ -3,7 +3,9 @@
 #include <cctype>
 
 #include "base/arr.h"
+#include "base/profiler.h"
 #include "base/str_builder.h"
+#include "base/str_view.h"
 #include "word.h"
 
 namespace {
@@ -11,29 +13,71 @@ namespace {
 static constexpr Arr<StrView, 8> inseparable_prefixes = {
 	  "be"_v, "emp"_v, "ent"_v, "er"_v, "ge"_v, "miss"_v, "ver"_v, "zer"_v};
 static constexpr Arr<StrView, 2> no_ge_suffixes = {"ieren"_v, "eien"_v};
+static constexpr Arr<StrView, 8> stem_parts_exceptions = {
+	  "icht"_v, "ister"_v, "ter"_v,  "ier"_v,
+	  "utel"_v, "ifer"_v,  "cher"_v, "isl"_v};
 
 template <Size N>
-StrView starts_with_one_of(StrView str, Arr<StrView, N> arr,
-                           Size size_addon = 4) {
+bool stem_starts_with_one_of_and_stem_looks_valid(StrView stem,
+                                                  Arr<StrView, N> arr) {
+	constexpr Size VALID_STEM_LENGTH_MIN = 3;
 	for (auto &pref : arr) {
-		bool is_long_enough = str.size >= pref.size + size_addon;
-		if (is_long_enough && pref == str.slice(0, pref.size)) {
-			return pref;
+		if (stem.is_starts_with(pref)) {
+			// there are words like bessern and betten, ernten and erben
+			// also beichten, geistern, entern
+			// these should take 'ge',
+			// and sser, tt, nt, b, icht, ister, ter, etc. — are not valid stems
+			if (stem.utf8_length() >=
+			    pref.utf8_length() + VALID_STEM_LENGTH_MIN) {
+				auto without_pref = stem.slice(pref.size);
+
+				// NOTE: if first stem symbol is  ß — it is
+				// automatically makes impossible 'without_pref' to be a valid
+				// stem
+				constexpr auto eszett = "ß"_v;
+				auto is_starts_with_eszett =
+					  0 == memcmp(without_pref.data, eszett.data, eszett.size);
+				// NOTE: cases like 'bessern' and 'betten'
+				bool has_double_letter =
+					  without_pref[1] == without_pref.first();
+				// NOTE: also, a valid stem should contain a german vowel
+				if (!is_starts_with_eszett && !has_double_letter &&
+				    without_pref.is_contains_vowels_german()) [[unlikely]] {
+					if (stem_parts_exceptions.is_contains(without_pref))
+						  [[unlikely]] {
+						return false;
+					}
+					return true;
+				}
+			}
 		}
 	}
-	return {};
+	return false;
 }
 
-template <Size N> StrView ends_with_one_of(StrView str, Arr<StrView, N> arr) {
-	for (auto &suf : arr) {
-		if (str.size >= suf.size && suf == str.slice(str.size - suf.size)) {
-			return suf;
+template <Size N>
+bool infinitiv_ends_with_one_of_and_infinitiv_looks_valid(StrView infinitiv,
+                                                          Arr<StrView, N> arr) {
+	for (auto &suff : arr) {
+		if (infinitiv.is_ends_with(suff)) {
+			// there are words like schneien
+			// these should take 'ge',
+			// and schn and others — are not valid start for such an infinitiv
+			if (infinitiv.utf8_length() >= suff.utf8_length() + 2) {
+				// SDL_Log(StrView_Fmt, StrView_Arg(infinitiv));
+				auto without_suff =
+					  infinitiv.slice(0, infinitiv.size - suff.size);
+				if (without_suff.is_contains_vowels_german()) {
+					return true;
+				}
+			}
 		}
 	}
-	return {};
+	return false;
 }
 
 inline bool needs_intercalary_e(StrView base) {
+	KLAPPT_PROFILE_SCOPE_N("grammar::needs_intercalary_e");
 	if (base.size < 2)
 		return false;
 	char last = base.last();
@@ -55,22 +99,22 @@ inline bool needs_intercalary_e(StrView base) {
 }
 
 StrView verb_form_pp(Arena &scratch, const Verb &v) {
+	KLAPPT_PROFILE_SCOPE_N("grammar::verb_form_pp");
 	StrView pref = grammar::verb_separable_prefix(v);
-	StrView stem = grammar::verb_stem(v); // infinitive without separable prefix
+
+	auto [stem, inf_without_pref] =
+		  grammar::verb_stem_and_infinitive_without_separable_prefix(
+				v); // no prefix and -n/-en
 
 	StrBuilder builder{};
 	if (pref) {
 		builder.push(scratch, pref);
 	}
 
-	bool do_not_add_ge = ends_with_one_of(stem, no_ge_suffixes) ||
-	                     (starts_with_one_of(stem, inseparable_prefixes));
-	// there are words like bessern and betten;
-	// TODO: investigate, are there more such cases?
-	if (stem.is_starts_with("be"_v)) {
-		auto str = stem.slice(2);
-		do_not_add_ge = do_not_add_ge && str.size > 2 && str[1] != str.first();
-	}
+	bool do_not_add_ge = infinitiv_ends_with_one_of_and_infinitiv_looks_valid(
+							   inf_without_pref, no_ge_suffixes) ||
+	                     (stem_starts_with_one_of_and_stem_looks_valid(
+							   stem, inseparable_prefixes));
 	if (!do_not_add_ge) {
 		builder.push(scratch, "ge"_v);
 	}
@@ -85,6 +129,7 @@ StrView verb_form_pp(Arena &scratch, const Verb &v) {
 }
 
 StrView verb_form_with_ending(Arena &scratch, const Verb &v, StrView ending) {
+	KLAPPT_PROFILE_SCOPE_N("grammar::verb_form_with_ending");
 	StrView pref = grammar::verb_separable_prefix(v);
 	StrView stem = grammar::verb_stem(v);
 
@@ -114,9 +159,12 @@ bool is_aux_sein(const Verb &v) {
 	return v.auxv_and_past_participle.is_starts_with("ist"_v);
 }
 
-bool is_regular(const Verb &v) {
-	return !v.third_person && (!v.praeteritum || v.praeteritum == "-"_v);
+bool is_irrregular(const Verb &v) {
+	return v.third_person || v.praeteritum ||  //
+	       v.auxv_and_past_participle.size > 3 // !just 'hat' and !just 'ist'
+		  ;
 }
+bool is_regular(const Verb &v) { return !is_irrregular(v); }
 
 StrView noun_singular_with_article(Arena &scratch, const Noun &n) {
 	if (is_plural_only(n)) {
@@ -321,18 +369,24 @@ StrView verb_separable_prefix(const Verb &v) {
 	return v.infinitive.slice(0, v.separable_prefix_size);
 }
 
-StrView verb_stem(const Verb &v) {
-	auto ret = verb_infinitive_without_separable_prefix(v);
-	if ('e' == ret[ret.size - 2]) {
-		return ret.slice(0, ret.size - 2);
-	}
-	--ret.size;
-	return ret;
-}
-
 StrView verb_infinitive_without_separable_prefix(const Verb &v) {
 	auto ret = v.infinitive.slice(v.separable_prefix_size);
 	return ret;
+}
+
+StrView verb_stem(const Verb &v) {
+	return verb_stem_and_infinitive_without_separable_prefix(v).first;
+}
+
+Pair<StrView, StrView>
+verb_stem_and_infinitive_without_separable_prefix(const Verb &v) {
+	const StrView inf = verb_infinitive_without_separable_prefix(v);
+	// '-en' case
+	if ('e' == inf[inf.size - 2]) {
+		return {inf.slice(0, inf.size - 2), inf};
+	}
+	// '-n' case
+	return {{inf.data, inf.size - 1}, inf};
 }
 
 StrView verb_past_participle(Arena &scratch, const Verb &v) {

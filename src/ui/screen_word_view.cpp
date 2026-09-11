@@ -23,7 +23,7 @@
 
 namespace {
 
-// // NOTE: unused
+[[maybe_unused]]
 static inline StrView word_to_str(Arena &scratch, Arena &a, const Word &w) {
 	StrBuilder strs{};
 	auto word_str = word_to_lexeme_str(scratch, a, w);

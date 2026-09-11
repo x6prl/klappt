@@ -221,7 +221,7 @@ Word word_clone(Arena &a, const Word &src) {
 	return dst;
 }
 
-// NOTE: unused
+[[maybe_unused]]
 StrView word_to_lexeme_str(Arena &scratch, Arena &a, const Word &w) {
 	StrBuilder strs{};
 	switch (w.type) {

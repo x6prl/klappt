@@ -335,6 +335,258 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "hat gebettelt"_v);
 	}
 	{
+		Verb v{.infinitive = "ernten"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "geerntet"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat geerntet"_v);
+	}
+	{
+		Verb v{.infinitive = "bechern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebechert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebechert"_v);
+	}
+	{
+		Verb v{.infinitive = "beisln"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebeislt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebeislt"_v);
+	}
+	{
+		Verb v{.infinitive = "beichten"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebeichtet"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebeichtet"_v);
+	}
+	{
+		Verb v{.infinitive = "geistern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gegeistert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gegeistert"_v);
+	}
+	{
+		Verb v{.infinitive = "entern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "geentert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat geentert"_v);
+	}
+	{
+		Verb v{.infinitive = "erörtern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "erörtert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat erörtert"_v);
+	}
+	{
+		Verb v{.infinitive = "entäußern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "entäußert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat entäußert"_v);
+	}
+	{
+		Verb v{.infinitive = "erben"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "geerbt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat geerbt"_v);
+	}
+	{
+		Verb v{.infinitive = "beuteln"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebeutelt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebeutelt"_v);
+	}
+	{
+		Verb v{.infinitive = "beiern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebeiert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebeiert"_v);
+	}
+	{
+		Verb v{.infinitive = "geiern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gegeiert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gegeiert"_v);
+	}
+	{
+		Verb v{.infinitive = "geifern"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gegeifert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gegeifert"_v);
+	}
+	{
+		Verb v{.infinitive = "telefonieren"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "telefoniert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat telefoniert"_v);
+	}
+	{
+		Verb v{.infinitive = "kasteien"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "kasteit"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat kasteit"_v);
+	}
+	{
+		Verb v{.infinitive = "prophezeien"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "prophezeit"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat prophezeit"_v);
+	}
+	{
+		Verb v{.infinitive = "schmieren"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "geschmiert"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat geschmiert"_v);
+	}
+	{
+		Verb v{.infinitive = "bleien"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "gebleit"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat gebleit"_v);
+	}
+	{
+		Verb v{.infinitive = "schneien"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "geschneit"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat geschneit"_v);
+	}
+	{
+		Verb v{.infinitive = "verjagen"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "verjagt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat verjagt"_v);
+	}
+	{
+		Verb v{.infinitive = "benoten"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "benotet"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat benotet"_v);
+	}
+	{
 		Verb v{.infinitive = "drucken"_v,
 		       .third_person = ""_v,
 		       .praeteritum = ""_v,

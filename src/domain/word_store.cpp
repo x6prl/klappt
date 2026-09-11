@@ -50,6 +50,7 @@ inline bool is_local_temp_id(WordId id) {
 }
 
 // NOTE: yet unused
+[[maybe_unused]]
 WordId generate_next_local_temp_id(Arena &scratch,
                                    Xapian::WritableDatabase &db) {
 	auto g = scratch.guard();

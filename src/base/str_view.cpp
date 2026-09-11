@@ -10,7 +10,7 @@ namespace {
 // Stolen from https://github.com/tsoding/nob.h/blob/main/nob.h
 // which is
 // Stolen from Jai's Unicode module
-static const int8_t bytes_for_utf8[] = {
+static constexpr int8_t bytes_for_utf8[] = {
 	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -53,7 +53,7 @@ uint32_t decode_utf8_at(const char *data, Size size, Size i, Size &char_len) {
 	uint8_t b0 = static_cast<uint8_t>(data[i]);
 	char_len = bytes_for_utf8[b0];
 
-	if (char_len <= 0 || i + char_len > size) {
+	if (i + char_len > size) {
 		char_len = 1;
 		return b0;
 	}
@@ -387,6 +387,55 @@ bool StrView::is_contains_punctuation_unicode() const {
 	return false;
 }
 
+bool StrView::is_contains_vowels_german() const {
+	int8_t char_len{0};
+	for (Size i{0}; i < size; i += char_len) {
+		uint8_t b0 = static_cast<uint8_t>(data[i]);
+		char_len = bytes_for_utf8[b0];
+
+		if (i + char_len > size) [[unlikely]] {
+			char_len = 1;
+			break;
+		}
+
+		if (char_len == 1) [[likely]] {
+			switch (b0) {
+			case 'a':
+			case 'o':
+			case 'e':
+			case 'u':
+			case 'i':
+			// case 'y': // not considered as a vowel!!
+			case 'A':
+			case 'O':
+			case 'E':
+			case 'U':
+			case 'I':
+				// case 'Y': // not considered as a vowel!!
+				return true;
+			default:
+				break;
+			}
+		} else if (char_len == 2 && (0xC3 == b0)) {
+			uint8_t b1 = static_cast<uint8_t>(data[i + 1]);
+			switch (b1) {
+			case 0xA4: // ä
+			case 0xB6: // ö
+			case 0xBC: // ü
+			case 0x84: // Ä
+			case 0x96: // Ö
+			case 0x9C: // Ü
+				return true;
+			default:
+				break;
+			}
+		} else [[unlikely]] {
+			continue;
+		}
+	}
+	return false;
+}
+
 bool StrView::is_starts_with(char ch) const {
 	return size > 0 && first() == ch;
 }
@@ -650,3 +699,5 @@ StrView StrView::from_number_hex(Arena &a, uint64_t val) {
 	}
 	return {data, 16};
 }
+
+int8_t StrView::utf8_codepoint_size(uint8_t b) { return bytes_for_utf8[b]; }
