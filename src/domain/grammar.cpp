@@ -66,6 +66,7 @@ StrView verb_form_pp(Arena &scratch, const Verb &v) {
 	bool do_not_add_ge = ends_with_one_of(stem, no_ge_suffixes) ||
 	                     (starts_with_one_of(stem, inseparable_prefixes));
 	// there are words like bessern and betten;
+	// TODO: investigate, are there more such cases?
 	if (stem.is_starts_with("be"_v)) {
 		auto str = stem.slice(2);
 		do_not_add_ge = do_not_add_ge && str.size > 2 && str[1] != str.first();
