@@ -92,7 +92,19 @@ static StrView phrase_word_class_to_badge(StrView cls) {
 		return "Interjektion"_v;
 	}
 	if (cls == "phrase"_v) {
-		return "Redewendung"_v; // or "Phrase"_v
+		return "Redewendung"_v; // or "Ausdruck"_v
+	}
+	if (cls == "id"_v || cls == "idiom"_v) {
+		return "Redewendung"_v;
+	}
+	if (cls == "contraction"_v) {
+		return "Kurzform"_v; // or "Kontraktion"_v (perfect for 's, is', etc.)
+	}
+	if (cls == "abbrev"_v || cls == "abbreviation"_v) {
+		return "Abkürzung"_v;
+	}
+	if (cls == "name"_v) {
+		return "Eigenname"_v;
 	}
 	if (cls == "affix"_v) {
 		return "Affix"_v;
@@ -102,6 +114,21 @@ static StrView phrase_word_class_to_badge(StrView cls) {
 	}
 	if (cls == "suffix"_v) {
 		return "Suffix"_v;
+	}
+	if (cls == "symbol"_v) {
+		return "Symbol"_v;
+	}
+	if (cls == "punct"_v || cls == "punctuation"_v) {
+		return "Satzzeichen"_v;
+	}
+	if (cls == "verb"_v) {
+		return "Verb"_v;
+	}
+	if (cls == "adj"_v) {
+		return "Adjektiv"_v;
+	}
+	if (cls == "adv"_v) {
+		return "Adverb"_v;
 	}
 	return cls;
 }
