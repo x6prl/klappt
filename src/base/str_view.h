@@ -35,8 +35,10 @@ struct StrView {
 	bool operator==(const StrView &other) const;
 	bool operator!=(const StrView &other) const;
 
+	// Does not check the size!
 	[[nodiscard]]
 	char first() const;
+	// Does not check the size!
 	[[nodiscard]]
 	char last() const;
 
@@ -68,7 +70,9 @@ struct StrView {
 	StrView &mut_trimr_by(int (*handler)(int ch));
 	StrView &mut_trim_by(int (*handler)(int ch));
 
+	// Does not check the size!
 	StrView &mut_chopl();
+	// Does not check the size!
 	StrView &mut_chopr();
 
 	// Non-mutating trim variants. Return a trimmed copy of this view.
