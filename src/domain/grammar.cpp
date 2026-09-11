@@ -27,13 +27,13 @@ bool stem_starts_with_one_of_and_stem_looks_valid(StrView stem,
 			// also beichten, geistern, entern
 			// these should take 'ge',
 			// and sser, tt, nt, b, icht, ister, ter, etc. — are not valid stems
-			if (stem.utf8_length() >=
-			    pref.utf8_length() + VALID_STEM_LENGTH_MIN) {
-				auto without_pref = stem.slice(pref.size);
-
+			const StrView without_pref = {stem.data + pref.size,
+			                              stem.size - pref.size};
+			const auto without_pref_length = without_pref.utf8_length();
+			if (without_pref_length >= VALID_STEM_LENGTH_MIN) {
 				// NOTE: if first stem symbol is  ß — it is
-				// automatically makes impossible 'without_pref' to be a valid
-				// stem
+				// automatically makes impossible 'without_pref' to be a
+				// valid stem
 				constexpr auto eszett = "ß"_v;
 				auto is_starts_with_eszett =
 					  0 == memcmp(without_pref.data, eszett.data, eszett.size);
@@ -47,8 +47,15 @@ bool stem_starts_with_one_of_and_stem_looks_valid(StrView stem,
 						  [[unlikely]] {
 						return false;
 					}
+					// SDL_Log(StrView_Fmt " | >>%" PRSize " vs size: %" PRSize,
+					//         StrView_Arg(without_pref),
+					//         without_pref.utf8_length(), without_pref.size);
 					return true;
 				}
+			} else if (2 == without_pref_length && stem == "empör"_v)
+				  [[unlikely]] {
+				// NOTE: empören...
+				return true;
 			}
 		}
 	}

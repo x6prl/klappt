@@ -1,116 +1,129 @@
-#include "SDL3/SDL_log.h"
+#include "app/app_context.h"
 #include "app/words_init.h"
 #include "app/worker.h"
-#include "base/atomic.h"
+#include "base/arr.h"
 #include "base/str_view.h"
 #include "domain/settings.h"
 #include "platform/net_worker.h"
+
 #include "ui/components/button.h"
-#include "ui/components/download_data.h"
 #include "ui/components/net_download_row.h"
 #include "ui/components/switch_button.h"
 #include "ui/dpi.h"
-#include "ui/screen_helpers.h"
 #include "ui/themes.h"
-#include <utility>
+
+#include "screen_helpers.h"
+#include "ui/translations/langs.h"
 
 namespace {
-void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
-                     StrView sub_text, bool is_turned_on, auto on_switched) {
-	auto label_text_size = udpi(16.f);
-	auto sub_text_size = udpi(12.f);
+
+static inline void onboarding_advance(AppContext *ctx, int delta = 1) {
+	ctx->settings.onboarding_stage += delta;
+	ctx->settings.save(ctx->arena_frame);
+	ctx->push_one_frame();
+}
+
+static inline StrView get_language_display_name(Lang lang) {
+	switch (lang) {
+	case lang_en:
+		return "English"_v;
+	case lang_ru:
+		return "Русский"_v;
+	case lang_tr:
+		return "Türkçe"_v;
+	case lang_ar:
+		return "العربية"_v;
+	default:
+		return lang_code(lang);
+	}
+}
+
+static void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
+                            StrView sub_text, bool is_turned_on,
+                            auto on_switched) {
+	const auto label_size = static_cast<uint16_t>(udpi(15.5f));
+	const auto sub_size = static_cast<uint16_t>(udpi(12.f));
 
 	CLAY(id,
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-						   .childGap = udpi(14.0f),
+						   .padding = CLAY_PADDING_ALL(udpi(14.0f)),
+						   .childGap = udpi(12.0f),
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
+						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					 },
 			   .backgroundColor = theme()->surfaceContainer,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16)),
-
-			   // .border = {.color = theme()->outline,
-	           //                  .width = {.bottom = udpi(1.f)}},
+			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
 		 }) {
-		CLAY(CLAY_IDI("Label", id.id),
+		CLAY(CLAY_IDI("LabelCol", id.id),
 		     {
 				   .layout =
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
+							   .childGap = udpi(3.0f),
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
-
 			 }) {
-			draw_text(label, theme()->onSurface, label_text_size,
+			draw_text(label, theme()->onSurface, label_size,
 			          translation_font_id(ctx), CLAY_TEXT_WRAP_WORDS,
 			          CLAY_TEXT_ALIGN_LEFT);
-			draw_text(sub_text, theme()->onSurface, sub_text_size,
-			          translation_font_id(ctx), CLAY_TEXT_WRAP_WORDS,
-			          CLAY_TEXT_ALIGN_LEFT);
+
+			auto sub_col = theme()->onSurface;
+			sub_col.a = static_cast<uint8_t>(sub_col.a * 0.65f);
+			draw_text(sub_text, sub_col, sub_size, translation_font_id(ctx),
+			          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 		}
-		if (switch_button(ctx, CLAY_IDI("Switch", id.id), is_turned_on, 42.f)) {
+
+		if (switch_button(ctx, CLAY_IDI("Switch", id.id), is_turned_on, 30.f)) {
 			on_switched(!is_turned_on);
 			ctx->push_one_frame();
 		}
 	}
 }
 
-bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
-                                       AssetsDL::Type t,
-                                       auto should_be_downloaded_f) {
+static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
+                                              AssetsDL::Type t,
+                                              auto should_be_downloaded_f) {
 	auto &s = ctx->settings;
 	auto &r = s.asset(t);
-	auto es = StrView::from_number(ctx->arena_frame, r.expected_size);
-	SDL_Log("TYPE (%d) ready2unp=%d unp=%d ziprem=%d expected=" StrView_Fmt,
-	        std::to_underlying(t), (int)r.is_zip_ready_to_unpack,
-	        (int)r.is_unpacked, (int)r.is_zip_removed, StrView_Arg(es));
 	if (should_be_downloaded_f(ctx) && !r.is_unpacked && !r.is_zip_removed) {
 		auto pool_index = Worker::net_download_and_unpack_asset(ctx, t);
 		if (pool_index >= 0) {
 			download_track(ctx, pool_index, label);
 		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "unxepected index %lld",
-			             pool_index);
-			if (pool_index == -2) {
+			if (pool_index == -2)
 				return false;
-			} else if (pool_index == -1) {
-				SDL_Log("Was already downloaded, will run unpack...");
-			}
 		}
 	}
 	return true;
-};
-
-bool run_download_and_unpack_tr_asset(AppContext *ctx) {
-	SDL_Log("run_download_and_unpack_tr_asset");
-	return check_and_run_download_and_unpack(                  //
-		  ctx, "Main dictionary"_v, AssetsDL::Type::XAPIAN_TR, //
-		  [](AppContext *_) { return true; }                   //
-	);
 }
 
-bool run_download_and_unpack_optional_assets(AppContext *ctx) {
-	SDL_Log("run_download_and_unpack_optional_assets");
+static bool run_download_and_unpack_tr_asset(AppContext *ctx) {
+	return check_and_run_download_and_unpack(
+		  ctx, "Main dictionary"_v, AssetsDL::Type::XAPIAN_TR,
+		  [](AppContext *_) { return true; });
+}
+
+static bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	auto ret = true;
 	ret = ret &&
 	      check_and_run_download_and_unpack(
 				ctx, "German Wiktionary"_v, AssetsDL::Type::OPTIONAL_XAPIAN_DE,
 				[](AppContext *ctx) { return ctx->settings.is_using_also_de; });
+	// ret = ret && check_and_run_download_and_unpack(
+	// 				   ctx, "English Wiktionary"_v,
+	// 				   AssetsDL::Type::OPTIONAL_XAPIAN_EN, [](AppContext *ctx) {
+	// 					   return ctx->settings.is_using_also_subdict_en;
+	// 				   });
 #if NEURO
-	ret = ret && check_and_run_download_and_unpack(
-					   ctx, "Text-to-speech"_v, AssetsDL::Type::OPTIONAL_TTS,
-					   [](AppContext *ctx) {
-						   SDL_Log("checking tts %d %d %d",
-		                           (int)ctx->settings.is_using_also_de,
-		                           (int)ctx->settings.is_using_tts,
-		                           (int)ctx->settings.is_using_asr);
-						   return ctx->settings.is_using_tts;
-					   });
+	ret = ret &&
+	      check_and_run_download_and_unpack(
+				ctx, "Text-to-speech"_v, AssetsDL::Type::OPTIONAL_TTS,
+				[](AppContext *ctx) { return ctx->settings.is_using_tts; });
 	ret = ret &&
 	      check_and_run_download_and_unpack(
 				ctx, "Voice recognition"_v, AssetsDL::Type::OPTIONAL_ASR,
@@ -119,359 +132,423 @@ bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	return ret;
 }
 
-// bool is_resources_were_downloaded_and_unpacked(AppContext *ctx) {
-// 	// TODO: add integrity check
-// 	auto &s = ctx->settings;
-// 	auto ret = true;
-// 	if (s.is_using_also_de) {
-// 		ret = ret && s.resource(Settings::AssetsDL::Type::OPTIONAL_XAPIAN_DE)
-// 		                   .is_unpacked;
-// 	}
-// 	if (s.is_using_tts) {
-// 		ret = ret &&
-// 		      s.resource(Settings::AssetsDL::Type::OPTIONAL_TTS).is_unpacked;
-// 	}
-// 	if (s.is_using_asr) {
-// 		ret = ret &&
-// 		      s.resource(Settings::AssetsDL::Type::OPTIONAL_ASR).is_unpacked;
-// 	}
-// 	return ret;
-// }
+static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
+	using AType = AssetsDL::Type;
+	auto &s = ctx->settings;
+
+	if (!s.asset(AType::XAPIAN_TR).is_unpacked) {
+		return false;
+	}
+
+	// Опциональные ассеты
+	if (s.is_using_also_de && !s.asset(AType::OPTIONAL_XAPIAN_DE).is_unpacked) {
+		return false;
+	}
+#if NEURO
+	if (s.is_using_tts && !s.asset(AType::OPTIONAL_TTS).is_unpacked) {
+		return false;
+	}
+	if (s.is_using_asr && !s.asset(AType::OPTIONAL_ASR).is_unpacked) {
+		return false;
+	}
+#endif
+
+	return true;
+}
+
+static void draw_segmented_progress_bar(AppContext *ctx, int current_step,
+                                        int total_steps) {
+	CLAY(CLAY_ID("OnboardingProgressBar"),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0),
+	                                  CLAY_SIZING_FIXED(dpi(4.0f))},
+						   .childGap = udpi(6.0f),
+						   .childAlignment = {CLAY_ALIGN_X_CENTER,
+	                                          CLAY_ALIGN_Y_CENTER},
+						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+					 },
+		 }) {
+		for (int i = 0; i < total_steps; ++i) {
+			const bool is_filled = (i <= current_step);
+			CLAY(CLAY_IDI("ProgressSeg", i),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_GROW(0)},
+							 },
+					   .backgroundColor = is_filled
+			                                    ? theme()->primary
+			                                    : theme()->surfaceContainerHigh,
+					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(2.0f)),
+				 }) {}
+		}
+	}
+}
+
+// ====================
+// onboarding screens
+// ====================
+
+static void step_draw_language(AppContext *ctx) {
+	const uint16_t title_size = static_cast<uint16_t>(udpi(22.f));
+
+	CLAY(CLAY_ID("StepCardLang"),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						   .padding = CLAY_PADDING_ALL(udpi(24.0f)),
+						   .childGap = udpi(20.0f),
+						   .childAlignment = {CLAY_ALIGN_X_CENTER,
+	                                          CLAY_ALIGN_Y_CENTER},
+						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					 },
+			   .backgroundColor = theme()->surfaceContainerLow,
+			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+		 }) {
+
+		draw_text("Choose your language"_v, theme()->onSurface, title_size,
+		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+
+		CLAY(CLAY_ID("LangOptionsGroup"),
+		     {
+				   .layout =
+						 {
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_FIT(0)},
+							   .childGap = udpi(10.0f),
+							   .childAlignment = {CLAY_ALIGN_X_CENTER,
+		                                          CLAY_ALIGN_Y_CENTER},
+							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+						 },
+			 }) {
+
+			Settings::for_every_lang([&](int i, Lang lang) {
+				if (lang == lang_ar || lang == lang_tr) {
+					// NOTE: only ru and en now...
+					return;
+				}
+				auto btn_style = mobile_button_style_surface_container_high();
+				btn_style.font_size = 17.f;
+				btn_style.padding_y = dpi(10.f);
+				btn_style.font_id =
+					  (lang == lang_ar) ? FontID::ARABIC_MAIN : FontID::MAIN;
+
+				auto btn =
+					  mobile_button(ctx, CLAY_IDI("LangSelectBtn", i),
+				                    get_language_display_name(lang), btn_style);
+				if (btn.activated()) {
+					ctx->settings.tr_language = lang;
+					ctx->settings.save(ctx->arena_frame);
+					onboarding_advance(ctx, 1);
+				}
+			});
+		}
+	}
+}
+
+static void step_draw_assets(AppContext *ctx) {
+	const uint16_t title_size = static_cast<uint16_t>(udpi(22.f));
+
+	CLAY(CLAY_ID("StepCardAssets"),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						   .padding = CLAY_PADDING_ALL(udpi(20.0f)),
+						   .childGap = udpi(16.0f),
+						   .childAlignment = {CLAY_ALIGN_X_CENTER,
+	                                          CLAY_ALIGN_Y_CENTER},
+						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					 },
+			   .backgroundColor = theme()->surfaceContainerLow,
+			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+		 }) {
+
+		if (ctx->downloads.is_empty()) {
+			draw_text("Ready to download dictionary?"_v, theme()->onSurface,
+			          title_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+			          CLAY_TEXT_ALIGN_CENTER);
+
+			auto sub_col = theme()->onSurface;
+			sub_col.a = static_cast<uint8_t>(sub_col.a * 0.65f);
+			draw_text(
+				  "The offline dictionary will be installed on your device for fast lookup without internet."_v,
+				  sub_col, static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
+				  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+
+			auto dlbtn = mobile_button(ctx, CLAY_ID("DLStartBtn"),
+			                           "Download & Continue"_v,
+			                           mobile_button_style_primary());
+			if (dlbtn.activated()) {
+				(void)run_download_and_unpack_tr_asset(ctx);
+			}
+		} else {
+			// ctx->settings.is_using_also_de = false;
+			draw_option_row(
+				  ctx, CLAY_ID("DEDictOpt"), "German glossary"_v,
+				  "Can be useful, if you can understand a little bit of German. ~110MB"_v,
+				  ctx->settings.is_using_also_de, [ctx](bool val) {
+					  ctx->settings.is_using_also_de = val;
+					  ctx->settings.save(ctx->arena_frame);
+				  });
+			if (ctx->settings.tr_language != lang_en) {
+				draw_option_row(
+					  ctx, CLAY_ID("ENDictOpt"), "English dictionary"_v,
+					  "English dictionary contains more words. It can be usefull, if you can read English. ~70MB"_v,
+					  ctx->settings.is_using_also_subdict_en, [ctx](bool val) {
+						  ctx->settings.is_using_also_subdict_en = val;
+						  ctx->settings.save(ctx->arena_frame);
+					  });
+			} else {
+				// ctx->settings.is_using_also_subdict_en = false;
+			}
+
+#if NEURO
+			draw_option_row(
+				  ctx, CLAY_ID("TTSOpt"), "Text-to-speech"_v,
+				  "Offline pronunciation generation for words and phrases. ~80MB"_v,
+				  ctx->settings.is_using_tts, [ctx](bool val) {
+					  ctx->settings.is_using_tts = val;
+					  ctx->settings.save(ctx->arena_frame);
+				  });
+
+			draw_option_row(ctx, CLAY_ID("ASROpt"), "Speech recognition"_v,
+			                "Voice input training model. ~160MB"_v,
+			                ctx->settings.is_using_asr, [ctx](bool val) {
+								ctx->settings.is_using_asr = val;
+								ctx->settings.save(ctx->arena_frame);
+							});
+#endif
+
+			auto next_btn =
+				  mobile_button(ctx, CLAY_ID("AssetsNextBtn"), "Next"_v,
+			                    mobile_button_style_primary());
+			if (next_btn.activated()) {
+				run_download_and_unpack_optional_assets(ctx);
+				onboarding_advance(ctx, 1);
+			}
+		}
+	}
+}
+
+static void step_draw_default_screen(AppContext *ctx) {
+	const uint16_t title_size = static_cast<uint16_t>(udpi(22.f));
+
+	CLAY(CLAY_ID("StepCardDefaultScreen"),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						   .padding = CLAY_PADDING_ALL(udpi(24.0f)),
+						   .childGap = udpi(20.0f),
+						   .childAlignment = {CLAY_ALIGN_X_CENTER,
+	                                          CLAY_ALIGN_Y_CENTER},
+						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					 },
+			   .backgroundColor = theme()->surfaceContainerLow,
+			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+		 }) {
+
+		draw_text("What would you like to open on launch?"_v,
+		          theme()->onSurface, title_size, FontID::MAIN,
+		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+
+		Arr<Pair<Screen, StrView>, 2> options{{
+			  {Screen::Trainer, "Word Trainer"_v},
+			  {Screen::Dictionary, "Dictionary & Search"_v},
+		}};
+
+		int counter = 0;
+		for (auto &[screen, label] : options) {
+			auto b_style = mobile_button_style_surface_container_high();
+			b_style.font_size = 16.f;
+			b_style.padding_y = dpi(10.f);
+
+			auto btn =
+				  mobile_button(ctx, CLAY_IDI_LOCAL("DefScreenOpt", counter++),
+			                    label, b_style);
+			if (btn.activated()) {
+				ctx->settings.default_screen = std::to_underlying(screen);
+				ctx->settings.save(ctx->arena_frame);
+				onboarding_advance(ctx, 1);
+			}
+		}
+	}
+}
+
+static void step_draw_downloading_and_setup(AppContext *ctx) {
+	ctx->anim();
+
+	if (ctx->downloads.is_empty()) {
+		if (ctx->net) {
+			run_download_and_unpack_tr_asset(ctx);
+			run_download_and_unpack_optional_assets(ctx);
+		}
+	} else {
+		if (ctx->net) {
+			SDL_SignalCondition(ctx->net_worker_job_queue.cond);
+		}
+	}
+
+	CLAY(CLAY_ID("StepCardDownloading"),
+	     {
+			   .layout =
+					 {
+						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
+						   .padding = CLAY_PADDING_ALL(udpi(20.0f)),
+						   .childGap = udpi(14.0f),
+						   .childAlignment = {CLAY_ALIGN_X_CENTER,
+	                                          CLAY_ALIGN_Y_CENTER},
+						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					 },
+			   .backgroundColor = theme()->surfaceContainerLow,
+			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+		 }) {
+
+		draw_text("Preparing resources…"_v, theme()->onSurface,
+		          static_cast<uint16_t>(udpi(20.f)), FontID::MAIN,
+		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+
+		auto sub_col = theme()->onSurface;
+		sub_col.a = static_cast<uint8_t>(sub_col.a * 0.6f);
+		draw_text("Downloading and setting up offline dictionary"_v, sub_col,
+		          static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
+		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+
+		for (auto &dl : ctx->downloads) {
+			download_row(ctx, dl);
+		}
+
+		if (are_all_selected_assets_fully_unpacked(ctx)) {
+			onboarding_advance(ctx, 1);
+		}
+	}
+}
+
+static void finish_onboarding_and_start(AppContext *ctx) {
+	ctx->settings.onboarding_stage = -1;
+	ctx->settings.save(ctx->arena_frame);
+
+	if (!init_runtime_data(*ctx)) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to init runtime data");
+		ctx->app_status.push_error("Failed to init runtime data"_v);
+	}
+	if (ctx->words && ctx->words->size == 0 &&
+	    !seed_default_learning_list(*ctx)) {
+		ctx->app_status.push_error("Seeding default learning list failed"_v);
+	}
+
+	screen_trainer_go(ctx);
+}
+
+struct OnboardingStepDescriptor {
+	void (*draw)(AppContext *ctx);
+	bool is_interactive_step{true};
+};
+
+static constexpr Arr<OnboardingStepDescriptor, 4> ONBOARDING_STEPS = {{
+	  {step_draw_language, true},
+	  {step_draw_assets, true},
+	  {step_draw_default_screen, true},
+	  {step_draw_downloading_and_setup, false},
+}};
+
+static constexpr int TOTAL_INTERACTIVE_STEPS = 3;
+
 } // namespace
 
 void screen_onboarding_go(AppContext *ctx) { ctx->go(Screen::Onboarding); }
 
 void screen_onboarding_draw(AppContext *const ctx) {
-	auto text_size = dpi(24.f);
-	auto &settings = ctx->settings;
+	const int stage = ctx->settings.onboarding_stage;
+	const auto padding = udpi(20.0f);
 
-	auto next_stage = [&ctx](bool is_should_save) {
-		ctx->settings.onboarding_stage += 1;
-		if (is_should_save) {
-			ctx->settings.save(ctx->arena_frame);
-		}
-	};
+	if (stage < 0 || stage >= static_cast<int>(ONBOARDING_STEPS.size())) {
+		finish_onboarding_and_start(ctx);
+		return;
+	}
 
-	CLAY(CLAY_ID("OnboardingContainer"),
+	const auto &current_step = ONBOARDING_STEPS[stage];
+
+	CLAY(CLAY_ID("OnboardingRoot"),
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(4.0f)),
-						   .childGap = udpi(160.f),
+						   .padding = CLAY_PADDING_ALL(padding),
+						   .childGap = udpi(16.0f),
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
-	                                          CLAY_ALIGN_Y_CENTER},
+	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
+			   .backgroundColor = theme()->surface,
 		 }) {
-		switch (settings.onboarding_stage) {
-		case 0: {
-			CLAY(CLAY_ID("LanguageLabel"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIT(0)},
-								   .padding = CLAY_PADDING_ALL(udpi(4.0f)),
-								   .childAlignment = {CLAY_ALIGN_X_CENTER,
-			                                          CLAY_ALIGN_Y_CENTER},
-							 },
-				 }) {
-				draw_text("Chose language"_v, theme()->onSurface, text_size);
-			}
 
-			CLAY(CLAY_ID("LanguageRow"),
+		if (current_step.is_interactive_step) {
+			CLAY(CLAY_ID("OnboardingTopBar"),
 			     {
 					   .layout =
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIT(0)},
-								   .padding = CLAY_PADDING_ALL(udpi(4.0f)),
-								   .childGap = udpi(14.0f),
+			                                  CLAY_SIZING_FIXED(dpi(40.0f))},
+								   .childGap = udpi(12.0f),
 								   .childAlignment = {CLAY_ALIGN_X_CENTER,
 			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							 },
 				 }) {
-				auto button_style =
-					  mobile_button_style_surface_container_high();
-				Settings::for_every_lang([&](int i, Lang lang) {
-					auto btn = mobile_button(ctx, CLAY_IDI("LangButton", i),
-					                         lang_code(lang), button_style);
-					if (btn.activated()) {
-						settings.tr_language = lang;
-						settings.save(ctx->arena_frame);
-						next_stage(true);
-					}
-				});
-			}
-		} break;
-		case 1:
-			CLAY(CLAY_ID("ResourcesAndOptions"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_GROW(0)},
-								   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-								   .childGap = udpi(56.0f),
-								   .childAlignment = {CLAY_ALIGN_X_CENTER,
-			                                          CLAY_ALIGN_Y_CENTER},
-								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-							 },
-				 }) {
-				if (ctx->downloads.is_empty()) { // ask user
-					draw_text(
-						  "We have to download and prepare the dictionaries"_v,
-						  theme()->onSurface, text_size);
-					auto dlbtn =
-						  mobile_button(ctx, CLAY_ID("DLButton"), "Download"_v);
-					if (dlbtn.activated()) {
-						(void)run_download_and_unpack_tr_asset(ctx);
+
+				if (stage > 0) {
+					auto back_btn = mobile_icon_button<false>(
+						  ctx, CLAY_ID("OnboardingBackBtn"), Icons::BACK);
+					if (back_btn.activated()) {
+						onboarding_advance(ctx, -1);
 					}
 				} else {
-					// TODO: upd
-					ctx->settings.is_using_also_de = false;
-					bool skip = true;
-					// draw_option_row(
-					// 	  ctx, CLAY_ID("DEWiki"), "German Wiktionary"_v,
-					// 	  "Usable, if you already understand something. "
-					// 	  "Glossary "
-					// 	  "information, without translation."_v,
-					// 	  settings.is_using_also_de, [ctx](bool new_val) {
-					// 		  ctx->settings.is_using_also_de = new_val;
-					// 		  ctx->settings.save(ctx->arena_frame);
-					// 	  });
-#if NEURO
-					// TODO: upd
-					skip = false;
-					draw_option_row(
-						  ctx, CLAY_ID("TTS"), "Text-to-speech"_v,
-						  "Allows you to hear the pronounciation of a word or a phrase, even when there is no audio in Wiktionary. Used for offline audio generation. May be very slow on old devices. ~80MB"_v,
-						  settings.is_using_tts, [ctx](bool new_val) {
-							  ctx->settings.is_using_tts = new_val;
-							  ctx->settings.save(ctx->arena_frame);
-						  });
-					draw_option_row(
-						  ctx, CLAY_ID("ASR"), "Speech recognition"_v,
-						  "Allows you to say something and see how ASR engine transcribes it. Currently NOT very usefull. May be REALLY slow on old devices. ~160MB"_v,
-						  settings.is_using_asr, [ctx](bool new_val) {
-							  ctx->settings.is_using_asr = new_val;
-							  ctx->settings.save(ctx->arena_frame);
-						  });
-#endif
-
-					auto next_btn =
-						  mobile_button(ctx, CLAY_ID("NextButton"), "Next"_v,
-					                    mobile_button_style_primary());
-					// TODO: upd
-					if (skip || next_btn.activated()) {
-						run_download_and_unpack_optional_assets(ctx);
-						next_stage(true);
-					}
+					CLAY(CLAY_ID("BackSpacer"),
+					     {
+							   .layout =
+									 {
+										   .sizing = {CLAY_SIZING_FIXED(
+															dpi(40.0f)),
+					                                  CLAY_SIZING_FIXED(
+															dpi(40.0f))},
+									 },
+						 }) {}
 				}
+
+				draw_segmented_progress_bar(ctx, stage,
+				                            TOTAL_INTERACTIVE_STEPS);
+
+				CLAY(CLAY_ID("RightSpacer"),
+				     {
+						   .layout =
+								 {
+									   .sizing = {CLAY_SIZING_FIXED(dpi(40.0f)),
+				                                  CLAY_SIZING_FIXED(
+														dpi(40.0f))},
+								 },
+					 }) {}
 			}
-			break;
-		case 2:
-			CLAY(CLAY_ID("DefaultScreen"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_GROW(0)},
-								   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-								   .childGap = udpi(56.0f),
-								   .childAlignment = {CLAY_ALIGN_X_CENTER,
-			                                          CLAY_ALIGN_Y_CENTER},
-								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-							 },
-				 }) {
+		}
 
-				draw_text("What would you like to open by default?"_v,
-				          theme()->onSurface, text_size);
-				auto current_default_screen =
-					  static_cast<Screen>(ctx->settings.default_screen);
-				Arr<Pair<Screen, StrView>, 2> options{{
-					  {Screen::Trainer, "Word trainer"_v},
-					  {Screen::Dictionary, "Dictionary with search"_v},
-				}};
-				int option_counter = 0;
-				for (auto &[screen, label] : options) {
-					auto btn = mobile_button(
-						  ctx, CLAY_IDI_LOCAL("OptionButton", option_counter++),
-						  label);
-					if (btn.activated()) {
-						ctx->settings.default_screen =
-							  std::to_underlying(screen);
-						ctx->settings.save(ctx->arena_frame);
-						next_stage(true);
-					}
-				}
-			}
-			break;
-		case 3:
-			CLAY(CLAY_ID("WaitingForDownloads"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_GROW(0)},
-								   .padding = CLAY_PADDING_ALL(udpi(8.0f)),
-								   .childGap = udpi(16.0f),
-								   .childAlignment = {CLAY_ALIGN_X_CENTER,
-			                                          CLAY_ALIGN_Y_CENTER},
-								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-							 },
-				 }) {
-				// NOTE: assests are NOT ready
+		CLAY(CLAY_ID("OnboardingStepCenterWrapper"),
+		     {
+				   .layout =
+						 {
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_GROW(0)},
+							   .childAlignment = {CLAY_ALIGN_X_CENTER,
+		                                          CLAY_ALIGN_Y_CENTER},
+							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+						 },
+			 }) {
 
-				// NOTE: case 0: no downloads were registered (app
-				// restarted)
-				if (ctx->downloads.is_empty()) {
-					if (ctx->net) { // if net subsystem ready
-						SDL_Log("RERUN all downloads");
-						run_download_and_unpack_tr_asset(ctx);
-						run_download_and_unpack_optional_assets(ctx);
-					} else {
-						SDL_Log("No net ctx, waiting to rerun downloads...");
-						ctx->anim();
-					}
-				}
-				// NOTE: case 1: downloads are registered
-				else {
-					// NOTE: waking up NetThread, because it will go to
-					// sleep due empty job queue :c
-					bool is_any_download_tracked_and_in_some_kind_of_progress =
-						  false;
-					for (auto &dl : ctx->downloads) {
-						bool is_tracked_but_finished =
-							  dl.status ==
-									DownloadData::Status::FINISHED_ERROR ||
-							  dl.status == DownloadData::Status::FINISHED_OK ||
-							  dl.status ==
-									DownloadData::Status::FINISHED_CANCELLED;
-						auto req_in_real_progress =
-							  [ctx](DownloadData dl) -> bool {
-							if (!ctx->net) {
-								return false;
-							}
-							if (dl.tracking_req_pool_index < 0) {
-								return false;
-							}
-							return Atomic::get(
-										 &ctx->net
-												->requests_pool
-													  [dl.tracking_req_pool_index]
-												.req.status) ==
-							       NetRequest::STATUS_IN_PROGRESS;
-						};
-						if (is_tracked_but_finished ||
-						    req_in_real_progress(dl)) {
-							is_any_download_tracked_and_in_some_kind_of_progress =
-								  true;
-							break;
-						}
-					}
-					if (!is_any_download_tracked_and_in_some_kind_of_progress) {
-						SDL_SignalCondition(ctx->net_worker_job_queue.cond);
-					}
-				}
-
-				draw_text("Downloading resources..."_v, theme()->onSurface,
-				          text_size);
-				draw_text("Please wait and do not close the app"_v,
-				          theme()->onSurface, text_size);
-
-				Size finished_count = 0;
-				for (auto &dl : ctx->downloads) {
-					if (dl.status == DownloadData::Status::FINISHED_OK) {
-						++finished_count;
-					}
-					// bool should_retry =
-					download_row(ctx, dl);
-					// if (should_retry) {
-					// 	Worker::net_request_retry(ctx,
-					// 	                          dl.tracking_req_pool_index);
-					// 	download_update_tracking(ctx,
-					// 	                         dl.tracking_req_pool_index);
-					// }
-				}
-				// resetting dl tracking
-				if (finished_count > 0 &&
-				    finished_count == ctx->downloads.size) {
-					SDL_Log("all %lld downloads are successful",
-					        finished_count);
-					ctx->downloads.size = 0;
-					next_stage(true);
-				}
-			}
-			break;
-		case 4:
-			CLAY(CLAY_ID("WaitingForUnpacking"),
-			     {
-					   .layout =
-							 {
-								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_GROW(0)},
-								   .padding = CLAY_PADDING_ALL(udpi(8.0f)),
-								   .childGap = udpi(16.0f),
-								   .childAlignment = {CLAY_ALIGN_X_CENTER,
-			                                          CLAY_ALIGN_Y_CENTER},
-								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-							 },
-				 }) {
-				bool is_unpacking_in_progress = false;
-				{
-					using AType = AssetsDL::Type;
-					is_unpacking_in_progress =
-						  settings.asset(AType::XAPIAN_TR)
-								.is_zip_ready_to_unpack &&
-						  !settings.asset(AType::XAPIAN_TR).is_unpacked;
-					settings.assets.for_each_optional(
-						  [&is_unpacking_in_progress](
-								AssetsDL::RemoteAsset &asset, auto) {
-							  auto g = tctx()->a.guard();
-							  // auto es = StrView::from_number(
-						      // tctx()->a, asset.expected_size);
-						      // SDL_Log("TYPE (%d) %d %d %d " StrView_Fmt,
-						      //            std::to_underlying(t),
-						      //            (int)asset.is_zip_ready_to_unpack,
-						      //            (int)asset.is_unpacked,
-						      //            (int)asset.is_zip_removed,
-						      //            StrView_Arg(es));
-							  is_unpacking_in_progress =
-									is_unpacking_in_progress ||
-									(asset.is_zip_ready_to_unpack &&
-						             !asset.is_unpacked);
-						  });
-				}
-
-				if (is_unpacking_in_progress) {
-					draw_text("Unpacking resources…"_v, theme()->onSurface,
-					          text_size);
-					draw_text("Please wait and do not close the app"_v,
-					          theme()->onSurface, text_size);
-				} else {
-					next_stage(true);
-				}
-			}
-			break;
-		default:
-
-			settings.onboarding_stage = -1;
-			settings.save(ctx->arena_frame);
-			if (!init_runtime_data(*ctx)) {
-				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-				             "failed to init runtime data");
-				ctx->app_status.push_error("Failed to init runtime data"_v);
-			}
-			if (ctx->words && ctx->words->size == 0 &&
-			    !seed_default_learning_list(*ctx)) {
-				ctx->app_status.push_error(
-					  "Seeding default learning list failed"_v);
-				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-				             "Seeding default learning list failed");
-			}
-			screen_trainer_go(ctx);
+			current_step.draw(ctx);
 		}
 	}
 }

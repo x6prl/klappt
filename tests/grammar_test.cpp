@@ -347,6 +347,18 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "hat geerntet"_v);
 	}
 	{
+		Verb v{.infinitive = "empören"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "empört"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat empört"_v);
+	}
+	{
 		Verb v{.infinitive = "bechern"_v,
 		       .third_person = ""_v,
 		       .praeteritum = ""_v,
@@ -489,6 +501,18 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "gegeifert"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "hat gegeifert"_v);
+	}
+	{
+		Verb v{.infinitive = "beirren"_v,
+		       .third_person = ""_v,
+		       .praeteritum = ""_v,
+		       .auxv_and_past_participle = "hat"_v,
+		       .separable_prefix_size = 0};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v),
+		                  "beirrt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
+		                  "hat beirrt"_v);
 	}
 	{
 		Verb v{.infinitive = "telefonieren"_v,
