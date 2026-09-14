@@ -12,32 +12,44 @@ struct ItemsRange {
 	Size last_exclusive{}; // exclusive
 };
 
-// vertical
+/*
+ * vertical
+ */
+
+// calls draw_item to draw every item
+// draw_item(ctx, i, CLAY_IDI_LOCAL("ListItem", i));
 template <typename TDrawFunc>
 void vertical_uniform(AppContext *ctx, Clay_ElementId list_id, Size item_count,
                       float item_height, TDrawFunc draw_item);
+// calls draw_items to draw a range of items
+// draw_items(ctx, window);
 template <typename TDrawItemsFunc>
 void vertical_uniform_w(AppContext *ctx, Clay_ElementId list_id,
                         Size item_count, float item_height,
                         TDrawItemsFunc draw_items);
+
 template <typename TDrawFunc, typename THeightFunc>
 void vertical_fixed(AppContext *ctx, Clay_ElementId list_id, Size item_count,
                     THeightFunc get_item_height, TDrawFunc draw_item);
+// rich version allows to set a gap
 template <typename TDrawFunc, typename THeightFunc>
 void vertical_fixed_rich(AppContext *ctx, Clay_ElementId list_id, uint16_t gap,
                          Clay_Padding padding, Size item_count,
                          THeightFunc get_item_height, TDrawFunc draw_item);
+
 template <typename TDrawFunc>
 void vertical_dynamic(AppContext *ctx, Clay_ElementId list_id, Size item_count,
                       TDrawFunc draw_item);
+// rich version allows to set a gap
 template <typename TDrawFunc>
 void vertical_dynamic_rich(AppContext *ctx, Clay_ElementId list_id,
                            uint16_t gap, Clay_Padding padding, Size item_count,
                            TDrawFunc draw_item);
 
 namespace {
+[[maybe_unused]]
 inline void log_clay_scroll_container_data(const char *tag,
-                                           Clay_ScrollContainerData data) {
+                                    Clay_ScrollContainerData data) {
 	if (!data.found) {
 		SDL_Log("[%s] Clay_ScrollContainerData: NOT FOUND (found = "
 		        "false)",
