@@ -259,13 +259,29 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 			exit(-6);
 		}
 		TTF_SetFontSize(font, font_size);
+		// typedef enum TTF_HintingFlags {
+		// 	TTF_HINTING_INVALID = -1,
+		// 	TTF_HINTING_NORMAL, /**< Normal hinting applies standard
+		// 	                       grid-fitting. */
+		// 	TTF_HINTING_LIGHT,  /**< Light hinting applies subtle adjustments to
+		// 	                       improve rendering. */
+		// 	TTF_HINTING_MONO,   /**< Monochrome hinting adjusts the font for
+		// 	                       better rendering at lower resolutions. */
+		// 	TTF_HINTING_NONE, /**< No hinting, the font is rendered without any
+		// 	                     grid-fitting. */
+		// 	TTF_HINTING_LIGHT_SUBPIXEL /**< Light hinting with subpixel
+		// 	                              rendering for more precise font edges.
+		// 	                            */
+		// } TTF_HintingFlags;
+		TTF_SetFontHinting(font, TTF_HINTING_NONE); // TODO: play with
 
+		// TODO: think it over
 		if (is_arabic_font(font_id)) {
 			TTF_SetFontDirection(font, TTF_DIRECTION_RTL);
 			TTF_SetFontScript(font, TTF_StringToTag("Arab"));
 		} else {
-			TTF_SetFontDirection(font, TTF_DIRECTION_LTR);
-			TTF_SetFontScript(font, TTF_StringToTag("Latn"));
+			// TTF_SetFontDirection(font, TTF_DIRECTION_LTR);
+			// TTF_SetFontScript(font, TTF_StringToTag("Latn"));
 		}
 
 		it->first = {font_id, font_size};
