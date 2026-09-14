@@ -38,7 +38,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 	                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
 		 }) {
 
-		if (ctx->settings.is_using_tts) {
+		if (ctx->settings.is_module_tts) {
 			// Header
 			CLAY(CLAY_ID("TTSSectionHeader"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),

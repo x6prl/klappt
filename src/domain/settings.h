@@ -12,16 +12,32 @@
 struct Settings {
 	Theme::Type theme_type{};
 	Lang tr_language = lang_ru;
-	bool is_using_also_de{false};
-	bool is_using_tts{true};
-	bool is_using_asr{false};
+
+	/*
+	 * FEATURES
+	 */
+	// subdicts
+	bool is_subdict_de{false};
+	bool is_subdict_en{false};
+	// behaviour
 	bool is_using_suggestions{true};
-	bool is_using_also_subdict_en{false};
-	int32_t exercise_round_size{5};
-	int32_t default_screen{0};
-	int32_t onboarding_stage{0};
+	// displaying
+	bool is_mark_verb_aux_sein{true};
+	bool is_mark_verb_irregular{true};
+	bool is_show_ipa{true};
+	bool is_show_noun_plural_as_suffix{false};
+	// modules
+	bool is_module_tts{true};
+	bool is_module_asr{false};
+
+	uint8_t exercise_round_size{5};
+
+	uint8_t default_screen{0};
+
 	DensityMode density{DensityMode::Normal};
 	FontScaleLevel font_scale{FontScaleLevel::Normal};
+
+	int32_t onboarding_stage{0};
 	AssetsDL assets;
 
 	static void for_every_lang(auto f) {
@@ -45,6 +61,8 @@ struct Settings {
 	static bool decode(void *src, Size size, Settings *dst) {
 		// TODO: :O :O :O fixme
 		if (sizeof(Settings) != size) {
+			*dst = Settings{};
+			return true;
 			return false;
 		}
 		memcpy(dst, src, size);
