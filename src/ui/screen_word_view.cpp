@@ -15,7 +15,7 @@
 #include "platform/neuro.h"
 #include "ui/components/button.h"
 #include "ui/components/lists.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 #include "ui/textcache.h"
 #include "ui/themes.h"
 
@@ -206,14 +206,14 @@ static StrView successful_reviews_to_next_mode(Arena &a,
 }
 
 static void draw_noun_title(AppContext *ctx, const Noun &n) {
-	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
+	const uint16_t title_font_size = sizes()->font.title_lg;
 
 	CLAY(CLAY_ID("NounTitleRow"),
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .childGap = udpi(8.f),
+						   .childGap = sizes()->space.md,
 						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					 },
 		 }) {
@@ -235,17 +235,13 @@ static void draw_noun_title(AppContext *ctx, const Noun &n) {
 }
 
 static void draw_adj_title(AppContext *ctx, const Word &w) {
-	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
-
-	draw_text(w.a.lemma, theme()->onSurface, title_font_size, FontID::MAIN,
-	          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+	draw_text(w.a.lemma, theme()->onSurface, sizes()->font.title_lg,
+	          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 }
 
 static void draw_verb_title(AppContext *ctx, const Word &w) {
-	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
-
-	draw_text(w.v.infinitive, theme()->onSurface, title_font_size, FontID::MAIN,
-	          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+	draw_text(w.v.infinitive, theme()->onSurface, sizes()->font.title_lg,
+	          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 }
 
 static void draw_phrase_title(AppContext *ctx, const Word &w) {
@@ -253,17 +249,15 @@ static void draw_phrase_title(AppContext *ctx, const Word &w) {
 	const Clay_TextAlignment text_align =
 		  is_long_phrase ? CLAY_TEXT_ALIGN_LEFT : CLAY_TEXT_ALIGN_CENTER;
 
-	const uint16_t title_font_size = static_cast<uint16_t>(udpi(26.f));
-
-	draw_text(w.p.text, theme()->onSurface, title_font_size, FontID::MAIN,
-	          CLAY_TEXT_WRAP_WORDS, text_align);
+	draw_text(w.p.text, theme()->onSurface, sizes()->font.title_lg,
+	          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, text_align);
 }
 
 static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
                            const Word &w, const WordPayload &word_payload) {
-	const float label_width = udpi(100.f);
-	const uint16_t form_font_size = static_cast<uint16_t>(udpi(15.f));
-	const uint16_t translation_font_size = static_cast<uint16_t>(udpi(15.f));
+	const float label_width = sizes()->dim.form_label_width;
+	const uint16_t form_font_size = sizes()->font.body_md;
+	const uint16_t translation_font_size = sizes()->font.body_sm;
 
 	DynArr<Pair<StrView, StrView>> forms{};
 	DynArr<StrView> badges{};
@@ -319,20 +313,14 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding =
-								 {
-									   .left = udpi(20.f),
-									   .right = udpi(20.f),
-									   .top = udpi(16.f),
-									   .bottom = udpi(20.f),
-								 },
-						   .childGap = udpi(12.f),
+						   .padding = sizes()->pad.card,
+						   .childGap = sizes()->space.md,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
 			   .backgroundColor = theme()->surfaceContainerLow,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+			   .cornerRadius = sizes()->radius.lg,
 			   // .border =
 	           // {
 	           //    .color = theme()->outline,
@@ -347,36 +335,28 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(6.f),
+							   .childGap = sizes()->space.xs,
 							   .childAlignment = {CLAY_ALIGN_X_LEFT,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 						 },
 			 }) {
-			CLAY(CLAY_ID("WordClassBadge"),
-			     {
-					   .layout =
-							 {
-								   .padding = {udpi(8.f), udpi(8.f), udpi(3.f),
-			                                   udpi(3.f)},
-							 },
-					   .backgroundColor = theme()->secondary,
-					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
-				 }) {
+			Clay_ElementDeclaration badge_style_template = {
+				  .layout = {.padding = sizes()->pad.badge},
+				  .backgroundColor = theme()->secondary,
+				  .cornerRadius = sizes()->radius.sm,
+			};
+			CLAY(CLAY_ID("WordClassBadge"), badge_style_template) {
 				draw_text(word_class_name, theme()->onSecondary,
-				          static_cast<uint16_t>(udpi(12.f)));
+				          sizes()->font.label_sm);
 			}
 
+			badge_style_template.backgroundColor =
+				  theme()->surfaceContainerHigh;
 			for (Size i{0}; i < badges.size; ++i) {
-				CLAY(CLAY_IDI("Badge", i),
-				     {
-						   .layout = {.padding = {udpi(8.f), udpi(8.f),
-				                                  udpi(3.f), udpi(3.f)}},
-						   .backgroundColor = theme()->surfaceContainerHigh,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
-					 }) {
+				CLAY(CLAY_IDI("Badge", i), badge_style_template) {
 					draw_text(badges[i], theme()->onSurfaceContainerHigh,
-					          static_cast<uint16_t>(udpi(12.f)));
+					          sizes()->font.label_sm);
 				}
 			}
 
@@ -390,30 +370,17 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 				Clay_Color fg = is_warning ? theme()->onWrongContainer
 				                           : theme()->onSurfaceContainerHigh;
 
-				CLAY(CLAY_IDI("StyleTagBadge", i),
-				     {
-						   .layout = {.padding = {udpi(6.f), udpi(6.f),
-				                                  udpi(2.f), udpi(2.f)}},
-						   .backgroundColor = bg,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
-					 }) {
-					draw_text(tag, fg, static_cast<uint16_t>(udpi(11.f)));
+				badge_style_template.backgroundColor = bg;
+				CLAY(CLAY_IDI("StyleTagBadge", i), badge_style_template) {
+					draw_text(tag, fg, sizes()->font.label_sm);
 				}
 			}
 
+			badge_style_template.backgroundColor = theme()->surfaceContainer;
 			if (w.in_learning_list > 0) {
-				CLAY(CLAY_ID("StatusBadge"),
-				     {
-						   .layout =
-								 {
-									   .padding = {udpi(8.f), udpi(8.f),
-				                                   udpi(3.f), udpi(3.f)},
-								 },
-						   .backgroundColor = theme()->surfaceContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
-					 }) {
+				CLAY(CLAY_ID("StatusBadge"), badge_style_template) {
 					draw_text("In learning list"_v, theme()->onSurfaceContainer,
-					          static_cast<uint16_t>(udpi(12.f)));
+					          sizes()->font.label_sm);
 				}
 			}
 		}
@@ -424,7 +391,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(4.f),
+							   .childGap = sizes()->space.xs,
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
 			 }) {
@@ -453,7 +420,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_FIT(0)},
-									   .childGap = udpi(8.f),
+									   .childGap = sizes()->space.sm,
 									   .childAlignment = {CLAY_ALIGN_X_LEFT,
 				                                          CLAY_ALIGN_Y_CENTER},
 									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -466,8 +433,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						StrView ipa_display = StrBuilder::concat(
 							  ctx->arena_frame, "["_v, ipa_joined, "]"_v);
 						draw_text(ipa_display, theme()->onSurfaceContainer,
-						          static_cast<uint16_t>(udpi(13.f)),
-						          FontID::MAIN);
+						          sizes()->font.label_md, FontID::MAIN);
 					}
 
 					// TODO: add
@@ -500,20 +466,14 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .padding =
-										 {
-											   .left = udpi(12.f),
-											   .right = udpi(12.f),
-											   .top = udpi(10.f),
-											   .bottom = udpi(10.f),
-										 },
-								   .childGap = udpi(6.f),
+								   .padding = sizes()->pad.card_compact,
+								   .childGap = sizes()->space.xs,
 								   .childAlignment = {CLAY_ALIGN_X_LEFT,
 			                                          CLAY_ALIGN_Y_TOP},
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 					   .backgroundColor = theme()->surfaceContainer,
-					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(10.f)),
+					   .cornerRadius = sizes()->radius.md,
 				 }) {
 				int counter = 0;
 				for (auto [label, value] : forms) {
@@ -523,7 +483,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									 {
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
-										   .childGap = udpi(6.f),
+										   .childGap = sizes()->space.sm,
 										   .layoutDirection =
 												 CLAY_LEFT_TO_RIGHT,
 									 },
@@ -552,8 +512,10 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		     {
 				   .layout =
 						 {
-							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_FIXED(dpi(1.f))},
+							   .sizing =
+									 {CLAY_SIZING_GROW(0),
+		                              CLAY_SIZING_FIXED(
+											1.f)}, // TODO: think about scale
 						 },
 				   .backgroundColor = theme()->outline,
 			 }) {}
@@ -565,7 +527,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .childGap = udpi(12.f),
+								   .childGap = sizes()->space.md,
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
@@ -579,36 +541,35 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									 {
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
-										   .childGap = udpi(8.f),
+										   .childGap = sizes()->space.sm,
 										   .childAlignment = {CLAY_ALIGN_X_LEFT,
 					                                          CLAY_ALIGN_Y_TOP},
 										   .layoutDirection =
 												 CLAY_LEFT_TO_RIGHT,
 									 },
 						 }) {
-
+						const float badge_dim = sizes()->dim.icon_sm;
 						if (word_payload.senses.size > 1) {
 							CLAY(CLAY_IDI("SenseNumberBadge", sense_index),
 							     {
 									   .layout =
 											 {
 												   .sizing = {CLAY_SIZING_FIXED(
-																	dpi(18.f)),
+																	badge_dim),
 							                                  CLAY_SIZING_FIXED(
-																	dpi(18.f))},
+																	badge_dim)},
 												   .childAlignment =
 														 {CLAY_ALIGN_X_CENTER,
 							                              CLAY_ALIGN_Y_CENTER},
 											 },
 									   .backgroundColor =
 											 theme()->surfaceContainerHigh,
-									   .cornerRadius =
-											 CLAY_CORNER_RADIUS(dpi(999.f)),
+									   .cornerRadius = sizes()->radius.full,
 								 }) {
 								draw_text(StrView::from_number(ctx->arena_frame,
 								                               sense_index + 1),
 								          theme()->onSurface,
-								          static_cast<uint16_t>(udpi(11.f)));
+								          sizes()->font.label_sm);
 							}
 						}
 
@@ -618,7 +579,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 										 {
 											   .sizing = {CLAY_SIZING_GROW(0),
 						                                  CLAY_SIZING_FIT(0)},
-											   .childGap = udpi(4.f),
+											   .childGap = sizes()->space.xs,
 											   .layoutDirection =
 													 CLAY_TOP_TO_BOTTOM,
 										 },
@@ -631,19 +592,17 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 												 {.sizing = {CLAY_SIZING_FIT(0),
 								                             CLAY_SIZING_FIT(
 																   0)},
-								                  .padding = {udpi(6.f),
-								                              udpi(6.f),
-								                              udpi(2.f),
-								                              udpi(2.f)}},
+								                  .padding =
+								                        sizes()
+								                              ->pad
+								                              .badge_compact},
 										   .backgroundColor =
 												 theme()->surfaceContainerHigh,
-										   .cornerRadius =
-												 CLAY_CORNER_RADIUS(dpi(4.f)),
+										   .cornerRadius = sizes()->radius.xs,
 									 }) {
-									draw_text(
-										  sense.valency,
-										  theme()->onSurfaceContainerHigh,
-										  static_cast<uint16_t>(udpi(11.f)));
+									draw_text(sense.valency,
+									          theme()->onSurfaceContainerHigh,
+									          sizes()->font.label_sm);
 								}
 							}
 
@@ -665,7 +624,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 																	0),
 								                              CLAY_SIZING_FIT(
 																	0)},
-													   .childGap = udpi(6.f),
+													   .childGap =
+															 sizes()->space.xs,
 													   .childAlignment =
 															 {CLAY_ALIGN_X_LEFT,
 								                              CLAY_ALIGN_Y_TOP},
@@ -696,7 +656,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .childGap = udpi(6.f),
+								   .childGap = sizes()->space.xs,
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
@@ -707,7 +667,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									 {
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
-										   .childGap = udpi(6.f),
+										   .childGap = sizes()->space.xs,
 										   .layoutDirection =
 												 CLAY_LEFT_TO_RIGHT,
 									 },
@@ -735,24 +695,23 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .childGap = udpi(4.f),
+								   .childGap = sizes()->space.xs,
 								   .childAlignment = {CLAY_ALIGN_X_LEFT,
 			                                          CLAY_ALIGN_Y_CENTER},
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							 },
 				 }) {
-				draw_text("Words:"_v, theme()->outline,
-				          static_cast<uint16_t>(udpi(12.f)));
+				draw_text("Words:"_v, theme()->outline, sizes()->font.label_md);
 				for (Size k{0}; k < word_payload.words.size; ++k) {
 					CLAY(CLAY_IDI("KeywordPill", k),
 					     {
-							   .layout = {.padding = {udpi(6.f), udpi(6.f),
-					                                  udpi(2.f), udpi(2.f)}},
+							   .layout = {.padding =
+					                            sizes()->pad.badge_compact},
 							   .backgroundColor = theme()->surfaceContainer,
-							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(4.f)),
+							   .cornerRadius = sizes()->radius.xs,
 						 }) {
 						draw_text(word_payload.words[k], theme()->primary,
-						          static_cast<uint16_t>(udpi(11.f)));
+						          sizes()->font.label_sm);
 					}
 				}
 			}
@@ -764,13 +723,15 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					   .layout =
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIXED(dpi(1.f))},
+			                                  CLAY_SIZING_FIXED(
+													1.f)}, // TODO: think about
+			                                               // scale
 							 },
 					   .backgroundColor = theme()->outline,
 				 }) {}
 
 			draw_text("Examples"_v, theme()->onSurfaceContainer,
-			          static_cast<uint16_t>(udpi(13.f)));
+			          sizes()->font.title_md);
 
 			CLAY(CLAY_ID("ExamplesList"),
 			     {
@@ -778,7 +739,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .childGap = udpi(6.f),
+								   .childGap = sizes()->space.sm,
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
@@ -794,13 +755,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
 										   .padding =
-												 {
-													   .left = udpi(12.f),
-													   .right = udpi(10.f),
-													   .top = udpi(8.f),
-													   .bottom = udpi(8.f),
-												 },
-										   .childGap = udpi(4.f),
+												 sizes()->pad.example_quote,
+										   .childGap = sizes()->space.xs,
 										   .layoutDirection =
 												 CLAY_TOP_TO_BOTTOM,
 									 },
@@ -812,18 +768,22 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					           //    0,
 					           //    dpi(8.f),
 					           // }, // CLAY_CORNER_RADIUS(dpi(8.f)),
-							   .border = {.color = theme()->secondary,
-					                      .width = {.left = udpi(3.f)}},
+							   .border =
+									 {.color = theme()->secondary,
+					                  .width =
+					                        {.left = static_cast<uint16_t>(
+												   sizes()
+														 ->dim
+														 .accent_border_width)}},
 						 }) {
 						draw_text(ex.text, theme()->onSurface,
-						          static_cast<uint16_t>(udpi(14.f)),
-						          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
-						          CLAY_TEXT_ALIGN_LEFT);
+						          sizes()->font.body_md, FontID::MAIN,
+						          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 
 						if (ex.translation) {
 							draw_text(
 								  ex.translation, theme()->onSurfaceContainer,
-								  static_cast<uint16_t>(udpi(13.f)),
+								  sizes()->font.body_sm,
 								  translation_font_id(ctx),
 								  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 						}
@@ -835,7 +795,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		if (!word_payload.synonyms.is_empty() ||
 		    !word_payload.antonyms.is_empty() ||
 		    !word_payload.hypernyms.is_empty()) {
-			const float syn_ant_label_width = udpi(36.f);
+			const float syn_ant_label_width =
+				  static_cast<float>(sizes()->space.xxl + sizes()->space.xs);
 
 			CLAY(CLAY_ID("SynAntContainer"),
 			     {
@@ -843,8 +804,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .padding = {.top = udpi(4.f)},
-								   .childGap = udpi(4.f),
+								   .padding = {.top = sizes()->space.xs},
+								   .childGap = sizes()->space.xs,
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
@@ -855,7 +816,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									 {
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
-										   .childGap = udpi(4.f),
+										   .childGap = sizes()->space.xs,
 										   .childAlignment = {CLAY_ALIGN_X_LEFT,
 					                                          CLAY_ALIGN_Y_TOP},
 										   .layoutDirection =
@@ -873,7 +834,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 										 },
 							 }) {
 							draw_text("Syn:"_v, theme()->outline,
-							          static_cast<uint16_t>(udpi(12.f)));
+							          sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("SynTextCol"),
 						     {
@@ -884,8 +845,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								  StrBuilder(word_payload.synonyms)
 										.join(ctx->arena_frame, ", "_v);
 							draw_text(syn_text, theme()->onSurfaceContainer,
-							          static_cast<uint16_t>(udpi(12.f)),
-							          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+							          sizes()->font.label_md, FontID::MAIN,
+							          CLAY_TEXT_WRAP_WORDS,
 							          CLAY_TEXT_ALIGN_LEFT);
 						}
 					}
@@ -898,7 +859,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									 {
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
-										   .childGap = udpi(4.f),
+										   .childGap = sizes()->space.xs,
 										   .childAlignment = {CLAY_ALIGN_X_LEFT,
 					                                          CLAY_ALIGN_Y_TOP},
 										   .layoutDirection =
@@ -916,7 +877,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 										 },
 							 }) {
 							draw_text("Ant:"_v, theme()->outline,
-							          static_cast<uint16_t>(udpi(12.f)));
+							          sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("AntTextCol"),
 						     {
@@ -927,8 +888,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								  StrBuilder(word_payload.antonyms)
 										.join(ctx->arena_frame, ", "_v);
 							draw_text(ant_text, theme()->onSurfaceContainer,
-							          static_cast<uint16_t>(udpi(12.f)),
-							          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+							          sizes()->font.label_md, FontID::MAIN,
+							          CLAY_TEXT_WRAP_WORDS,
 							          CLAY_TEXT_ALIGN_LEFT);
 						}
 					}
@@ -941,7 +902,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									 {
 										   .sizing = {CLAY_SIZING_GROW(0),
 					                                  CLAY_SIZING_FIT(0)},
-										   .childGap = udpi(4.f),
+										   .childGap = sizes()->space.xs,
 										   .childAlignment = {CLAY_ALIGN_X_LEFT,
 					                                          CLAY_ALIGN_Y_TOP},
 										   .layoutDirection =
@@ -959,7 +920,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 										 },
 							 }) {
 							draw_text("Hyp:"_v, theme()->outline,
-							          static_cast<uint16_t>(udpi(12.f)));
+							          sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("HyperTextCol"),
 						     {
@@ -970,8 +931,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								  StrBuilder(word_payload.hypernyms)
 										.join(ctx->arena_frame, ", "_v);
 							draw_text(hyp_text, theme()->onSurfaceContainer,
-							          static_cast<uint16_t>(udpi(12.f)),
-							          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+							          sizes()->font.label_md, FontID::MAIN,
+							          CLAY_TEXT_WRAP_WORDS,
 							          CLAY_TEXT_ALIGN_LEFT);
 						}
 					}
@@ -1022,25 +983,19 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding =
-								 {
-									   .left = udpi(16.f),
-									   .right = udpi(16.f),
-									   .top = udpi(14.f),
-									   .bottom = udpi(14.f),
-								 },
-						   .childGap = udpi(10.f),
+						   .padding = sizes()->pad.card,
+						   .childGap = sizes()->space.sm,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
 			   .backgroundColor = theme()->surfaceContainerLow,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+			   .cornerRadius = sizes()->radius.lg,
 			   .border =
 					 {
 						   .color = theme()->outline,
-						   .width = {udpi(1.f), udpi(1.f), udpi(1.f),
-	                                 udpi(1.f)},
+						   .width = {(1), (1), (1),
+	                                 (1)}, // TODO: think about scale
 					 },
 		 }) {
 
@@ -1050,21 +1005,20 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(8.f),
+							   .childGap = sizes()->space.sm,
 							   .childAlignment = {CLAY_ALIGN_X_LEFT,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 						 },
 			 }) {
 			draw_text(mode_name(s.mode), theme()->onSurface,
-			          static_cast<uint16_t>(udpi(15.f)));
+			          sizes()->font.body_md);
 
 			draw_text(StrBuilder::concat(ctx->arena_frame, "("_v,
 			                             StrView::from_number(ctx->arena_frame,
 			                                                  current_step + 1),
 			                             "/4)"_v),
-			          theme()->onSurfaceContainer,
-			          static_cast<uint16_t>(udpi(13.f)));
+			          theme()->onSurfaceContainer, sizes()->font.body_sm);
 
 			StrView due_str{};
 			Clay_Color due_bg{};
@@ -1088,13 +1042,12 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			     {
 					   .layout =
 							 {
-								   .padding = {udpi(8.f), udpi(8.f), udpi(3.f),
-			                                   udpi(3.f)},
+								   .padding = sizes()->pad.badge_compact,
 							 },
 					   .backgroundColor = due_bg,
-					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
+					   .cornerRadius = sizes()->radius.sm,
 				 }) {
-				draw_text(due_str, due_fg, static_cast<uint16_t>(udpi(11.f)));
+				draw_text(due_str, due_fg, sizes()->font.label_sm);
 			}
 		}
 
@@ -1104,7 +1057,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(4.f),
+							   .childGap = sizes()->space.xs,
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 						 },
 			 }) {
@@ -1114,13 +1067,15 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 				     {
 						   .layout =
 								 {
-									   .sizing = {CLAY_SIZING_GROW(0),
-				                                  CLAY_SIZING_FIXED(dpi(5.f))},
+									   .sizing =
+											 {CLAY_SIZING_GROW(0),
+				                              CLAY_SIZING_FIXED(
+													(float)sizes()->space.xs)},
 								 },
 						   .backgroundColor =
 								 is_filled ? theme()->secondary
 										   : theme()->surfaceContainerHigh,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(3.f)),
+						   .cornerRadius = sizes()->radius.xs,
 					 }) {}
 			}
 		}
@@ -1130,11 +1085,10 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 				  successful_reviews_to_next_mode(ctx->arena_frame, s);
 			draw_text(StrBuilder::concat(ctx->arena_frame, "Next level in "_v,
 			                             left, " review(s)"_v),
-			          theme()->onSurfaceContainer,
-			          static_cast<uint16_t>(udpi(12.f)));
+			          theme()->onSurfaceContainer, sizes()->font.label_md);
 		} else {
 			draw_text("Mastered (Max level)"_v, theme()->onSurfaceContainer,
-			          static_cast<uint16_t>(udpi(12.f)));
+			          sizes()->font.label_md);
 		}
 	}
 }
@@ -1223,9 +1177,6 @@ void screen_word_view_draw(AppContext *ctx) {
 		                                  CLAY_SIZING_GROW(0)},
 						 },
 			 }) {
-			const auto padding = CLAY_PADDING_ALL(udpi(14.f));
-			const uint16_t gap = udpi(12.f);
-
 			const Size count = state.has_learning_state ? 2 : 1;
 
 			auto draw_cards = [&state](AppContext *ctx, Size i,
@@ -1247,8 +1198,9 @@ void screen_word_view_draw(AppContext *ctx) {
 				}
 			};
 
-			list::vertical_dynamic_rich(ctx, CLAY_ID("WordCardsList"), gap,
-			                            padding, count, draw_cards);
+			list::vertical_dynamic_rich(ctx, CLAY_ID("WordCardsList"),
+			                            sizes()->space.md, sizes()->pad.screen,
+			                            count, draw_cards);
 		}
 
 		CLAY(CLAY_ID("WordViewBottomBar"),
@@ -1259,12 +1211,12 @@ void screen_word_view_draw(AppContext *ctx) {
 		                                  CLAY_SIZING_FIT(0)},
 							   .padding =
 									 {
-										   .left = udpi(16.f),
-										   .right = udpi(16.f),
-										   .top = udpi(10.f),
-										   .bottom = udpi(16.f),
+										   .left = sizes()->space.lg,
+										   .right = sizes()->space.lg,
+										   .top = sizes()->space.sm,
+										   .bottom = sizes()->space.lg,
 									 },
-							   .childGap = udpi(16.f),
+							   .childGap = sizes()->space.md,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,

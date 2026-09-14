@@ -5,6 +5,7 @@
 #include "app/assets_dl.h"
 #include "base/str_view.h"
 #include "platform/files.h"
+#include "ui/sizes.h"
 #include "ui/themes.h"
 #include "ui/translations/langs.h"
 
@@ -19,6 +20,8 @@ struct Settings {
 	int32_t exercise_round_size{5};
 	int32_t default_screen{0};
 	int32_t onboarding_stage{0};
+	DensityMode density{DensityMode::Normal};
+	FontScaleLevel font_scale{FontScaleLevel::Normal};
 	AssetsDL assets;
 
 	static void for_every_lang(auto f) {

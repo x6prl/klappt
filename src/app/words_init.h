@@ -179,6 +179,7 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 }
 
 inline bool seed_default_learning_list(AppContext &ctx) {
+	return true; // TODO: rethink
 	static constexpr LearningListSeedSpec DEFAULT_SEEDS[] = {
 		  {WordType::Verb, "sein"_v},
 		  {WordType::Verb, "kommen"_v},

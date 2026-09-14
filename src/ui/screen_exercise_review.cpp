@@ -7,7 +7,7 @@
 #include "platform/neuro.h"
 
 #include "ui/components/button.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 #include "ui/themes.h"
 
 #include "screen_helpers.h"
@@ -118,8 +118,10 @@ static void draw_wrapped_diff_tokens(AppContext *ctx,
 	const auto &parts = merged.parts;
 	const auto &is_right = merged.is_right;
 
+	const float horizontal_insets =
+		  static_cast<float>(sizes()->space.lg * 4 + sizes()->space.sm);
 	const float max_row_width =
-		  std::max(100.0f, ctx->display_width - udpi(72.0f));
+		  std::max(100.0f, ctx->display_width - horizontal_insets);
 
 	auto get_token_width = [&](StrView token) -> float {
 		if (!token || token.size == 0)
@@ -144,7 +146,7 @@ static void draw_wrapped_diff_tokens(AppContext *ctx,
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .childGap = udpi(4.0f),
+						   .childGap = sizes()->space.xs,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -198,16 +200,14 @@ static void draw_wrapped_diff_tokens(AppContext *ctx,
 							   .layout =
 									 {
 										   .padding =
-												 has_bg
-													   ? Clay_Padding{udpi(1.f),
-					                                                  udpi(1.f),
-					                                                  udpi(3.f),
-					                                                  udpi(3.f)}
-													   : Clay_Padding{0, 0, 0,
-					                                                  0},
+												 has_bg ? sizes()
+																->pad
+																.badge_compact
+														: Clay_Padding{0, 0, 0,
+					                                                   0},
 									 },
 							   .backgroundColor = bg,
-							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(3.f)),
+							   .cornerRadius = sizes()->radius.xs,
 						 }) {
 						draw_text(token, fg, static_cast<uint16_t>(font_size),
 						          FontID::MONOSPACE_REGULAR);
@@ -242,8 +242,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_GROW(0)},
-							   .padding = CLAY_PADDING_ALL(udpi(20.0f)),
-							   .childGap = udpi(16.0f),
+							   .padding = sizes()->pad.screen,
+							   .childGap = sizes()->space.lg,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -251,14 +251,13 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				   .backgroundColor = theme()->surface,
 			 }) {
 			draw_text("All answers correct!"_v, theme()->onSurface,
-			          static_cast<uint16_t>(udpi(24.f)));
+			          sizes()->font.title_lg);
 		}
 		return;
 	}
 
 	const auto &diff = ctx->exercises.current_result_review();
 	const bool is_correct = (diff.actual == diff.expected);
-	const auto padding = udpi(20.0f);
 
 	const Size max_str_len =
 		  std::max({diff.source.utf8_length(), diff.expected.utf8_length(),
@@ -272,12 +271,12 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
 						   .padding =
 								 {
-									   .left = padding,
-									   .right = padding,
-									   .top = udpi(10.f),
-									   .bottom = udpi(16.f),
+									   .left = sizes()->space.lg,
+									   .right = sizes()->space.lg,
+									   .top = sizes()->space.sm,
+									   .bottom = sizes()->space.lg,
 								 },
-						   .childGap = udpi(12.0f),
+						   .childGap = sizes()->space.md,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -302,12 +301,12 @@ void screen_exercise_review_draw(AppContext *ctx) {
 		                                  CLAY_SIZING_FIT(0)},
 							   .padding =
 									 {
-										   .left = udpi(8.f),
-										   .right = udpi(8.f),
-										   .top = udpi(4.f),
-										   .bottom = udpi(6.f),
+										   .left = sizes()->space.sm,
+										   .right = sizes()->space.sm,
+										   .top = sizes()->space.xs,
+										   .bottom = sizes()->space.xs,
 									 },
-							   .childGap = udpi(4.f),
+							   .childGap = sizes()->space.xs,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -322,21 +321,20 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			if (diff.source_sub0.size > 0) {
 				auto sub_col = theme()->onSurface;
 				sub_col.a = static_cast<uint8_t>(sub_col.a * 0.6f);
-				draw_text(diff.source_sub0, sub_col,
-				          static_cast<uint16_t>(udpi(12.f)), font_id,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				draw_text(diff.source_sub0, sub_col, sizes()->font.label_md,
+				          font_id, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 			}
 
 			if (diff.source_sub1.size > 0) {
 				CLAY(CLAY_ID("ValencyChip"),
 				     {
-						   .layout = {.padding = {udpi(6.f), udpi(6.f),
-				                                  udpi(2.f), udpi(2.f)}},
+						   .layout = {.padding = sizes()->pad.badge_compact},
 						   .backgroundColor = theme()->surfaceContainerHigh,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(4.f)),
+						   .cornerRadius = sizes()->radius.xs,
 					 }) {
 					draw_text(diff.source_sub1, theme()->onSurfaceContainerHigh,
-					          static_cast<uint16_t>(udpi(11.f)));
+					          sizes()->font.label_sm);
 				}
 			}
 		}
@@ -347,14 +345,14 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_GROW(0)},
-							   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-							   .childGap = udpi(12.0f),
+							   .padding = sizes()->pad.card,
+							   .childGap = sizes()->space.md,
 							   .childAlignment = {CLAY_ALIGN_X_LEFT,
 		                                          CLAY_ALIGN_Y_TOP},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
 				   .backgroundColor = theme()->surfaceContainerLow,
-				   .cornerRadius = CLAY_CORNER_RADIUS(dpi(20.f)),
+				   .cornerRadius = sizes()->radius.lg,
 				   .clip =
 						 {
 							   .vertical = true,
@@ -364,7 +362,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 
 			auto label_color = theme()->onSurfaceContainer;
 			label_color.a = static_cast<uint8_t>(label_color.a * 0.6f);
-			const float diff_font_size = is_phrase ? udpi(15.f) : udpi(18.f);
+			const float diff_font_size =
+				  is_phrase ? sizes()->font.body_sm : sizes()->font.body_md;
 
 			if (is_correct) {
 				CLAY(CLAY_ID("CorrectHeaderRow"),
@@ -380,14 +379,13 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					 }) {
 					CLAY(CLAY_ID("SuccessBadge"),
 					     {
-							   .layout = {.padding = {udpi(8.f), udpi(8.f),
-					                                  udpi(3.f), udpi(3.f)}},
+							   .layout = {.padding = sizes()->pad.badge},
 							   .backgroundColor = theme()->rightContainer,
-							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(6.f)),
+							   .cornerRadius = sizes()->radius.sm,
 						 }) {
 						draw_text("✓ Correct answer"_v,
 						          theme()->onRightContainer,
-						          static_cast<uint16_t>(udpi(12.f)));
+						          sizes()->font.label_md);
 					}
 				}
 
@@ -397,10 +395,10 @@ void screen_exercise_review_draw(AppContext *ctx) {
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_FIT(0)},
-									   .padding = CLAY_PADDING_ALL(udpi(12.f)),
+									   .padding = sizes()->pad.card,
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(12.f)),
+						   .cornerRadius = sizes()->radius.md,
 					 }) {
 					draw_text(diff.expected, theme()->onSurface,
 					          static_cast<uint16_t>(diff_font_size),
@@ -410,17 +408,17 @@ void screen_exercise_review_draw(AppContext *ctx) {
 
 			} else {
 				draw_text("Expected answer"_v, label_color,
-				          static_cast<uint16_t>(udpi(12.f)));
+				          sizes()->font.label_md);
 				CLAY(CLAY_ID("ExpectedBox"),
 				     {
 						   .layout =
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_FIT(0)},
-									   .padding = CLAY_PADDING_ALL(udpi(12.f)),
+									   .padding = sizes()->pad.card,
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(12.f)),
+						   .cornerRadius = sizes()->radius.md,
 					 }) {
 					if (diff.expected_parts.size > 0) {
 						draw_wrapped_diff_tokens(ctx, diff.expected_parts,
@@ -435,17 +433,17 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				}
 
 				draw_text("Your answer"_v, label_color,
-				          static_cast<uint16_t>(udpi(12.f)));
+				          sizes()->font.label_md);
 				CLAY(CLAY_ID("ActualBox"),
 				     {
 						   .layout =
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_FIT(0)},
-									   .padding = CLAY_PADDING_ALL(udpi(12.f)),
+									   .padding = sizes()->pad.card_compact,
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(12.f)),
+						   .cornerRadius = sizes()->radius.md,
 					 }) {
 					if (diff.actual_parts.size > 0) {
 						draw_wrapped_diff_tokens(ctx, diff.actual_parts,
@@ -468,10 +466,10 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			                                  CLAY_SIZING_GROW(0)},
 								   .padding =
 										 {
-											   .top = udpi(4.f),
-											   .bottom = udpi(4.f),
+											   .top = sizes()->space.xs,
+											   .bottom = sizes()->space.xs,
 										 },
-								   .childGap = udpi(14.0f),
+								   .childGap = sizes()->space.md,
 								   .childAlignment = {CLAY_ALIGN_X_CENTER,
 			                                          CLAY_ALIGN_Y_BOTTOM},
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -489,10 +487,10 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				// 	ctx->exercises.next_result();
 				// }
 				draw_text("click anywhere to review next"_v, theme()->outline,
-				          udpi(16.f));
+				          sizes()->font.body_md);
 			}
-			if (Clay_Hovered() && (ctx->tslt.is_tap() ||
-			    ctx->tslt.is_longtap())) {
+			if (Clay_Hovered() &&
+			    (ctx->tslt.is_tap() || ctx->tslt.is_longtap())) {
 				ctx->exercises.next_result();
 			}
 		}
@@ -505,10 +503,10 @@ void screen_exercise_review_draw(AppContext *ctx) {
 		                                  CLAY_SIZING_FIT(0)},
 							   .padding =
 									 {
-										   .top = udpi(4.f),
-										   .bottom = udpi(4.f),
+										   .top = sizes()->space.xs,
+										   .bottom = sizes()->space.xs,
 									 },
-							   .childGap = udpi(14.0f),
+							   .childGap = sizes()->space.md,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,

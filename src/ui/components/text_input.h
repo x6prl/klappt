@@ -4,8 +4,8 @@
 #include <SDL3/SDL_properties.h>
 
 #include "ui/components/button.h"
-#include "ui/dpi.h"
 #include "ui/textcache.h"
+#include "ui/themes.h"
 #include "ui/translations/langs.h"
 
 #ifdef __EMSCRIPTEN__
@@ -13,23 +13,22 @@
 extern "C" void mobile_text_input_web_wakeup();
 #endif
 
-#include "../themes.h"
 #include "app/app_context.h"
 #include "base/str_view.h"
 #include "text_input_state.h"
-#include <clay/clay.h>
 
 struct MobileTextInputStyle {
 	bool fill_width{true};
 	float min_width{0.0f};
-	float height{56.0f};
-	float padding_x{16.0f};
-	float padding_y{14.0f};
-	float corner_radius{18.0f};
-	float font_size{18.0f};
-	float border_width{1.0f};
+	float height{
+		  0.0f}; // Resolved in factory from sizes()->dim.min_touch_target
+	uint16_t padding_x{0};     // Resolved in factory from sizes()->space.lg
+	uint16_t padding_y{0};     // Resolved in factory from sizes()->space.sm
+	float corner_radius{0.0f}; // Resolved in factory from sizes()->radius.md
+	uint16_t font_size{0};     // Resolved in factory from sizes()->font.body_md
+	uint16_t border_width{1};
 	float caret_width{2.0f};
-	float caret_height{24.0f};
+	float caret_height{0.0f}; // Resolved in factory from sizes()->font.title_md
 	uint16_t font_id{FontID::MAIN};
 	SDL_TextInputType text_type{SDL_TEXTINPUT_TYPE_TEXT};
 	SDL_Capitalization capitalization{SDL_CAPITALIZE_SENTENCES};
@@ -45,7 +44,6 @@ struct MobileTextInputStyle {
 	Clay_Color composition{};
 	Clay_Color caret{};
 };
-
 struct MobileTextInputResult {
 	bool focused{};
 	bool tapped{};
@@ -69,7 +67,18 @@ inline Clay_Color mobile_text_input_mix(Clay_Color lhs, Clay_Color rhs,
 
 inline MobileTextInputStyle mobile_text_input_style_default() {
 	const Theme *t = theme();
+	const Sizes *s = sizes();
+
 	return {
+		  .height = s->dim.min_touch_target,
+		  .padding_x = s->space.lg,
+		  .padding_y = s->space.sm,
+		  .corner_radius = s->radius.md.topLeft,
+		  .font_size = s->font.body_md,
+		  .border_width = 1,
+		  .caret_width = 2.0f * s->scale,
+		  .caret_height = static_cast<float>(s->font.title_md),
+		  .font_id = FontID::MAIN,
 		  .background = t->surface,
 		  .background_focused =
 				mobile_text_input_mix(t->surface, t->primary, 0.08f),
@@ -81,7 +90,6 @@ inline MobileTextInputStyle mobile_text_input_style_default() {
 		  .caret = t->primary,
 	};
 }
-
 inline StrView mobile_text_input_view(const MobileTextInputBuffer &value) {
 	return value.view();
 }
@@ -108,6 +116,7 @@ inline Size mobile_text_input_utf8_codepoint_bytes(unsigned char lead) {
 
 inline void mobile_text_input_clear_composition(AppContext *ctx) {
 	ctx->mobile_text_input.composition.clear();
+	SDL_ClearComposition(ctx->window);
 }
 
 inline float mobile_text_input_measure_text(AppContext *ctx, StrView text,
@@ -202,6 +211,8 @@ inline void mobile_text_input_clear(AppContext *ctx,
 	runtime.scroll_offset_px = 0.0f;
 	runtime.cursor_offset_px = 0.0f;
 	runtime.composition.clear();
+
+	SDL_ClearComposition(ctx->window);
 
 #ifdef __EMSCRIPTEN__
 	EM_ASM({
@@ -776,16 +787,15 @@ inline MobileTextInputResult mobile_text_input(
 	  const MobileTextInputStyle &style = mobile_text_input_style_default(),
 	  Clay_ElementId detached_clear_button_id =
 			CLAY_ID("DetachedClearButton")) {
-
-	const uint16_t padding_x = udpi(style.padding_x);
-	const uint16_t padding_y = udpi(style.padding_y);
-	const uint16_t border_width = udpi(style.border_width);
-	const uint16_t font_size = udpi(style.font_size);
-	const uint16_t caret_width = udpi(style.caret_width);
-	const uint16_t caret_height = udpi(style.caret_height);
-	const float min_width = dpi(style.min_width);
-	const float height = dpi(style.height);
-	const float corner_radius = dpi(style.corner_radius);
+	const uint16_t padding_x = style.padding_x;
+	const uint16_t padding_y = style.padding_y;
+	const uint16_t border_width = style.border_width;
+	const uint16_t font_size = style.font_size;
+	const uint16_t caret_width = static_cast<uint16_t>(style.caret_width);
+	const uint16_t caret_height = static_cast<uint16_t>(style.caret_height);
+	const float min_width = style.min_width;
+	const float height = style.height;
+	const float corner_radius = style.corner_radius;
 
 	const bool rtl = style.rtl || (ctx->settings.tr_language == lang_ar);
 	MobileTextInputStyle effective_style = style;
@@ -796,7 +806,7 @@ inline MobileTextInputResult mobile_text_input(
 
 	const bool has_value = (value && value->size > 0);
 	const float clear_btn_reserve =
-		  (style.clearable && has_value) ? udpi(36.0f) : 0.0f;
+		  (style.clearable && has_value) ? sizes()->dim.action_btn_size : 0.0f;
 
 	auto &runtime = ctx->mobile_text_input;
 	const bool is_pointer_over =
@@ -864,8 +874,9 @@ inline MobileTextInputResult mobile_text_input(
 		                    clear_btn_reserve;
 		if (inner_width < 1.0f)
 			inner_width = 1.0f;
-		const float caret_extent =
-			  cursor_offset_px + static_cast<float>(caret_width) + dpi(4.0f);
+		const float caret_extent = cursor_offset_px +
+		                           static_cast<float>(caret_width) +
+		                           static_cast<float>(sizes()->space.xs);
 		if (caret_extent > inner_width) {
 			scroll_offset_px = caret_extent - inner_width;
 		}
@@ -937,7 +948,7 @@ inline MobileTextInputResult mobile_text_input(
 							 },
 				 }) {
 
-				if (show_placeholder) {
+				if (show_placeholder || !value || 0 == value->size) {
 					if (focused) {
 						CLAY(CLAY_ID_LOCAL("Caret"),
 						     {
@@ -1034,15 +1045,29 @@ inline MobileTextInputResult mobile_text_input(
 				auto btn_style = mobile_button_style_surface_container_high();
 				btn_style.background.a = 0.f;
 				btn_style.background_pressed.a = 0.f;
+				btn_style.border_width = 0;
+				btn_style.border = {};
+				btn_style.border_pressed = {};
 				btn_style.font_id = FontID::ICONS;
-				btn_style.font_size *= 1.5f;
-				btn_style.text.a *= 0.6f;
+				btn_style.font_size =
+					  static_cast<uint16_t>(sizes()->dim.icon_sm);
+				btn_style.height = sizes()->dim.min_touch_target;
+				btn_style.min_width = sizes()->dim.min_touch_target * 0.65f;
+				btn_style.padding_x = sizes()->space.lg;
+				btn_style.padding_y = 0;
+				btn_style.text.a *= 0.5f;
 
 				auto b = mobile_button(ctx, CLAY_ID_LOCAL("ClearButton"),
 				                       Icons::CLEAR, btn_style);
 				if (b.activated()) {
 					mobile_text_input_clear(ctx, value);
+					// runtime.changed_id = id.id;
+
+					// runtime.cursor_byte_offset = 0;
+					// runtime.scroll_offset_px = 0.0f;
+					// runtime.cursor_offset_px = 0.0f;
 					runtime.changed_id = id.id;
+					ctx->push_one_frame();
 				}
 			}
 		}

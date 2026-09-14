@@ -1,18 +1,15 @@
 #include "keypad_island.h"
 
-#include <cstdint>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_pixels.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
-#include "SDL3/SDL_log.h"
-#include "SDL3/SDL_pixels.h"
-#include "SDL3_ttf/SDL_ttf.h"
-
-#include "../dpi.h"
-#include "../textcache.h"
-#include "../themes.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/stats.h"
 #include "render_helpers.h"
+#include "ui/sizes.h"
+#include "ui/themes.h"
 
 namespace {
 
@@ -276,7 +273,7 @@ void keypad_island_commit(AppContext *ctx) {
 		float tile = (box.w * size_w_percent) / 3.f;
 		float x = (box.w - tile * island_columns) * 0.5f;
 		float y = box.h / 15.f;
-		float divider_thickness = roundf(dpi(1.f));
+		float divider_thickness = std::max(1.0f, roundf(sizes()->scale));
 
 		// calculate boxes for buttons
 		// SDL_FRect cells[6]{};
@@ -309,8 +306,8 @@ void keypad_island_commit(AppContext *ctx) {
 		 * DRAW SHADOWS
 		 */
 		const auto SHADOW_LAYERS = 12;
-		const auto shadow_layer_dt = dpi(1.f);
-		const auto radius = dpi(16.f);
+		const auto shadow_layer_dt = std::max(1.0f, roundf(sizes()->scale));
+		const auto radius = sizes()->radius.lg.topLeft;
 		for (Size l{0}; l < SHADOW_LAYERS; ++l) {
 			auto layer_color = shadow;
 			layer_color.a = shadow.a / 12.f * l;
@@ -333,7 +330,7 @@ void keypad_island_commit(AppContext *ctx) {
 		 */
 		auto color_text = g_keypad_island.pending.style.text;
 		auto labels = g_keypad_island.pending.labels;
-		auto font_size = udpi(30.f);
+		auto font_size = sizes()->font.title_lg; // TODO: adjust size
 		auto ticks = ctx->ticks;
 		TTF_Font *font{};
 		{

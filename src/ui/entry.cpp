@@ -1,5 +1,6 @@
 #include "entry.h"
 #include "app/worker.h"
+#include "ui/sizes.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -28,7 +29,7 @@
 #include "components/keypad_island.h"
 #include "components/list_island.h"
 #include "components/text_input.h"
-#include "dpi.h"
+
 #include "sdlcr.h"
 #include "textcache.h"
 #include "themes.h"
@@ -91,7 +92,8 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 		strs.push(ctx->arena_frame, ctx->app_status.error_msgs.size);
 		title = strs.join(ctx->arena_frame, ' ');
 	}
-	const auto app_bar_height = dpi(60.0f);
+
+	const float bar_height = sizes()->dim.app_bar_height;
 	const auto app_bar_button_style = mobile_button_style_app_bar();
 	CLAY(CLAY_ID("AppBar"),
 	     {
@@ -100,8 +102,7 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 						   .sizing =
 								 {
 									   .width = CLAY_SIZING_GROW(0),
-									   .height =
-											 CLAY_SIZING_FIXED(app_bar_height),
+									   .height = CLAY_SIZING_FIXED(bar_height),
 								 },
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_BOTTOM},
@@ -115,10 +116,10 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 						 {
 							   .sizing =
 									 {
-										   .width = CLAY_SIZING_FIXED(
-												 app_bar_height),
-										   .height = CLAY_SIZING_FIXED(
-												 app_bar_height),
+										   .width =
+												 CLAY_SIZING_FIXED(bar_height),
+										   .height =
+												 CLAY_SIZING_FIXED(bar_height),
 									 },
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
@@ -137,13 +138,14 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 				   .layout =
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_FIXED(app_bar_height)},
+		                                  CLAY_SIZING_FIXED(bar_height)},
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 						 },
 			 }) {
 			if (title) {
-				draw_text(title, theme()->onSurfaceContainerLow, udpi(20.0f));
+				draw_text(title, theme()->onSurfaceContainerLow,
+				          sizes()->font.title_md);
 			}
 		}
 		CLAY(CLAY_ID("RightActionSlot"),
@@ -152,10 +154,10 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 						 {
 							   .sizing =
 									 {
-										   .width = CLAY_SIZING_FIXED(
-												 app_bar_height),
-										   .height = CLAY_SIZING_FIXED(
-												 app_bar_height),
+										   .width =
+												 CLAY_SIZING_FIXED(bar_height),
+										   .height =
+												 CLAY_SIZING_FIXED(bar_height),
 									 },
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
@@ -173,7 +175,7 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 }
 
 void bottom_bar_layout(AppContext *ctx) {
-	constexpr auto bottom_bar_size{60.f};
+	const auto bar_size = sizes()->dim.bottom_bar_height;
 	constexpr Arr<Triple<StrView, Screen, StrView>, 4> menu{{
 		  {""_v, Screen::Trainer},
 		  {"T"_v, Screen::TTS_ASR},
@@ -203,7 +205,7 @@ void bottom_bar_layout(AppContext *ctx) {
 					  .sizing =
 							{
 								  CLAY_SIZING_GROW(0),
-								  CLAY_SIZING_FIXED(dpi(bottom_bar_size)),
+								  CLAY_SIZING_FIXED(bar_size),
 							},
 				},
 	      .backgroundColor = theme()->surfaceContainerLow}) {
@@ -211,8 +213,8 @@ void bottom_bar_layout(AppContext *ctx) {
 		auto style = mobile_button_style_surface_container_high();
 		style.background = style.border = style.background_pressed = {};
 		style.font_id = FontID::ICONS;
-		style.font_size = (bottom_bar_size / 1.8) * 0.5;
-		style.height = style.font_size * 1.2f;
+		style.font_size = sizes()->dim.icon_md;
+		style.height = sizes()->dim.icon_md * 1.2f;
 		style.corner_radius = 0.f;
 		style.border_width = 0.f;
 
@@ -230,8 +232,7 @@ void bottom_bar_layout(AppContext *ctx) {
 			CLAY(CLAY_IDI("ButtonParent", i),
 			     {.layout = {
 						.sizing = {.width = CLAY_SIZING_GROW(0),
-			                       .height = CLAY_SIZING_FIXED(
-										 dpi(bottom_bar_size))},
+			                       .height = CLAY_SIZING_FIXED(bar_size)},
 				  }}) {
 				bool is_selected = menu[i].second == ctx->screen();
 				bool is_activated = Clay_Hovered() && ctx->tslt.is_tap();
@@ -265,7 +266,7 @@ void bottom_bar_layout(AppContext *ctx) {
 						}
 					}
 					draw_text(screen_to_screen_name(menu[i].second), style.text,
-					          udpi(16.f));
+					          sizes()->font.label_sm);
 				}
 			}
 		}
@@ -306,6 +307,8 @@ extern "C" void ui_clay_init(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_clay_init");
 	clay_init(ctx);
 	Clay_SetMeasureTextFunction(measure_text_sdl, ctx->text);
+	sizes_set_scale(ctx->scale, ctx->settings.density,
+	                ctx->settings.font_scale);
 }
 
 extern "C" void ui_settings_init(AppContext *ctx) {
@@ -414,15 +417,15 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 			int height = 0;
 			SDL_GetWindowSizeInPixels(ctx->window, &width, &height);
 
-			// SDL_Rect safe_area{};
-			// SDL_GetWindowSafeArea(ctx->window, &safe_area);
-			// width = safe_area.w;
-			// height = safe_area.h;
 			Clay_SetLayoutDimensions(Clay_Dimensions{
 				  static_cast<float>(width), static_cast<float>(height)});
 			ctx->display_width = width;
-			ctx->scale = SDL_GetWindowDisplayScale(ctx->window),
-			SDL_Log("Resize: %d×%d", width, height);
+			ctx->scale = SDL_GetWindowDisplayScale(ctx->window);
+
+			sizes_set_scale(ctx->scale, ctx->settings.density,
+			                ctx->settings.font_scale);
+
+			SDL_Log("Resize: %d×%d (scale: %.2f)", width, height, ctx->scale);
 			ctx->push_one_frame();
 		} break;
 		case SDL_EVENT_FINGER_DOWN:
@@ -551,7 +554,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 								 {
 									   .top = pad_top, // Pushes icons safely
 	                                                   // below the clock
-									   // .bottom = pad_bottom,
+	                                                   // .bottom = pad_bottom,
 								 },
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },

@@ -1,19 +1,19 @@
 #pragma once
 
-#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_timer.h>
 // #include <SDL3_mixer/SDL_mixer.h>
 // #include <SDL3_ttf/SDL_ttf.h>
 
 #include <clay/clay.h>
 
-#include "base/dyn_arr.h"
-#include "base/str_view.h"
-#include "base/arena.h"
-#include "base/profiler.h"
 #include "app/app_status.h"
 #include "app/audio_context.h"
 #include "app/worker.h"
+#include "base/arena.h"
+#include "base/dyn_arr.h"
+#include "base/profiler.h"
+#include "base/str_view.h"
 #include "domain/engine.h"
 #include "domain/exercises.h"
 #include "domain/settings.h"
@@ -122,7 +122,7 @@ struct AppContext {
 	JobQueue<Job> worker_job_queue{};
 
 	DynArr<DownloadData> downloads{};
-	NetContext *net{nullptr};     // NOTE: created by NetThread
+	NetContext *net{nullptr}; // NOTE: created by NetThread
 	JobQueue<Size> net_worker_job_queue{};
 
 	AudioContext *audio{nullptr}; //       created by AudioThread
@@ -145,14 +145,35 @@ struct AppContext {
 	}
 	Screen screen() const { return stack[current]; }
 	Screen screen_prev() const {
-		if (current >0) {
-			return stack[current-1];
-		} 
+		if (current > 0) {
+			return stack[current - 1];
+		}
 		return Screen::Trainer;
 	}
 	void on_screen_change(Screen from, Screen to) {
 		(void)from;
 		(void)to;
+
+		// { // text_input_reset
+		// 	if (window) {
+		// 		SDL_ClearComposition(window);
+		// 		if (SDL_TextInputActive(window)) {
+		// 			SDL_StopTextInput(window);
+		// 		}
+		// 		SDL_SetTextInputArea(window, nullptr, 0);
+		// 	}
+		// 	mobile_text_input.focused_id = 0;
+		// 	mobile_text_input.focused_element = {};
+		// 	mobile_text_input.focused_value = nullptr;
+		// 	mobile_text_input.focused_bounds = {};
+		// 	mobile_text_input.cursor_byte_offset = 0;
+		// 	mobile_text_input.scroll_offset_px = 0.0f;
+		// 	mobile_text_input.cursor_offset_px = 0.0f;
+		// 	mobile_text_input.focused_bounds_valid = false;
+		// 	mobile_text_input.focused_drawn_this_frame = false;
+		// 	mobile_text_input.composition.clear();
+		// 	mobile_text_input.activate_text_input = false;
+		// }
 		switch (from) {
 		case Screen::TTS_ASR: {
 			// stop recording and turn off micro

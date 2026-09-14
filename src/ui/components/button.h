@@ -1,13 +1,13 @@
 #pragma once
 
+#include <SDL3/SDL_log.h>
+#include <clay/clay.h>
+
 #include "../themes.h"
 #include "app/app_context.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "ui/dpi.h"
-#include <SDL3/SDL_log.h>
-#include <clay/clay.h>
-#include <cstdint>
+#include "ui/sizes.h"
 
 namespace Icons {
 constexpr auto EDIT = ""_v;
@@ -32,13 +32,14 @@ constexpr auto ENVELOPE = ""_v;
 struct MobileButtonStyle {
 	bool fill_width{false};
 	float min_width{0.0f};
-	float height{48.0f};
-	float padding_x{18.0f};
-	float padding_y{12.0f};
-	float corner_radius{16.0f};
-	float font_size{16.0f};
+	float height{
+		  0.0f}; // Resolved in factory from sizes()->dim.min_touch_target
+	uint16_t padding_x{0};     // Resolved in factory from sizes()->space.lg
+	uint16_t padding_y{0};     // Resolved in factory from sizes()->space.sm
+	float corner_radius{0.0f}; // Resolved in factory from sizes()->radius.md
+	uint16_t font_size{0};     // Resolved in factory from sizes()->font.body_md
 	uint16_t font_id{FontID::MAIN};
-	float border_width{0.0f};
+	uint16_t border_width{0};
 	Clay_LayoutAlignmentX text_align{CLAY_ALIGN_X_CENTER};
 	Clay_Color background{};
 	Clay_Color background_pressed{};
@@ -71,41 +72,59 @@ inline Clay_Color mobile_button_mix(Clay_Color lhs, Clay_Color rhs, float t) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
+inline MobileButtonStyle mobile_button_style_base() {
+	const Sizes *s = sizes();
+	return {
+		  .height = s->dim.min_touch_target,
+		  .padding_x = s->space.lg,
+		  .padding_y = s->space.sm,
+		  .corner_radius = s->radius.md.topLeft,
+		  .font_size = s->font.body_md,
+		  .font_id = FontID::MAIN,
+		  .border_width = 0,
+		  .text_align = CLAY_ALIGN_X_CENTER,
+	};
+}
+
 inline MobileButtonStyle mobile_button_style_primary() {
 	const Theme *t = theme();
-	return {
-		  .background = t->primary,
-		  .background_pressed = mobile_button_mix(t->primary, t->shadow, 0.24f),
-		  .border = t->primary,
-		  .border_pressed = mobile_button_mix(t->primary, t->shadow, 0.32f),
-		  .text = t->onPrimary,
-		  .text_pressed = t->onPrimary,
-	};
+	MobileButtonStyle style = mobile_button_style_base();
+	style.background = t->primary;
+	style.background_pressed = mobile_button_mix(t->primary, t->shadow, 0.24f);
+	style.border = t->primary;
+	style.border_pressed = mobile_button_mix(t->primary, t->shadow, 0.32f);
+	style.text = t->onPrimary;
+	style.text_pressed = t->onPrimary;
+	return style;
 }
 
 inline MobileButtonStyle mobile_button_style_surface_container_high() {
 	const Theme *t = theme();
-	return {
-		  .background = t->surfaceContainerHigh,
-		  .background_pressed = mobile_button_mix(
-				t->surfaceContainerHigh, t->onSurfaceContainerHigh, 0.12f),
-		  .border = t->outline,
-		  .border_pressed =
-				mobile_button_mix(t->outline, t->onSurfaceContainerHigh, 0.24f),
-		  .text = t->onSurfaceContainerHigh,
-		  .text_pressed = t->onSurfaceContainerHigh,
-	};
+	MobileButtonStyle style = mobile_button_style_base();
+	style.border_width = 1;
+	style.background = t->surfaceContainerHigh;
+	style.background_pressed = mobile_button_mix(
+		  t->surfaceContainerHigh, t->onSurfaceContainerHigh, 0.12f);
+	style.border = t->outline;
+	style.border_pressed =
+		  mobile_button_mix(t->outline, t->onSurfaceContainerHigh, 0.24f);
+	style.text = t->onSurfaceContainerHigh;
+	style.text_pressed = t->onSurfaceContainerHigh;
+	return style;
 }
 
 inline MobileButtonStyle mobile_button_style_app_bar() {
 	const Theme *t = theme();
+	const Sizes *s = sizes();
+
 	return {
-		  .min_width = 44.0f,
-		  .height = 44.0f,
-		  .padding_x = 12.0f,
-		  .padding_y = 12.0f,
-		  .corner_radius = 14.0f,
-		  .font_size = 24,
+		  .min_width = s->dim.action_btn_size,
+		  .height = s->dim.action_btn_size,
+		  .padding_x = s->space.xs,
+		  .padding_y = s->space.xs,
+		  .corner_radius = s->radius.md.topLeft,
+		  .font_size = static_cast<uint16_t>(s->dim.icon_md),
 		  .font_id = FontID::ICONS,
 		  .border_width = 0,
 		  .background = {0, 0, 0, 0},
@@ -117,7 +136,6 @@ inline MobileButtonStyle mobile_button_style_app_bar() {
 		  .text_pressed = t->onSurfaceContainerLow,
 	};
 }
-
 inline MobileButtonResult mobile_button_state(const AppContext *ctx,
                                               Clay_ElementId id) {
 	const bool hit = Clay_PointerOver(id);
@@ -135,13 +153,13 @@ mobile_button(AppContext *ctx, Clay_ElementId id, StrView label,
               const MobileButtonStyle &style =
                     mobile_button_style_surface_container_high()) {
 	KLAPPT_PROFILE_SCOPE_N("mobile_button");
-	const uint16_t padding_x = udpi(style.padding_x);
-	const uint16_t padding_y = udpi(style.padding_y);
-	const uint16_t border_width = udpi(style.border_width);
-	const uint16_t font_size = udpi(style.font_size);
-	const float min_width = udpi(style.min_width);
-	const float height = udpi(style.height);
-	const float corner_radius = udpi(style.corner_radius);
+	const uint16_t padding_x = style.padding_x;
+	const uint16_t padding_y = style.padding_y;
+	const uint16_t border_width = style.border_width;
+	const uint16_t font_size = style.font_size;
+	const float min_width = style.min_width;
+	const float height = style.height;
+	const float corner_radius = style.corner_radius;
 
 	const auto state = mobile_button_state(ctx, id);
 	if (label.data && label.size > 0) {
@@ -197,7 +215,17 @@ inline MobileButtonResult mobile_icon_button(AppContext *ctx, Clay_ElementId id,
 	} else {
 		style = mobile_button_style_surface_container_high();
 	}
+
+	const Sizes *s = sizes();
 	style.font_id = FontID::ICONS;
+	style.font_size = static_cast<uint16_t>(s->dim.icon_md);
+	style.height = s->dim.action_btn_size;
+	style.min_width = s->dim.action_btn_size;
+	style.padding_x = s->space.xs;
+	style.padding_y = s->space.xs;
+	style.corner_radius = s->radius.sm.topLeft;
+	style.border_width = 0;
+
 	return mobile_button(ctx, id, icon, style);
 }
 #pragma GCC diagnostic pop

@@ -10,20 +10,7 @@ struct MobileTextInputBuffer {
 	char data[MAX_SIZE]; // TODO: make thinner :o
 	Size size{0};
 
-	void clear() {
-		if (true) {
-			memset(data, 0, MAX_SIZE);
-			size = 0;
-		} else {
-			size = 0;
-			data[0] = '\0';
-		}
-	}
-
-	const char *c_str() {
-		data[size] = '\0';
-		return data;
-	}
+	void clear() { size = 0; }
 
 	StrView view() const { return {data, size}; }
 };

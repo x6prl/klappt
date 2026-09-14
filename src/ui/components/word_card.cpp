@@ -1,17 +1,19 @@
 #include "word_card.h"
 
-#include "../dpi.h"
-#include "../themes.h"
+#include <SDL3/SDL_log.h>
+#include <cstdint>
+
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/grammar.h"
 #include "domain/word.h"
 #include "ui/components/button.h"
+#include "ui/sizes.h"
+#include "ui/textcache.h"
+#include "ui/themes.h"
 #include "ui/translations/langs.h"
 #include "ui/tslt.h"
-#include <SDL3/SDL_log.h>
-#include <charconv>
 
 namespace {
 
@@ -42,6 +44,7 @@ void word_main(Clay_ElementId id, StrView pre, StrView main, StrView post,
 			CLAY_TEXT(main.to_clay_string(),
 			          CLAY_TEXT_CONFIG({
 							.textColor = color,
+							// .fontId = FontID::MAIN,
 							.fontId = FontID::MONOSPACE_REGULAR,
 							.fontSize = font_size,
 							.wrapMode = CLAY_TEXT_WRAP_NONE,
@@ -90,28 +93,34 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 TapSwipeLongTap::State
 word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_for_words_list");
-	const auto padding = udpi(6.f);
-	const auto height = dpi(WORD_CARD_HEIGHT);
 	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
 	auto is_usual_card = w.in_learning_list == 0;
 
+	uint16_t border_width =
+		  is_usual_card ? 0u
+						: static_cast<uint16_t>(
+								sizes()->scale > 1.f ? sizes()->scale : 1u);
 	CLAY(id,
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0),
-	                                  CLAY_SIZING_FIXED(height)},
-						   .padding = CLAY_PADDING_ALL(padding),
-						   .childGap = udpi(8.f),
+	                                  CLAY_SIZING_FIXED(
+											sizes()->dim.word_card_height)},
+						   .padding = sizes()->pad.list_item,
+						   .childGap = sizes()->space.sm,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_CENTER},
 					 },
 			   .backgroundColor = is_usual_card ? theme()->surfaceContainer
 	                                            : theme()->surfaceContainerHigh,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(10.f)),
-			   .border = {.color = is_usual_card ? theme()->surfaceContainer
-	                                             : theme()->secondary,
-	                      .width = CLAY_BORDER_OUTSIDE(udpi(1.f))},
+			   .cornerRadius = sizes()->radius.md,
+			   .border =
+					 {
+						   .color = is_usual_card ? theme()->surfaceContainer
+	                                              : theme()->secondary,
+						   .width = CLAY_BORDER_OUTSIDE(border_width),
+					 },
 		 }) {
 		StrView pre_main{};
 		StrView main;
@@ -142,11 +151,12 @@ word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 		auto col = is_usual_card ? theme()->onSurfaceContainer
 		                         : theme()->onSurfaceContainerHigh;
 		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
-		          col, udpi(13), udpi(3));
+		          col, sizes()->font.body_md, sizes()->space.xs);
 
 		auto tr_plain = w.translations_raw;
 		word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
-		                tr_plain, col, udpi(13), translation_font_id(ctx));
+		                tr_plain, col, sizes()->font.body_sm,
+		                translation_font_id(ctx));
 
 		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
 		                          ctx->tslt.state == TapSwipeLongTap::LongTap);
@@ -159,28 +169,31 @@ word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 
 bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_tap");
-	const auto padding = udpi(6.f);
-	const auto height = dpi(WORD_CARD_HEIGHT);
 	bool ret{false};
 	auto is_usual_card = w.in_learning_list == 0;
 
+	uint16_t border_width =
+		  is_usual_card ? 0u
+						: static_cast<uint16_t>(
+								sizes()->scale > 1.f ? sizes()->scale : 1u);
 	CLAY(id,
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0),
-	                                  CLAY_SIZING_FIXED(height)},
-						   .padding = CLAY_PADDING_ALL(padding),
-						   .childGap = udpi(8.f),
+	                                  CLAY_SIZING_FIXED(
+											sizes()->dim.word_card_height)},
+						   .padding = sizes()->pad.list_item,
+						   .childGap = sizes()->space.sm,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_CENTER},
 					 },
 			   .backgroundColor = is_usual_card ? theme()->surfaceContainer
 	                                            : theme()->surfaceContainerHigh,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(10.f)),
+			   .cornerRadius = sizes()->radius.md,
 			   .border = {.color = is_usual_card ? theme()->surfaceContainer
 	                                             : theme()->secondary,
-	                      .width = CLAY_BORDER_OUTSIDE(udpi(1.f))},
+	                      .width = CLAY_BORDER_OUTSIDE(border_width)},
 		 }) {
 		StrView pre_main{};
 		StrView main;
@@ -207,11 +220,12 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 		auto col = is_usual_card ? theme()->onSurfaceContainer
 		                         : theme()->onSurfaceContainerHigh;
 		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
-		          col, udpi(13), udpi(4));
+		          col, sizes()->font.body_md, sizes()->space.xs);
 
 		auto trs_plain = w.translations_raw;
 		word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
-		                trs_plain, col, udpi(13), translation_font_id(ctx));
+		                trs_plain, col, sizes()->font.body_sm,
+		                translation_font_id(ctx));
 
 		if (ctx->tslt.is_tap() && Clay_Hovered()) {
 			ret = true;
@@ -224,8 +238,6 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
                                           const Word &w, int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
-	const auto padding = udpi(6.f);
-	const auto height = dpi(WORD_CARD_HEIGHT);
 	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
 
 	CLAY(id,
@@ -233,15 +245,15 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0),
-	                                  CLAY_SIZING_FIXED(height)},
-						   .padding = CLAY_PADDING_ALL(padding),
-						   .childGap = udpi(8.f),
+	                                  CLAY_SIZING_FIXED(
+											sizes()->dim.word_card_height)},
+						   .padding = sizes()->pad.list_item,
+						   .childGap = sizes()->space.sm,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_CENTER},
 					 },
 			   .backgroundColor = theme()->surfaceContainer,
-
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(10.f)),
+			   .cornerRadius = sizes()->radius.md,
 			   // .border = {.color = is_usual_card ? theme()->surfaceContainer
 	           //                                         : theme()->secondary,
 	           // .width = CLAY_BORDER_OUTSIDE(udpi(1.f))},
@@ -270,15 +282,16 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 		}
 		auto col = theme()->onSurfaceContainer;
 		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
-		          col, udpi(13), udpi(4));
+		          col, sizes()->font.body_md, sizes()->space.xs);
 
 		CLAY(CLAY_IDI("SecondColWrapper", id.id),
 		     {
 				   .layout =
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
-		                                  CLAY_SIZING_FIXED(height)},
-							   .padding = {.right = padding},
+		                                  CLAY_SIZING_FIXED(
+												sizes()->dim.word_card_height)},
+							   .padding = sizes()->pad.list_item,
 							   .childAlignment = {CLAY_ALIGN_X_LEFT,
 		                                          CLAY_ALIGN_Y_CENTER},
 						 },
@@ -286,19 +299,21 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 			 }) {
 			auto trs_plain = w.translations_raw;
 			word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
-			                trs_plain, col, udpi(13), translation_font_id(ctx));
+			                trs_plain, col, sizes()->font.body_sm,
+			                translation_font_id(ctx));
 		}
 		StrView already_should_icon = Icons::ENVELOPE;
 		if (due_mark < 0) {
 			auto color_due = theme()->primary;
 			color_due.a = 255.f;
-			CLAY_TEXT(already_should_icon.to_clay_string(),
-			          CLAY_TEXT_CONFIG({
-							.textColor = color_due,
-							.fontId = FontID::ICONS,
-							.fontSize = udpi(13),
-							.wrapMode = CLAY_TEXT_WRAP_NONE,
-					  }));
+			CLAY_TEXT(
+				  already_should_icon.to_clay_string(),
+				  CLAY_TEXT_CONFIG({
+						.textColor = color_due,
+						.fontId = FontID::ICONS,
+						.fontSize = static_cast<uint16_t>(sizes()->dim.icon_sm),
+						.wrapMode = CLAY_TEXT_WRAP_NONE,
+				  }));
 		} else {
 			auto color_wait = theme()->secondary;
 			color_wait.a = 255.f;
@@ -343,7 +358,7 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 							.textColor = color_wait,
 							.fontId = FontID::MAIN,
 							// .fontId = FontID::ICONS,
-							.fontSize = udpi(13),
+							.fontSize = sizes()->font.label_md,
 							.wrapMode = CLAY_TEXT_WRAP_NONE,
 					  }));
 		}

@@ -1,23 +1,26 @@
+#include <SDL3/SDL_log.h>
+
 #include "domain/word.h"
 #include "platform/neuro.h"
-#include "screen_helpers.h"
+
 #include "ui/components/lists.h"
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
-#include "ui/dpi.h"
+
+#include "ui/sizes.h"
 #include "ui/tslt.h"
-#include <SDL3/SDL_log.h>
+
+#include "screen_helpers.h"
 
 void screen_learning_list_go(AppContext *ctx) { ctx->go(Screen::LearningList); }
 
 void screen_learning_list_draw(AppContext *ctx) {
-	const auto padding = udpi(6.f);
-	const auto search_height = dpi(mobile_text_input_style_default().height);
+	const auto search_height = sizes()->dim.min_touch_target;
 	CLAY(CLAY_ID("WordsListShell"),
 	     {.layout = {
 				.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-				.padding = CLAY_PADDING_ALL(padding),
-				.childGap = udpi(6.f),
+				.padding = sizes()->pad.screen,
+				.childGap = sizes()->space.sm,
 				.layoutDirection = CLAY_TOP_TO_BOTTOM,
 		  }}) {
 		CLAY(CLAY_ID("WordsSearchSlot"),
@@ -37,9 +40,11 @@ void screen_learning_list_draw(AppContext *ctx) {
 		CLAY(CLAY_ID("WordsListSlot"),
 		     {.layout = {
 					.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)}}}) {
+			const float card_gap = static_cast<float>(sizes()->space.xs);
+			const float row_slot_height =
+				  sizes()->dim.word_card_height + card_gap;
 			list::vertical_uniform_w(
-				  ctx, CLAY_ID("WordsList"), total_words,
-				  dpi(WORD_CARD_ROW_HEIGHT),
+				  ctx, CLAY_ID("WordsList"), total_words, row_slot_height,
 				  [&](AppContext *ctx, list::ItemsRange window) {
 					  for_each_matching_learning_word_range(
 							ctx->arena_frame, *ctx->words, query, window.first,
@@ -47,10 +52,14 @@ void screen_learning_list_draw(AppContext *ctx) {
 							[&](Size index, const Word &w) {
 								CLAY(CLAY_IDI("WordRow", index),
 					                 {.layout = {
-											.sizing = {
-												  CLAY_SIZING_GROW(0),
-												  CLAY_SIZING_FIXED(dpi(
-														WORD_CARD_ROW_HEIGHT))}}}) {
+											.sizing = {CLAY_SIZING_GROW(0),
+					                                   CLAY_SIZING_FIXED(
+															 row_slot_height)},
+											.padding = {
+												  .bottom =
+														static_cast<uint16_t>(
+															  card_gap),
+											}}}) {
 									Engine::State state{};
 									// auto [is_success, is_present] =
 									ctx->states.get(w.word_id, state);

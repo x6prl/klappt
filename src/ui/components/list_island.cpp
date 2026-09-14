@@ -1,18 +1,16 @@
 #include "list_island.h"
 
-#include <cstring>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_rect.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
-#include "SDL3/SDL_log.h"
-#include "SDL3/SDL_pixels.h"
-#include "SDL3/SDL_rect.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3_ttf/SDL_ttf.h"
-
-#include "../dpi.h"
-#include "../textcache.h"
-#include "../themes.h"
-#include "base/profiler.h"
 #include "render_helpers.h"
+
+#include "base/profiler.h"
+#include "ui/sizes.h"
+#include "ui/themes.h"
 
 namespace {
 
@@ -152,8 +150,8 @@ void list_island_commit(AppContext *ctx) {
 
 		const SDL_FRect outer{outer_x, outer_y, outer_w, outer_h};
 		// prect("outer", outer);
-		const float radius = dpi(16.f);
-		const float divider_thickness = roundf(dpi(1.f));
+		const float radius = sizes()->radius.lg.topLeft;
+		const float divider_thickness = std::max(1.0f, roundf(sizes()->scale));
 
 		SDL_SetRenderTarget(renderer, tex);
 		SDL_SetRenderDrawColorFloat(renderer, surface_color.r, surface_color.g,
@@ -161,7 +159,7 @@ void list_island_commit(AppContext *ctx) {
 		SDL_RenderClear(renderer);
 
 		const auto shadow_layers = 12;
-		const auto shadow_step = dpi(1.f);
+		const auto shadow_step = std::max(1.0f, roundf(sizes()->scale));
 		for (int layer = 0; layer < shadow_layers; ++layer) {
 			auto layer_color = shadow;
 			layer_color.a = shadow.a / 12.f * layer;
@@ -180,7 +178,7 @@ void list_island_commit(AppContext *ctx) {
 		render_filled_rounded_rect(renderer, &outer, radius, CORNER_ALL,
 		                           background);
 
-		auto font_size = udpi(30.f);
+		auto font_size = sizes()->font.title_md; // TODO: adjust size
 		TTF_Font *font{};
 		{
 			KLAPPT_PROFILE_SCOPE_N("list_island.get_font");

@@ -1,8 +1,9 @@
-#include "app/words_init.h"
 #include "screen_helpers.h"
+
 #include "ui/components/switch_button.h"
 #include "ui/components/text_input.h"
-#include "ui/dpi.h"
+
+#include "ui/sizes.h"
 
 namespace {
 
@@ -64,7 +65,6 @@ static void assign_buffer(MobileTextInputBuffer &dst, StrView src) {
 		SDL_memcpy(next.data, src.data, copy_size);
 	}
 	next.size = copy_size;
-	next.c_str();
 	dst = next;
 }
 
@@ -213,7 +213,6 @@ static void save_edit(AppContext *ctx) {
 
 	auto &view = *ctx->word_view_state;
 	view.word_copy = word;
-	// view.title = word_most_meaningfull_lemma(view.word_copy);
 	if (view.has_learning_state) {
 		view.learning_state_copy.mode = edit.mode;
 		if (!ctx->states.set(view.word_id, view.learning_state_copy)) {
@@ -227,19 +226,22 @@ static void save_edit(AppContext *ctx) {
 static MobileButtonStyle enum_button_style(bool selected) {
 	auto style = selected ? mobile_button_style_primary()
 	                      : mobile_button_style_surface_container_high();
-	style.height = 40.f;
-	style.padding_x = 12.f;
-	style.padding_y = 8.f;
-	style.corner_radius = 12.f;
-	style.font_size = 14.f;
+	// CHANGED: compact enum button dimensions mapped to sizes() tokens
+	style.height =
+		  static_cast<float>(sizes()->space.xxl + sizes()->space.sm); // 40dp
+	style.padding_x = sizes()->space.md;
+	style.padding_y = sizes()->space.sm;
+	style.corner_radius = sizes()->radius.md.topLeft;
+	style.font_size = sizes()->font.body_sm; // 14sp
 	return style;
 }
 
 static void draw_row_label(AppContext *ctx, Clay_ElementId id, StrView label) {
 	CLAY(id,
 	     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)}}}) {
-		draw_text(label, theme()->onSurface, udpi(16), FontID::MAIN,
-		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+		// CHANGED: replaced udpi(16) with sizes()->font.body_md (16sp)
+		draw_text(label, theme()->onSurface, sizes()->font.body_md,
+		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 	}
 }
 
@@ -247,10 +249,12 @@ static void draw_field(AppContext *ctx, Clay_ElementId id,
                        Clay_ElementId input_id, MobileTextInputBuffer *buffer,
                        StrView placeholder) {
 	CLAY(id, {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-	                     .childGap = udpi(4.f),
+	                     // CHANGED: replaced udpi(4.f) with sizes()->space.xs
+	                     .childGap = sizes()->space.xs,
 	                     .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
-		draw_text(placeholder, theme()->onSurface, udpi(14), FontID::MAIN,
-		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+		// CHANGED: replaced udpi(14) with sizes()->font.body_sm (14sp)
+		draw_text(placeholder, theme()->onSurface, sizes()->font.body_sm,
+		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 		if (auto input = mobile_text_input(ctx, input_id, buffer, placeholder);
 		    input.changed || input.submitted || input.blurred) {
 			validate(*ctx->word_edit_state);
@@ -266,8 +270,10 @@ static void draw_enum_row(AppContext *ctx, Clay_ElementId row_id,
                           NameFn name, IdFn id, SelectFn select) {
 	CLAY(row_id,
 	     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-	                 .padding = CLAY_PADDING_ALL(udpi(4.f)),
-	                 .childGap = udpi(6.f),
+	                 // CHANGED: replaced udpi(4.f) with sizes()->space.xs
+	                 .padding = CLAY_PADDING_ALL(sizes()->space.xs),
+	                 // CHANGED: replaced udpi(6.f) with sizes()->space.xs
+	                 .childGap = sizes()->space.xs,
 	                 .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                    CLAY_ALIGN_Y_CENTER}}}) {
 		draw_row_label(ctx, label_id, label);
@@ -285,25 +291,27 @@ static void draw_word_type_row(AppContext *ctx) {
 	auto &edit = *ctx->word_edit_state;
 	const WordType types[] = {WordType::Noun, WordType::Verb, WordType::Adj,
 	                          WordType::Phrase};
-	draw_enum_row(ctx, CLAY_ID("WordTypeRow"), CLAY_ID("TypeLabel"), "Type"_v,
-	              types, 4, edit.type, word_type_name,
-	              [](Size i) { return CLAY_IDI("TypeButton", i); },
-	              [&](WordType type) {
-		              edit.type = type;
-		              validate(edit);
-	              });
+	draw_enum_row(
+		  ctx, CLAY_ID("WordTypeRow"), CLAY_ID("TypeLabel"), "Type"_v, types, 4,
+		  edit.type, word_type_name,
+		  [](Size i) { return CLAY_IDI("TypeButton", i); },
+		  [&](WordType type) {
+			  edit.type = type;
+			  validate(edit);
+		  });
 }
 
 static void draw_gender_row(AppContext *ctx) {
 	auto &edit = *ctx->word_edit_state;
 	const Gender genders[] = {Gender::m, Gender::f, Gender::n, Gender::none};
-	draw_enum_row(ctx, CLAY_ID("GenderRow"), CLAY_ID("GenderLabel"),
-	              "Gender"_v, genders, 4, edit.gender, gender_name,
-	              [](Size i) { return CLAY_IDI("GenderButton", i); },
-	              [&](Gender gender) {
-		              edit.gender = gender;
-		              validate(edit);
-	              });
+	draw_enum_row(
+		  ctx, CLAY_ID("GenderRow"), CLAY_ID("GenderLabel"), "Gender"_v,
+		  genders, 4, edit.gender, gender_name,
+		  [](Size i) { return CLAY_IDI("GenderButton", i); },
+		  [&](Gender gender) {
+			  edit.gender = gender;
+			  validate(edit);
+		  });
 }
 
 static void draw_mode_row(AppContext *ctx) {
@@ -315,13 +323,14 @@ static void draw_mode_row(AppContext *ctx) {
 	for (int i = 0; i < Engine::MODE_COUNT; ++i) {
 		modes[i] = Engine::imode(i);
 	}
-	draw_enum_row(ctx, CLAY_ID("ModeRow"), CLAY_ID("ModeLabel"), "Mode"_v,
-	              modes, Engine::MODE_COUNT, edit.mode, mode_name,
-	              [](Size i) { return CLAY_IDI("ModeButton", i); },
-	              [&](Engine::Mode mode) {
-		              edit.mode = mode;
-		              validate(edit);
-	              });
+	draw_enum_row(
+		  ctx, CLAY_ID("ModeRow"), CLAY_ID("ModeLabel"), "Mode"_v, modes,
+		  Engine::MODE_COUNT, edit.mode, mode_name,
+		  [](Size i) { return CLAY_IDI("ModeButton", i); },
+		  [&](Engine::Mode mode) {
+			  edit.mode = mode;
+			  validate(edit);
+		  });
 }
 
 static void draw_type_fields(AppContext *ctx) {
@@ -352,13 +361,16 @@ static void draw_type_fields(AppContext *ctx) {
 		           &edit.lemma, "Lemma"_v);
 		CLAY(CLAY_ID("IndeclinableRow"),
 		     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-		                 .padding = CLAY_PADDING_ALL(udpi(4.f)),
-		                 .childGap = udpi(12.f),
+		                 // CHANGED: replaced udpi(4.f) with sizes()->space.xs
+		                 .padding = CLAY_PADDING_ALL(sizes()->space.xs),
+		                 // CHANGED: replaced udpi(12.f) with sizes()->space.md
+		                 .childGap = sizes()->space.md,
 		                 .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                    CLAY_ALIGN_Y_CENTER}}}) {
 			draw_row_label(ctx, CLAY_ID("IndeclinableLabel"), "Indeclinable"_v);
+			// CHANGED: switch uses sizes()->dim.icon_md automatically
 			if (switch_button(ctx, CLAY_ID("IndeclinableSwitch"),
-			                  edit.adjective_indeclinable, 30.f)) {
+			                  edit.adjective_indeclinable)) {
 				edit.adjective_indeclinable = !edit.adjective_indeclinable;
 				validate(edit);
 			}
@@ -393,16 +405,25 @@ void screen_word_edit_draw(AppContext *ctx) {
 	auto &edit = *ctx->word_edit_state;
 	validate(edit);
 
-	const auto padding = udpi(8.f);
 	CLAY(CLAY_ID("WordEditScreenShell"),
-	     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-	                 .padding = CLAY_PADDING_ALL(padding),
-	                 .childGap = udpi(8.f),
-	                 .layoutDirection = CLAY_TOP_TO_BOTTOM}}) {
+	     {.layout = {
+				.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
+				// CHANGED: replaced hardcoded udpi(8.f) with
+	            // sizes()->pad.screen
+				.padding = sizes()->pad.screen,
+				// CHANGED: replaced udpi(8.f) with sizes()->space.sm (8dp)
+				.childGap = sizes()->space.sm,
+				.layoutDirection = CLAY_TOP_TO_BOTTOM,
+		  }}) {
 		CLAY(CLAY_ID("WordEditScroll"),
-		     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-		                 .childGap = udpi(10.f),
-		                 .layoutDirection = CLAY_TOP_TO_BOTTOM},
+		     {.layout =
+		            {
+						  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
+						  // CHANGED: replaced udpi(10.f) with sizes()->space.md
+		                  // (12dp)
+						  .childGap = sizes()->space.md,
+						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					},
 		      .clip = {.vertical = true,
 		               .childOffset = Clay_GetScrollOffset()}}) {
 			draw_word_type_row(ctx);
@@ -412,23 +433,36 @@ void screen_word_edit_draw(AppContext *ctx) {
 			           "Translations"_v);
 			draw_mode_row(ctx);
 			if (!edit.valid) {
-				draw_text(edit.validation_error, theme()->error, udpi(15),
-				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
-				          CLAY_TEXT_ALIGN_LEFT);
+				// CHANGED: replaced udpi(15) with sizes()->font.body_sm (14sp)
+				draw_text(edit.validation_error, theme()->error,
+				          sizes()->font.body_sm, FontID::MAIN,
+				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 			}
 		}
 
 		CLAY(CLAY_ID("Buttons"),
-		     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
-		                            CLAY_SIZING_FIXED(dpi(76.f))},
-		                 .padding = CLAY_PADDING_ALL(udpi(12.f)),
-		                 .childGap = udpi(12.f),
-		                 .childAlignment = {CLAY_ALIGN_X_CENTER,
-		                                    CLAY_ALIGN_Y_CENTER}}}) {
+		     {.layout = {
+					.sizing =
+						  {
+								CLAY_SIZING_GROW(0),
+								// CHANGED: replaced dpi(76.f) with standardized
+		                        // bar height (64dp)
+								CLAY_SIZING_FIXED(
+									  sizes()->dim.bottom_bar_height),
+						  },
+					// CHANGED: replaced udpi(12.f) with sizes()->space.sm
+					.padding = CLAY_PADDING_ALL(sizes()->space.sm),
+					// CHANGED: replaced udpi(12.f) with sizes()->space.md
+					.childGap = sizes()->space.md,
+					.childAlignment = {CLAY_ALIGN_X_CENTER,
+		                               CLAY_ALIGN_Y_CENTER},
+			  }}) {
 			auto style = edit.valid
 			                   ? mobile_button_style_primary()
 			                   : mobile_button_style_surface_container_high();
 			style.font_id = FontID::ICONS;
+			// CHANGED: icon font size bound to sizes()->dim.icon_md (24dp)
+			style.font_size = static_cast<uint16_t>(sizes()->dim.icon_md);
 			auto save =
 				  mobile_button(ctx, CLAY_ID("SaveButton"), Icons::SAVE, style);
 			if (save.activated() && edit.valid) {

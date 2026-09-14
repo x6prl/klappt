@@ -8,7 +8,7 @@
 
 #include "ui/components/button.h"
 #include "ui/components/word_card.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 
 #include "screen_helpers.h"
 
@@ -49,13 +49,13 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 	CLAY(CLAY_ID("WordSuggestionsScreen"),
 	     {
 			   .layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-	                      .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-	                      .childGap = udpi(12.0f),
+	                      .padding = sizes()->pad.screen,
+	                      .childGap = sizes()->space.md,
 	                      .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                         CLAY_ALIGN_Y_TOP},
 	                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
 		 }) {
-		draw_text("Click a word to select"_v, theme()->onSurface, udpi(24));
+		draw_text("Click a word to select"_v, theme()->onSurface, sizes()->font.title_lg);
 		for (auto &word : ctx->suggestions_list) {
 			if (word_card_tap(ctx, CLAY_IDI("Suggestion", word.word_id.value),
 			                  word)) {
@@ -73,7 +73,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 										   CLAY_SIZING_GROW(0),
 										   CLAY_SIZING_GROW(0),
 									 },
-							   .childGap = udpi(12.f),
+							   .childGap = sizes()->space.md,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 						 },

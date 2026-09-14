@@ -1,39 +1,44 @@
 #include "app/app_context.h"
 #include "base/arr.h"
 #include "base/str_view.h"
+
 #include "ui/components/button.h"
 #include "ui/components/switch_button.h"
-#include "ui/dpi.h"
+
+#include "ui/sizes.h"
 #include "ui/textcache.h"
 #include "ui/themes.h"
 #include "ui/trs.h"
 
 #include "screen_helpers.h"
+#include <utility>
 
 void screen_settings_push(AppContext *ctx) { ctx->push(Screen::Settings); }
 
-namespace {
-
-static inline void draw_settings_divider(AppContext *ctx, uint32_t index) {
-	CLAY(CLAY_IDI("SettingsDivider", index),
-	     {
-			   .layout =
-					 {
-						   .sizing = {CLAY_SIZING_GROW(0),
-	                                  CLAY_SIZING_FIXED(dpi(1.0f))},
-					 },
-			   .backgroundColor = theme()->outline,
-		 }) {}
-}
-
-} // namespace
+namespace {} // namespace
 
 void screen_settings_draw(AppContext *ctx) {
-	const auto padding = udpi(16.0f);
-	const auto row_padding =
-		  Clay_Padding{padding, padding, udpi(16.0f), udpi(16.0f)};
-	const uint16_t title_font_size = static_cast<uint16_t>(udpi(17.0f));
+	const auto row_padding = Clay_Padding{sizes()->space.lg, sizes()->space.lg,
+	                                      sizes()->space.lg, sizes()->space.lg};
+	const uint16_t title_font_size = sizes()->font.body_md;
 	const auto trans_font = translation_font_id(ctx);
+
+	int settings_divider_counter{};
+	auto draw_settings_divider = [&settings_divider_counter, ctx]() {
+		const float divider_h =
+			  std::max(1.0f, roundf(sizes()->scale)); // TODO: unify
+		auto div_color = theme()->outline;
+		div_color.a = static_cast<uint8_t>(div_color.a * 0.25f);
+		CLAY(CLAY_IDI("SettingsDivider", settings_divider_counter++),
+		     {
+				   .layout =
+						 {
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_FIXED(divider_h)},
+						 },
+				   .backgroundColor = div_color,
+			 }) {}
+	};
 
 	CLAY(CLAY_ID("SettingsScreenRoot"),
 	     {
@@ -86,7 +91,7 @@ void screen_settings_draw(AppContext *ctx) {
 					          theme()->onSurface, title_font_size, trans_font);
 				}
 
-				if (switch_button(ctx, CLAY_ID("ThemeSwitch"), is_dark, 28.f)) {
+				if (switch_button(ctx, CLAY_ID("ThemeSwitch"), is_dark)) {
 					auto new_theme = !is_dark ? Theme::Dark : Theme::Light;
 					theme_set(new_theme);
 					ctx->settings.theme_type = new_theme;
@@ -95,7 +100,7 @@ void screen_settings_draw(AppContext *ctx) {
 				}
 			}
 
-			draw_settings_divider(ctx, 0);
+			draw_settings_divider();
 
 			CLAY(CLAY_ID("RoundSizeRow"),
 			     {
@@ -126,7 +131,7 @@ void screen_settings_draw(AppContext *ctx) {
 				     {
 						   .layout =
 								 {
-									   .childGap = udpi(14.f),
+									   .childGap = sizes()->space.md,
 									   .childAlignment = {CLAY_ALIGN_X_CENTER,
 				                                          CLAY_ALIGN_Y_CENTER},
 									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -137,7 +142,10 @@ void screen_settings_draw(AppContext *ctx) {
 						  mobile_button_style_surface_container_high();
 					btn_style.background.a = 0.f;
 					btn_style.background_pressed.a = 0.f;
-					btn_style.font_size = 20.f;
+					btn_style.border_width = 0;
+					btn_style.border = {};
+					btn_style.border_pressed = {};
+					btn_style.font_size = sizes()->font.title_md;
 					btn_style.font_id = FontID::MAIN;
 
 					auto current_value = ctx->settings.exercise_round_size;
@@ -147,8 +155,7 @@ void screen_settings_draw(AppContext *ctx) {
 
 					draw_text(
 						  StrView::from_number(ctx->arena_frame, current_value),
-						  theme()->primary, static_cast<uint16_t>(udpi(19.f)),
-						  FontID::MAIN);
+						  theme()->primary, btn_style.font_size, FontID::MAIN);
 
 					auto btn_plus = mobile_button(ctx, CLAY_ID("PlusBtn"),
 					                              "+"_v, btn_style);
@@ -165,7 +172,7 @@ void screen_settings_draw(AppContext *ctx) {
 				}
 			}
 
-			draw_settings_divider(ctx, 1);
+			draw_settings_divider();
 
 			CLAY(CLAY_ID("DefaultScreenRow"),
 			     {
@@ -195,7 +202,7 @@ void screen_settings_draw(AppContext *ctx) {
 				     {
 						   .layout =
 								 {
-									   .childGap = udpi(8.f),
+									   .childGap = sizes()->space.sm,
 									   .childAlignment = {CLAY_ALIGN_X_CENTER,
 				                                          CLAY_ALIGN_Y_CENTER},
 									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -214,9 +221,13 @@ void screen_settings_draw(AppContext *ctx) {
 
 						auto b_style =
 							  mobile_button_style_surface_container_high();
-						b_style.font_size = 15.f;
-						b_style.padding_x = dpi(10.f);
-						b_style.padding_y = dpi(6.f);
+						b_style.border_width = 0;
+						b_style.border = {};
+						b_style.border_pressed = {};
+						b_style.font_size = sizes()->font.body_sm;
+						b_style.padding_x = sizes()->space.md;
+						b_style.padding_y = sizes()->space.xs;
+						b_style.corner_radius = sizes()->radius.sm.topLeft;
 
 						if (is_selected) {
 							b_style.background = theme()->surfaceContainerHigh;
@@ -238,7 +249,163 @@ void screen_settings_draw(AppContext *ctx) {
 				}
 			}
 
-			draw_settings_divider(ctx, 2);
+			draw_settings_divider();
+
+			CLAY(CLAY_ID("FontScaleRow"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIT(0)},
+								   .padding = row_padding,
+								   .childAlignment = {CLAY_ALIGN_X_CENTER,
+			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+							 },
+				 }) {
+				CLAY(CLAY_ID("LabelFontCol"),
+				     {
+						   .layout = {.sizing = {CLAY_SIZING_GROW(0),
+				                                 CLAY_SIZING_FIT(0)}},
+					 }) {
+					draw_text("Text size"_v, theme()->onSurface,
+					          title_font_size, trans_font);
+				}
+
+				CLAY(CLAY_ID("FontStepperGroup"),
+				     {
+						   .layout =
+								 {
+									   .childGap = sizes()->space.md,
+									   .childAlignment = {CLAY_ALIGN_X_CENTER,
+				                                          CLAY_ALIGN_Y_CENTER},
+									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+								 },
+					 }) {
+					auto btn_style =
+						  mobile_button_style_surface_container_high();
+					btn_style.background.a = 0.f;
+					btn_style.background_pressed.a = 0.f;
+					btn_style.border_width = 0;
+					btn_style.border = {};
+					btn_style.font_size = sizes()->font.title_md;
+
+					auto current_level =
+						  std::to_underlying(ctx->settings.font_scale);
+
+					auto btn_minus = mobile_button(ctx, CLAY_ID("FontMinusBtn"),
+					                               "A−"_v, btn_style);
+
+					constexpr Arr<StrView, 5> FONT_LEVEL_NAMES = {
+						  "85%"_v, "100%"_v, "115%"_v, "130%"_v, "145%"_v};
+
+					draw_text(FONT_LEVEL_NAMES[current_level], theme()->primary,
+					          sizes()->font.title_md, FontID::MAIN);
+
+					auto btn_plus = mobile_button(ctx, CLAY_ID("FontPlusBtn"),
+					                              "A+"_v, btn_style);
+
+					if (btn_minus.activated() && current_level > 0) {
+						--current_level;
+						ctx->settings.font_scale =
+							  static_cast<FontScaleLevel>(current_level);
+						sizes_set_scale(ctx->scale, ctx->settings.density,
+						                ctx->settings.font_scale);
+						ctx->settings.save(ctx->arena_frame);
+						ctx->push_one_frame();
+					} else if (btn_plus.activated() && current_level < 4) {
+						++current_level;
+						ctx->settings.font_scale =
+							  static_cast<FontScaleLevel>(current_level);
+						sizes_set_scale(ctx->scale, ctx->settings.density,
+						                ctx->settings.font_scale);
+						ctx->settings.save(ctx->arena_frame);
+						ctx->push_one_frame();
+					}
+				}
+			}
+
+			draw_settings_divider();
+
+			CLAY(CLAY_ID("DensityRow"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIT(0)},
+								   .padding = row_padding,
+								   .childAlignment = {CLAY_ALIGN_X_CENTER,
+			                                          CLAY_ALIGN_Y_CENTER},
+								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+							 },
+				 }) {
+				CLAY(CLAY_ID("LabelDensityCol"),
+				     {
+						   .layout = {.sizing = {CLAY_SIZING_GROW(0),
+				                                 CLAY_SIZING_FIT(0)}},
+					 }) {
+					draw_text("Density"_v, theme()->onSurface, title_font_size,
+					          trans_font);
+				}
+
+				CLAY(CLAY_ID("DensityOptions"),
+				     {
+						   .layout =
+								 {
+									   .padding = CLAY_PADDING_ALL(
+											 sizes()->space.xs),
+									   .childGap = sizes()->space.xs,
+									   .childAlignment = {CLAY_ALIGN_X_CENTER,
+				                                          CLAY_ALIGN_Y_CENTER},
+									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+								 },
+						   .backgroundColor = theme()->surfaceContainerHigh,
+						   .cornerRadius = sizes()->radius.sm,
+					 }) {
+
+					auto current_density = ctx->settings.density;
+					Arr<Pair<DensityMode, StrView>, 3> d_options{{
+						  {DensityMode::Compact, "Compact"_v},
+						  {DensityMode::Normal, "Normal"_v},
+						  {DensityMode::Comfortable, "Spacious"_v},
+					}};
+
+					int counter = 0;
+					for (auto &[mode, label] : d_options) {
+						const bool is_selected = (mode == current_density);
+
+						auto b_style =
+							  mobile_button_style_surface_container_high();
+						b_style.border_width = 0;
+						b_style.border = {};
+						b_style.font_size = sizes()->font.label_md; // 12sp
+						b_style.padding_x = sizes()->space.sm;      // 8dp
+						b_style.padding_y = sizes()->space.xs;      // 4dp
+						b_style.corner_radius = sizes()->radius.xs.topLeft;
+
+						if (is_selected) {
+							b_style.background = theme()->surface;
+							b_style.text = theme()->primary;
+						} else {
+							b_style.background.a = 0.f;
+							b_style.text = theme()->onSurfaceContainer;
+						}
+
+						auto btn = mobile_button(
+							  ctx, CLAY_IDI("DensityOpt", counter++), label,
+							  b_style);
+						if (btn.activated()) {
+							ctx->settings.density = mode;
+							sizes_set_scale(ctx->scale, ctx->settings.density,
+							                ctx->settings.font_scale);
+							ctx->settings.save(ctx->arena_frame);
+							ctx->push_one_frame();
+						}
+					}
+				}
+			}
+
+			draw_settings_divider();
 
 			CLAY(CLAY_ID("SuggestionsRow"),
 			     {
@@ -263,12 +430,12 @@ void screen_settings_draw(AppContext *ctx) {
 				                                  CLAY_SIZING_FIT(0)},
 								 },
 					 }) {
-					draw_text("Suggestions"_v,
-					          theme()->onSurface, title_font_size, trans_font);
+					draw_text("Suggestions"_v, theme()->onSurface,
+					          title_font_size, trans_font);
 				}
 
 				if (switch_button(ctx, CLAY_ID("SuggestionsSwitch"),
-				                  is_using_suggestions, 28.f)) {
+				                  is_using_suggestions)) {
 					auto new_val = !is_using_suggestions;
 					ctx->settings.is_using_suggestions = new_val;
 					ctx->settings.save(ctx->arena_frame);
@@ -285,12 +452,12 @@ void screen_settings_draw(AppContext *ctx) {
 		                                  CLAY_SIZING_FIT(0)},
 							   .padding =
 									 {
-										   .left = padding,
-										   .right = padding,
-										   .top = udpi(16.f),
-										   .bottom = udpi(20.f),
+										   .left = sizes()->space.lg,
+										   .right = sizes()->space.lg,
+										   .top = sizes()->space.lg,
+										   .bottom = sizes()->space.xl,
 									 },
-							   .childGap = udpi(6.0f),
+							   .childGap = sizes()->space.xs,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_BOTTOM},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -299,8 +466,7 @@ void screen_settings_draw(AppContext *ctx) {
 
 			auto sub_color = theme()->onSurface;
 			sub_color.a = static_cast<uint8_t>(sub_color.a * 0.5f);
-			const uint16_t note_font_size = static_cast<uint16_t>(udpi(11.0f));
-
+			const uint16_t note_font_size = sizes()->font.label_sm;
 			draw_text(
 				  "This product includes data from Wiktionary (https://www.wiktionary.org/) licensed under CC BY-SA 4.0."_v,
 				  sub_color, note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,

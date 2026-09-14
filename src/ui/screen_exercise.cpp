@@ -10,7 +10,7 @@
 
 #include "ui/components/button.h"
 #include "ui/components/list_island.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 #include "ui/themes.h"
 
 #include "screen_helpers.h"
@@ -47,7 +47,8 @@ static inline void draw_exercise_progress_bar(AppContext *ctx,
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0),
-	                                  CLAY_SIZING_FIXED(dpi(3.0f))},
+	                                  CLAY_SIZING_FIXED(static_cast<float>(
+											sizes()->space.xs))},
 						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					 },
 			   .backgroundColor = theme()->surfaceContainerHigh,
@@ -95,7 +96,7 @@ void screen_exercise_draw(AppContext *ctx) {
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_GROW(0)},
-								   .childGap = udpi(24.f),
+								   .childGap = sizes()->space.xl,
 								   .childAlignment = {CLAY_ALIGN_X_CENTER,
 			                                          CLAY_ALIGN_Y_CENTER},
 								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -103,7 +104,7 @@ void screen_exercise_draw(AppContext *ctx) {
 					   .backgroundColor = theme()->surface,
 				 }) {
 				draw_text("No exercises due"_v, theme()->onSurface,
-				          static_cast<uint16_t>(udpi(24.f)));
+				          sizes()->font.title_lg);
 
 				auto gen =
 					  mobile_button(ctx, CLAY_ID("GenExercises"),
@@ -120,7 +121,6 @@ void screen_exercise_draw(AppContext *ctx) {
 
 	auto &es = ctx->exercises;
 	const auto &current_ex = es.exercises[es.exercise_current_idx];
-	const auto padding = udpi(20.f);
 
 	const auto source_text = es.source();
 	const Size text_length = source_text.utf8_length();
@@ -159,12 +159,12 @@ void screen_exercise_draw(AppContext *ctx) {
 												is_phrase ? 0.20f : 0.18f)},
 							   .padding =
 									 {
-										   .left = padding,
-										   .right = padding,
-										   .top = udpi(8.f),
-										   .bottom = udpi(4.f),
+										   .left = sizes()->space.lg,
+										   .right = sizes()->space.lg,
+										   .top = sizes()->space.sm,
+										   .bottom = sizes()->space.xs,
 									 },
-							   .childGap = udpi(5.f),
+							   .childGap = sizes()->space.xs,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -188,7 +188,7 @@ void screen_exercise_draw(AppContext *ctx) {
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_FIT(0)},
-									   .childGap = udpi(6.f),
+									   .childGap = sizes()->space.xs,
 									   .childAlignment = {CLAY_ALIGN_X_CENTER,
 				                                          CLAY_ALIGN_Y_CENTER},
 									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -199,15 +199,14 @@ void screen_exercise_draw(AppContext *ctx) {
 						     {
 								   .layout =
 										 {
-											   .padding = {udpi(7.f), udpi(7.f),
-						                                   udpi(2.f),
-						                                   udpi(2.f)},
+											   .padding =
+													 sizes()->pad.badge_compact,
 										 },
 								   .backgroundColor = theme()->secondary,
-								   .cornerRadius = CLAY_CORNER_RADIUS(dpi(5.f)),
+								   .cornerRadius = sizes()->radius.xs,
 							 }) {
 							draw_text(form_badge_text, theme()->onSecondary,
-							          static_cast<uint16_t>(udpi(11.f)));
+							          sizes()->font.label_sm);
 						}
 					}
 					if (has_valency) {
@@ -215,17 +214,16 @@ void screen_exercise_draw(AppContext *ctx) {
 						     {
 								   .layout =
 										 {
-											   .padding = {udpi(7.f), udpi(7.f),
-						                                   udpi(2.f),
-						                                   udpi(2.f)},
+											   .padding =
+													 sizes()->pad.badge_compact,
 										 },
 								   .backgroundColor =
 										 theme()->surfaceContainerHigh,
-								   .cornerRadius = CLAY_CORNER_RADIUS(dpi(5.f)),
+								   .cornerRadius = sizes()->radius.xs,
 							 }) {
 							draw_text(valency_text,
 							          theme()->onSurfaceContainerHigh,
-							          static_cast<uint16_t>(udpi(11.f)));
+							          sizes()->font.label_sm);
 						}
 					}
 				}
@@ -234,9 +232,9 @@ void screen_exercise_draw(AppContext *ctx) {
 			if (!is_phrase && es.source_sub0().size > 0) {
 				auto sub_color = theme()->onSurface;
 				sub_color.a = static_cast<uint8_t>(sub_color.a * 0.6f);
-				draw_text(es.source_sub0(), sub_color,
-				          static_cast<uint16_t>(udpi(12.f)), font_id,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				draw_text(es.source_sub0(), sub_color, sizes()->font.label_md,
+				          font_id, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 			}
 		}
 
@@ -249,10 +247,10 @@ void screen_exercise_draw(AppContext *ctx) {
 												is_phrase ? 0.30f : 0.32f)},
 							   .padding =
 									 {
-										   .left = padding,
-										   .right = padding,
-										   .top = udpi(6.f),
-										   .bottom = udpi(6.f),
+										   .left = sizes()->space.lg,
+										   .right = sizes()->space.lg,
+										   .top = sizes()->space.xs,
+										   .bottom = sizes()->space.xs,
 									 },
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          is_phrase
@@ -278,26 +276,19 @@ void screen_exercise_draw(AppContext *ctx) {
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_GROW(0)},
-									   .padding =
-											 {
-												   .left = udpi(16.f),
-												   .right = udpi(16.f),
-												   .top = udpi(12.f),
-												   .bottom = udpi(12.f),
-											 },
+									   .padding = sizes()->pad.badge_compact,
 									   .childAlignment = {CLAY_ALIGN_X_LEFT,
 				                                          CLAY_ALIGN_Y_TOP},
 									   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+						   .cornerRadius = sizes()->radius.lg,
 						   .clip = {.vertical = true,
 				                    .childOffset = {0.0f, autoscroll_y}},
 					 }) {
 					draw_text(es.response(), theme()->onSurfaceContainer,
-					          static_cast<uint16_t>(udpi(17.f)),
-					          FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_WORDS,
-					          CLAY_TEXT_ALIGN_LEFT);
+					          sizes()->font.body_md, FontID::MONOSPACE_REGULAR,
+					          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 				}
 			} else {
 				CLAY(CLAY_ID("AnswerCompactBox"),
@@ -306,24 +297,17 @@ void screen_exercise_draw(AppContext *ctx) {
 								 {
 									   .sizing = {CLAY_SIZING_GROW(0),
 				                                  CLAY_SIZING_FIT(0)},
-									   .padding =
-											 {
-												   .left = udpi(16.f),
-												   .right = udpi(16.f),
-												   .top = udpi(14.f),
-												   .bottom = udpi(14.f),
-											 },
+									   .padding = sizes()->pad.card,
 									   .childAlignment = {CLAY_ALIGN_X_LEFT,
 				                                          CLAY_ALIGN_Y_CENTER},
 									   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 								 },
 						   .backgroundColor = theme()->surfaceContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+						   .cornerRadius = sizes()->radius.lg,
 					 }) {
 					draw_text(es.response(), theme()->onSurfaceContainer,
-					          static_cast<uint16_t>(udpi(18.f)),
-					          FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_WORDS,
-					          CLAY_TEXT_ALIGN_LEFT);
+					          sizes()->font.body_md, FontID::MONOSPACE_REGULAR,
+					          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 				}
 			}
 		}

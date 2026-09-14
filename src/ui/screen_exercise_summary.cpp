@@ -1,10 +1,10 @@
+#include "app/app_context.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/exercises.h"
-#include "app/app_context.h"
 
 #include "ui/components/button.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 #include "ui/themes.h"
 
 #include "screen_helpers.h"
@@ -63,7 +63,6 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 
 	const uint64_t title_rnd_seed = static_cast<uint64_t>(
 		  correct * 10 + total * 20 + es.exercises.first().points_earned * 30);
-	const auto padding = udpi(20.0f);
 
 	CLAY(CLAY_ID("ExerciseSummaryRoot"),
 	     {
@@ -72,12 +71,12 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
 						   .padding =
 								 {
-									   .left = padding,
-									   .right = padding,
-									   .top = udpi(12.f),
-									   .bottom = udpi(16.f),
+									   .left = sizes()->space.lg,
+									   .right = sizes()->space.lg,
+									   .top = sizes()->space.md,
+									   .bottom = sizes()->space.lg,
 								 },
-						   .childGap = udpi(16.0f),
+						   .childGap = sizes()->space.lg,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -91,26 +90,19 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_PERCENT(0.6)},
-							   .padding =
-									 {
-										   .left = udpi(20.f),
-										   .right = udpi(20.f),
-										   .top = udpi(20.f),
-										   .bottom = udpi(20.f),
-									 },
-							   .childGap = udpi(12.0f),
+							   .padding = sizes()->pad.card,
+							   .childGap = sizes()->space.md,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
 				   .backgroundColor = theme()->surfaceContainerLow,
-				   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+				   .cornerRadius = sizes()->radius.lg,
 			 }) {
 
 			draw_text(get_motivation_title(ratio, title_rnd_seed),
-			          theme()->onSurface, static_cast<uint16_t>(udpi(26.f)),
-			          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
-			          CLAY_TEXT_ALIGN_CENTER);
+			          theme()->onSurface, sizes()->font.title_lg, FontID::MAIN,
+			          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 			StrBuilder percent_str{};
 			percent_str.push(ctx->arena_frame,
@@ -118,8 +110,8 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 			percent_str.push(ctx->arena_frame, "%"_v);
 
 			draw_text(percent_str.join(ctx->arena_frame), theme()->primary,
-			          static_cast<uint16_t>(udpi(56.f)), FontID::MAIN,
-			          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+			          sizes()->font.display, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+			          CLAY_TEXT_ALIGN_CENTER);
 
 			// StrBuilder score_str{};
 			// score_str.push(ctx->arena_frame,
@@ -140,56 +132,40 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
-								   .childGap = udpi(8.f),
+								   .childGap = sizes()->space.sm,
 								   .childAlignment = {CLAY_ALIGN_X_CENTER,
 			                                          CLAY_ALIGN_Y_CENTER},
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							 },
 				 }) {
+				Clay_ElementDeclaration badge_template = {
+					  .layout =
+							{
+								  .padding = sizes()->pad.badge_compact,
+								  .childGap = sizes()->space.xs,
+								  .childAlignment = {CLAY_ALIGN_X_CENTER,
+				                                     CLAY_ALIGN_Y_CENTER},
+								  .layoutDirection = CLAY_LEFT_TO_RIGHT,
+							},
+					  .backgroundColor = theme()->rightContainer,
+					  .cornerRadius = sizes()->radius.sm,
+				};
 				if (correct > 0) {
-					CLAY(CLAY_ID("CorrectBadge"),
-					     {
-							   .layout =
-									 {
-										   .padding = {udpi(10.f), udpi(10.f),
-					                                   udpi(4.f), udpi(4.f)},
-										   .childGap = udpi(5.f),
-										   .childAlignment =
-												 {CLAY_ALIGN_X_CENTER,
-					                              CLAY_ALIGN_Y_CENTER},
-										   .layoutDirection =
-												 CLAY_LEFT_TO_RIGHT,
-									 },
-							   .backgroundColor = theme()->rightContainer,
-							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
-						 }) {
+					CLAY(CLAY_ID("CorrectBadge"), badge_template) {
 						draw_text("✓"_v, theme()->onRightContainer,
-						          static_cast<uint16_t>(udpi(12.f)),
-						          FontID::MAIN);
+						          sizes()->font.label_md, FontID::MAIN);
 						draw_text(
 							  StrView::from_number(ctx->arena_frame, correct),
-							  theme()->onRightContainer,
-							  static_cast<uint16_t>(udpi(13.f)), FontID::MAIN);
+							  theme()->onRightContainer, sizes()->font.label_md,
+							  FontID::MAIN);
 					}
 				}
 
 				if (to_review > 0) {
-					CLAY(CLAY_ID("ReviewBadge"),
-					     {
-							   .layout =
-									 {
-										   .padding = {udpi(10.f), udpi(10.f),
-					                                   udpi(4.f), udpi(4.f)},
-										   .childGap = udpi(5.f),
-										   .childAlignment =
-												 {CLAY_ALIGN_X_CENTER,
-					                              CLAY_ALIGN_Y_CENTER},
-										   .layoutDirection =
-												 CLAY_LEFT_TO_RIGHT,
-									 },
-							   .backgroundColor = theme()->surfaceContainerHigh,
-							   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
-						 }) {
+					badge_template.backgroundColor =
+						  theme()->surfaceContainerHigh;
+
+					CLAY(CLAY_ID("ReviewBadge"), badge_template) {
 
 						StrBuilder r_text{};
 						r_text.push(ctx->arena_frame,
@@ -199,8 +175,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 
 						draw_text(r_text.join(ctx->arena_frame),
 						          theme()->onSurfaceContainerHigh,
-						          static_cast<uint16_t>(udpi(13.f)),
-						          FontID::MAIN);
+						          sizes()->font.label_md, FontID::MAIN);
 					}
 				}
 			}
@@ -212,7 +187,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_GROW(0)},
-							   .childGap = udpi(12.0f),
+							   .childGap = sizes()->space.md,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_LEFT_TO_RIGHT,

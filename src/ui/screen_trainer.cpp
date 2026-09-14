@@ -1,3 +1,4 @@
+#include "app/app_context.h"
 #include "base/dyn_arr.h"
 #include "base/pair.h"
 #include "base/profiler.h"
@@ -5,10 +6,9 @@
 #include "base/str_view.h"
 #include "domain/exercises.h"
 #include "domain/word.h"
-#include "app/app_context.h"
 
 #include "ui/components/button.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 #include "ui/themes.h"
 
 #include "screen_helpers.h"
@@ -48,15 +48,14 @@ static inline Pair<Size, Size> collect_trainer_stats(AppContext *ctx) {
 void screen_trainer_draw(AppContext *ctx) {
 	const auto [due_count, total_learning] = collect_trainer_stats(ctx);
 	const bool has_due = (due_count > 0);
-	const auto padding = udpi(20.0f);
 
 	CLAY(CLAY_ID("ScreenTrainerRoot"),
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-						   .padding = CLAY_PADDING_ALL(padding),
-						   .childGap = udpi(16.0f),
+						   .padding = sizes()->pad.screen,
+						   .childGap = sizes()->space.xl,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -72,23 +71,23 @@ void screen_trainer_draw(AppContext *ctx) {
 		                                  CLAY_SIZING_FIT(0)},
 							   .padding =
 									 {
-										   .left = udpi(20.f),
-										   .right = udpi(20.f),
-										   .top = udpi(28.f),
-										   .bottom = udpi(28.f),
+										   .left = sizes()->space.lg,
+										   .right = sizes()->space.lg,
+										   .top = sizes()->space.xl,
+										   .bottom = sizes()->space.xl,
 									 },
-							   .childGap = udpi(14.0f),
+							   .childGap = sizes()->space.sm,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
 				   .backgroundColor = theme()->surfaceContainerLow,
-				   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+				   .cornerRadius = sizes()->radius.lg,
 			 }) {
 
 			if (has_due) {
 				draw_text("Bereit zum Lernen?"_v, theme()->onSurface,
-				          static_cast<uint16_t>(udpi(24.f)), FontID::MAIN,
+				          sizes()->font.title_lg, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 				StrBuilder count_str{};
@@ -96,13 +95,13 @@ void screen_trainer_draw(AppContext *ctx) {
 					  ctx->arena_frame,
 					  StrView::from_number(ctx->arena_frame, due_count));
 				draw_text(count_str.join(ctx->arena_frame), theme()->primary,
-				          static_cast<uint16_t>(udpi(64.f)), FontID::MAIN,
+				          sizes()->font.display, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 				draw_text("words ready for review"_v,
-				          theme()->onSurfaceContainer,
-				          static_cast<uint16_t>(udpi(15.f)), FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				          theme()->onSurfaceContainer, sizes()->font.body_sm,
+				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 
 				// CLAY(CLAY_ID("TotalLearningBadge"),
 				//      {
@@ -122,27 +121,24 @@ void screen_trainer_draw(AppContext *ctx) {
 
 			} else if (total_learning > 0) {
 				draw_text("Alles erledigt!"_v, theme()->onSurface,
-				          static_cast<uint16_t>(udpi(24.f)), FontID::MAIN,
+				          sizes()->font.title_lg, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 				CLAY(CLAY_ID("AllDoneBadge"),
 				     {
-						   .layout = {.padding = {udpi(12.f), udpi(12.f),
-				                                  udpi(6.f), udpi(6.f)}},
+						   .layout = {.padding = sizes()->pad.badge},
 						   .backgroundColor = theme()->rightContainer,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(10.f)),
+						   .cornerRadius = sizes()->radius.sm,
 					 }) {
 					draw_text("✓ All words reviewed for now"_v,
-					          theme()->onRightContainer,
-					          static_cast<uint16_t>(udpi(14.f)));
+					          theme()->onRightContainer, sizes()->font.body_md);
 				}
 
 				CLAY(CLAY_ID("TotalLearningBadge"),
 				     {
-						   .layout = {.padding = {udpi(10.f), udpi(10.f),
-				                                  udpi(4.f), udpi(4.f)}},
+						   .layout = {.padding = sizes()->pad.badge},
 						   .backgroundColor = theme()->surfaceContainerHigh,
-						   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
+						   .cornerRadius = sizes()->radius.sm,
 					 }) {
 					StrBuilder t_str{};
 					t_str.push(ctx->arena_frame, "In learning: "_v);
@@ -151,17 +147,17 @@ void screen_trainer_draw(AppContext *ctx) {
 					                                total_learning));
 					draw_text(t_str.join(ctx->arena_frame),
 					          theme()->onSurfaceContainerHigh,
-					          static_cast<uint16_t>(udpi(12.f)));
+					          sizes()->font.label_md);
 				}
 			} else {
 				draw_text("Keine Wörter im Training"_v, theme()->onSurface,
-				          static_cast<uint16_t>(udpi(22.f)), FontID::MAIN,
+				          sizes()->font.title_lg, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 				draw_text("Add words from dictionary to start practicing"_v,
-				          theme()->onSurfaceContainer,
-				          static_cast<uint16_t>(udpi(14.f)), FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				          theme()->onSurfaceContainer, sizes()->font.body_sm,
+				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 			}
 		}
 

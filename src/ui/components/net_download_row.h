@@ -8,8 +8,8 @@
 #include "platform/net_worker.h"
 #include "ui/components/button.h"
 #include "ui/components/download_data.h"
-#include "ui/dpi.h"
 #include "ui/screen_helpers.h"
+#include "ui/sizes.h"
 #include "ui/textcache.h"
 #include "ui/themes.h"
 
@@ -184,13 +184,13 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0),
 	                                  CLAY_SIZING_FIXED(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(16.0f)),
+						   .padding = sizes()->pad.card,
 						   .childAlignment = {CLAY_ALIGN_X_LEFT,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					 },
 			   .backgroundColor = theme()->surfaceContainer,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+			   .cornerRadius = sizes()->radius.md,
 		 }) {
 		CLAY(CLAY_IDI("TextColumn", dl.tracking_req_id),
 		     {
@@ -210,8 +210,7 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIXED(0)},
-								   // .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-								   .childGap = udpi(14.0f),
+								   .childGap = sizes()->space.md,
 								   .childAlignment = {CLAY_ALIGN_X_LEFT,
 			                                          CLAY_ALIGN_Y_CENTER},
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -225,11 +224,12 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 				     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 				                            CLAY_SIZING_FIXED(0)}}}) {}
 				if (status_text) {
-					draw_text(status_text, theme()->onSurface, udpi(12),
-					          FontID::MONOSPACE_REGULAR, CLAY_TEXT_WRAP_NONE);
+					draw_text(status_text, theme()->onSurface,
+					          sizes()->font.label_sm, FontID::MONOSPACE_REGULAR,
+					          CLAY_TEXT_WRAP_NONE);
 				} else if (!is_cancelable) {
-					draw_text(status_icon, status_icon_color, udpi(12),
-					          FontID::ICONS);
+					draw_text(status_icon, status_icon_color,
+					          sizes()->font.label_sm, FontID::ICONS);
 				}
 			}
 			// CLAY(CLAY_IDI("Status", dl.tracking_req_id),
@@ -253,13 +253,14 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 				  dl.status == DownloadData::TRACKING && percentage >= 0;
 			// SDL_Log("%d: %s perc %d", dl.tracking_req_id,
 			//         has_percentage ? "T" : "F", percentage);
-			auto spacer_height = dpi(2.f);
+			const float progress_height = static_cast<float>(sizes()->space.xs);
 			CLAY(CLAY_IDI("ProgressBar", dl.tracking_req_id),
 			     {
 					   .layout =
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIXED(spacer_height)},
+			                                  CLAY_SIZING_FIXED(
+													progress_height)},
 								   // .padding = CLAY_PADDING_ALL(udpi(16.0f)),
 			                       // .childGap = udpi(14.0f),
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -267,6 +268,7 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 					   .backgroundColor = has_percentage
 			                                    ? theme()->wrongContainer
 			                                    : Clay_Color{},
+					   .cornerRadius = sizes()->radius.xs,
 				 }) {
 				if (has_percentage) {
 					CLAY(CLAY_IDI("Percentage", dl.tracking_req_id),
@@ -277,7 +279,7 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 															(float)percentage *
 															0.01f),
 					                                  CLAY_SIZING_FIXED(
-															spacer_height)},
+															progress_height)},
 										   // .padding =
 					                       // CLAY_PADDING_ALL(udpi(16.0f)),
 					                       // .childGap = udpi(14.0f),
@@ -285,6 +287,7 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 												 CLAY_LEFT_TO_RIGHT,
 									 },
 							   .backgroundColor = theme()->onRightContainer,
+							   .cornerRadius = sizes()->radius.xs,
 						 }) {}
 				}
 			}
@@ -293,7 +296,12 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 		if (is_cancelable || dl.status == DownloadData::FINISHED_ERROR) {
 			auto style = mobile_button_style_surface_container_high();
 			style.font_id = FontID::ICONS;
-			style.font_size = udpi(24.f);
+			style.font_size = static_cast<uint16_t>(sizes()->dim.icon_md);
+			style.height = sizes()->dim.action_btn_size;
+			style.min_width = sizes()->dim.action_btn_size;
+			style.padding_x = sizes()->space.xs;
+			style.padding_y = sizes()->space.xs;
+			style.corner_radius = sizes()->radius.sm.topLeft;
 			style.background = {};
 			style.text = theme()->onWrongContainer;
 			auto icon = Icons::STOP;
@@ -347,8 +355,8 @@ inline bool download_row(AppContext *ctx, DownloadData &dl,
 		if (pool_index >= 0) {
 			download_update_tracking(ctx, dl, pool_index);
 		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "retry: unxepected index %" PRSize,
-			             pool_index);
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "retry: unxepected index %" PRSize, pool_index);
 		}
 	}
 	return is_retry_pressed;

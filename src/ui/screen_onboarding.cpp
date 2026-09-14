@@ -9,11 +9,12 @@
 #include "ui/components/button.h"
 #include "ui/components/net_download_row.h"
 #include "ui/components/switch_button.h"
-#include "ui/dpi.h"
+
+#include "ui/sizes.h"
 #include "ui/themes.h"
+#include "ui/translations/langs.h"
 
 #include "screen_helpers.h"
-#include "ui/translations/langs.h"
 
 namespace {
 
@@ -41,22 +42,22 @@ static inline StrView get_language_display_name(Lang lang) {
 static void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
                             StrView sub_text, bool is_turned_on,
                             auto on_switched) {
-	const auto label_size = static_cast<uint16_t>(udpi(15.5f));
-	const auto sub_size = static_cast<uint16_t>(udpi(12.f));
+	const uint16_t label_size = sizes()->font.body_md;
+	const uint16_t sub_size = sizes()->font.label_md;
 
 	CLAY(id,
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(14.0f)),
-						   .childGap = udpi(12.0f),
+						   .padding = sizes()->pad.card_compact,
+						   .childGap = sizes()->space.md,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					 },
 			   .backgroundColor = theme()->surfaceContainer,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(16.f)),
+			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 		CLAY(CLAY_IDI("LabelCol", id.id),
 		     {
@@ -64,7 +65,7 @@ static void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(3.0f),
+							   .childGap = sizes()->space.xs,
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 						 },
 			 }) {
@@ -78,7 +79,7 @@ static void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
 			          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 		}
 
-		if (switch_button(ctx, CLAY_IDI("Switch", id.id), is_turned_on, 30.f)) {
+		if (switch_button(ctx, CLAY_IDI("Switch", id.id), is_turned_on)) {
 			on_switched(!is_turned_on);
 			ctx->push_one_frame();
 		}
@@ -114,11 +115,6 @@ static bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	      check_and_run_download_and_unpack(
 				ctx, "German Wiktionary"_v, AssetsDL::Type::OPTIONAL_XAPIAN_DE,
 				[](AppContext *ctx) { return ctx->settings.is_using_also_de; });
-	// ret = ret && check_and_run_download_and_unpack(
-	// 				   ctx, "English Wiktionary"_v,
-	// 				   AssetsDL::Type::OPTIONAL_XAPIAN_EN, [](AppContext *ctx) {
-	// 					   return ctx->settings.is_using_also_subdict_en;
-	// 				   });
 #if NEURO
 	ret = ret &&
 	      check_and_run_download_and_unpack(
@@ -140,7 +136,6 @@ static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
 		return false;
 	}
 
-	// Опциональные ассеты
 	if (s.is_using_also_de && !s.asset(AType::OPTIONAL_XAPIAN_DE).is_unpacked) {
 		return false;
 	}
@@ -163,8 +158,9 @@ static void draw_segmented_progress_bar(AppContext *ctx, int current_step,
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0),
-	                                  CLAY_SIZING_FIXED(dpi(4.0f))},
-						   .childGap = udpi(6.0f),
+	                                  CLAY_SIZING_FIXED(static_cast<float>(
+											sizes()->space.xs))},
+						   .childGap = sizes()->space.xs,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -182,7 +178,7 @@ static void draw_segmented_progress_bar(AppContext *ctx, int current_step,
 					   .backgroundColor = is_filled
 			                                    ? theme()->primary
 			                                    : theme()->surfaceContainerHigh,
-					   .cornerRadius = CLAY_CORNER_RADIUS(dpi(2.0f)),
+					   .cornerRadius = sizes()->radius.xs,
 				 }) {}
 		}
 	}
@@ -193,21 +189,22 @@ static void draw_segmented_progress_bar(AppContext *ctx, int current_step,
 // ====================
 
 static void step_draw_language(AppContext *ctx) {
-	const uint16_t title_size = static_cast<uint16_t>(udpi(22.f));
+	const uint16_t title_size = sizes()->font.title_lg;
 
 	CLAY(CLAY_ID("StepCardLang"),
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(24.0f)),
-						   .childGap = udpi(20.0f),
+						   .padding = {sizes()->space.xl, sizes()->space.xl,
+	                                   sizes()->space.xl, sizes()->space.xl},
+						   .childGap = sizes()->space.lg,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
 			   .backgroundColor = theme()->surfaceContainerLow,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
 		draw_text("Choose your language"_v, theme()->onSurface, title_size,
@@ -219,7 +216,7 @@ static void step_draw_language(AppContext *ctx) {
 						 {
 							   .sizing = {CLAY_SIZING_GROW(0),
 		                                  CLAY_SIZING_FIT(0)},
-							   .childGap = udpi(10.0f),
+							   .childGap = sizes()->space.sm,
 							   .childAlignment = {CLAY_ALIGN_X_CENTER,
 		                                          CLAY_ALIGN_Y_CENTER},
 							   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -228,12 +225,11 @@ static void step_draw_language(AppContext *ctx) {
 
 			Settings::for_every_lang([&](int i, Lang lang) {
 				if (lang == lang_ar || lang == lang_tr) {
-					// NOTE: only ru and en now...
 					return;
 				}
 				auto btn_style = mobile_button_style_surface_container_high();
-				btn_style.font_size = 17.f;
-				btn_style.padding_y = dpi(10.f);
+				btn_style.font_size = sizes()->font.body_md;
+				btn_style.padding_y = sizes()->space.sm;
 				btn_style.font_id =
 					  (lang == lang_ar) ? FontID::ARABIC_MAIN : FontID::MAIN;
 
@@ -251,21 +247,21 @@ static void step_draw_language(AppContext *ctx) {
 }
 
 static void step_draw_assets(AppContext *ctx) {
-	const uint16_t title_size = static_cast<uint16_t>(udpi(22.f));
+	const uint16_t title_size = sizes()->font.title_lg;
 
 	CLAY(CLAY_ID("StepCardAssets"),
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(20.0f)),
-						   .childGap = udpi(16.0f),
+						   .padding = sizes()->pad.card,
+						   .childGap = sizes()->space.lg,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
 			   .backgroundColor = theme()->surfaceContainerLow,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
 		if (ctx->downloads.is_empty()) {
@@ -277,7 +273,7 @@ static void step_draw_assets(AppContext *ctx) {
 			sub_col.a = static_cast<uint8_t>(sub_col.a * 0.65f);
 			draw_text(
 				  "The offline dictionary will be installed on your device for fast lookup without internet."_v,
-				  sub_col, static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
+				  sub_col, sizes()->font.body_sm, FontID::MAIN,
 				  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 			auto dlbtn = mobile_button(ctx, CLAY_ID("DLStartBtn"),
@@ -287,7 +283,6 @@ static void step_draw_assets(AppContext *ctx) {
 				(void)run_download_and_unpack_tr_asset(ctx);
 			}
 		} else {
-			// ctx->settings.is_using_also_de = false;
 			draw_option_row(
 				  ctx, CLAY_ID("DEDictOpt"), "German glossary"_v,
 				  "Can be useful, if you can understand a little bit of German. ~110MB"_v,
@@ -303,8 +298,6 @@ static void step_draw_assets(AppContext *ctx) {
 						  ctx->settings.is_using_also_subdict_en = val;
 						  ctx->settings.save(ctx->arena_frame);
 					  });
-			} else {
-				// ctx->settings.is_using_also_subdict_en = false;
 			}
 
 #if NEURO
@@ -336,21 +329,22 @@ static void step_draw_assets(AppContext *ctx) {
 }
 
 static void step_draw_default_screen(AppContext *ctx) {
-	const uint16_t title_size = static_cast<uint16_t>(udpi(22.f));
+	const uint16_t title_size = sizes()->font.title_lg;
 
 	CLAY(CLAY_ID("StepCardDefaultScreen"),
 	     {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(24.0f)),
-						   .childGap = udpi(20.0f),
+						   .padding = {sizes()->space.xl, sizes()->space.xl,
+	                                   sizes()->space.xl, sizes()->space.xl},
+						   .childGap = sizes()->space.lg,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
 			   .backgroundColor = theme()->surfaceContainerLow,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
 		draw_text("What would you like to open on launch?"_v,
@@ -365,8 +359,8 @@ static void step_draw_default_screen(AppContext *ctx) {
 		int counter = 0;
 		for (auto &[screen, label] : options) {
 			auto b_style = mobile_button_style_surface_container_high();
-			b_style.font_size = 16.f;
-			b_style.padding_y = dpi(10.f);
+			b_style.font_size = sizes()->font.body_md;
+			b_style.padding_y = sizes()->space.sm;
 
 			auto btn =
 				  mobile_button(ctx, CLAY_IDI_LOCAL("DefScreenOpt", counter++),
@@ -399,25 +393,25 @@ static void step_draw_downloading_and_setup(AppContext *ctx) {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .padding = CLAY_PADDING_ALL(udpi(20.0f)),
-						   .childGap = udpi(14.0f),
+						   .padding = sizes()->pad.card,
+						   .childGap = sizes()->space.md,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_CENTER},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
 			   .backgroundColor = theme()->surfaceContainerLow,
-			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(24.f)),
+			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
 		draw_text("Preparing resources…"_v, theme()->onSurface,
-		          static_cast<uint16_t>(udpi(20.f)), FontID::MAIN,
-		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		          sizes()->font.title_md, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
 		auto sub_col = theme()->onSurface;
 		sub_col.a = static_cast<uint8_t>(sub_col.a * 0.6f);
 		draw_text("Downloading and setting up offline dictionary"_v, sub_col,
-		          static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
-		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		          sizes()->font.body_sm, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
 		for (auto &dl : ctx->downloads) {
 			download_row(ctx, dl);
@@ -465,7 +459,6 @@ void screen_onboarding_go(AppContext *ctx) { ctx->go(Screen::Onboarding); }
 
 void screen_onboarding_draw(AppContext *const ctx) {
 	const int stage = ctx->settings.onboarding_stage;
-	const auto padding = udpi(20.0f);
 
 	if (stage < 0 || stage >= static_cast<int>(ONBOARDING_STEPS.size())) {
 		finish_onboarding_and_start(ctx);
@@ -479,8 +472,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-						   .padding = CLAY_PADDING_ALL(padding),
-						   .childGap = udpi(16.0f),
+						   .padding = sizes()->pad.screen,
+						   .childGap = sizes()->space.lg,
 						   .childAlignment = {CLAY_ALIGN_X_CENTER,
 	                                          CLAY_ALIGN_Y_TOP},
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -489,13 +482,15 @@ void screen_onboarding_draw(AppContext *const ctx) {
 		 }) {
 
 		if (current_step.is_interactive_step) {
+			const float top_bar_h = sizes()->dim.action_btn_size;
+
 			CLAY(CLAY_ID("OnboardingTopBar"),
 			     {
 					   .layout =
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
-			                                  CLAY_SIZING_FIXED(dpi(40.0f))},
-								   .childGap = udpi(12.0f),
+			                                  CLAY_SIZING_FIXED(top_bar_h)},
+								   .childGap = sizes()->space.md,
 								   .childAlignment = {CLAY_ALIGN_X_CENTER,
 			                                          CLAY_ALIGN_Y_CENTER},
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -513,10 +508,9 @@ void screen_onboarding_draw(AppContext *const ctx) {
 					     {
 							   .layout =
 									 {
-										   .sizing = {CLAY_SIZING_FIXED(
-															dpi(40.0f)),
-					                                  CLAY_SIZING_FIXED(
-															dpi(40.0f))},
+										   .sizing =
+												 {CLAY_SIZING_FIXED(top_bar_h),
+					                              CLAY_SIZING_FIXED(top_bar_h)},
 									 },
 						 }) {}
 				}
@@ -528,9 +522,8 @@ void screen_onboarding_draw(AppContext *const ctx) {
 				     {
 						   .layout =
 								 {
-									   .sizing = {CLAY_SIZING_FIXED(dpi(40.0f)),
-				                                  CLAY_SIZING_FIXED(
-														dpi(40.0f))},
+									   .sizing = {CLAY_SIZING_FIXED(top_bar_h),
+				                                  CLAY_SIZING_FIXED(top_bar_h)},
 								 },
 					 }) {}
 			}

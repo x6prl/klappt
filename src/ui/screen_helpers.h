@@ -9,6 +9,7 @@
 #include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
+#include "ui/sizes.h"
 #include "ui/textcache.h"
 
 void screen_trainer_go(AppContext *ctx);
@@ -50,10 +51,13 @@ void screen_tts_asr_draw(AppContext *ctx);
 #endif // NEURO
 
 inline void
-draw_text(StrView text, Clay_Color color, uint16_t font_size = 16,
+draw_text(StrView text, Clay_Color color, uint16_t font_size = 0,
           uint16_t font_id = FontID::MAIN,
           Clay_TextElementConfigWrapMode wrap_mode = CLAY_TEXT_WRAP_WORDS,
           Clay_TextAlignment text_alignment = CLAY_TEXT_ALIGN_CENTER) {
+	if (font_size == 0) {
+		font_size = sizes()->font.body_md;
+	}
 	CLAY_TEXT(text.to_clay_string(), CLAY_TEXT_CONFIG({
 										   .textColor = color,
 										   .fontId = font_id,
@@ -68,15 +72,22 @@ inline uint16_t translation_font_id(const AppContext *ctx) {
 	                                            : FontID::MAIN;
 }
 
-inline float get_font_size_based_on_str_size(float viewpoint_width, float scale,
+inline float get_font_size_based_on_str_size(float viewport_width, float scale,
                                              Size str_size,
-                                             float min_font_size = 20.f,
-                                             float max_font_size = 32.f) {
-	float length_factor = std::clamp(str_size - 15.f, 0.f, 10.f) / 10.f;
-	auto target_text_width = viewpoint_width * (0.8f + 0.15f * length_factor);
-	auto font_size = std::clamp((target_text_width / str_size),
-	                            scale * min_font_size, scale * max_font_size);
-	return font_size;
+                                             float min_font_size = 16.f,
+                                             float max_font_size = 28.f) {
+	const float effective_scale = scale > 0.05f ? scale : sizes()->scale;
+
+	const float length_factor =
+		  std::clamp(static_cast<float>(str_size) - 15.f, 0.f, 10.f) / 10.f;
+	const auto target_text_width =
+		  viewport_width * (0.8f + 0.15f * length_factor);
+
+	const float min_scaled = effective_scale * min_font_size;
+	const float max_scaled = effective_scale * max_font_size;
+
+	return std::clamp((target_text_width / static_cast<float>(str_size)),
+	                  min_scaled, max_scaled);
 }
 
 inline void add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,
@@ -121,8 +132,9 @@ inline void remove_word_from_learning_list(Arena &tmparena, Word *word,
 	word_store->save(tmparena, *word);
 }
 
-inline void toggle_word_from_learning_list_and_save_words_dat(AppContext *ctx, Arena &tmparena,
-                                           Word *word) {
+inline void toggle_word_from_learning_list_and_save_words_dat(AppContext *ctx,
+                                                              Arena &tmparena,
+                                                              Word *word) {
 	word->in_learning_list = word->in_learning_list ^ 1u;
 	auto w_copy = word_clone(ctx->arena, *word);
 	if (0 != word->in_learning_list) {
