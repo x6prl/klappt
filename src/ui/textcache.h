@@ -73,6 +73,17 @@ struct TextCache {
 	// -------------------------------------------------------------------------
 	// State
 	// -------------------------------------------------------------------------
+
+	uint64_t rng_state{0x853c49e6748fea9bULL}; // used for sampled eviction
+
+	// delay TTF destruction
+	constexpr static uint32_t DESTROY_QUEUE_MAX =
+		  1u << 12; // TODO: play with the value
+	TTF_Text *destroy_queue[DESTROY_QUEUE_MAX]{};
+	uint32_t destroy_queue_size{0};
+	void pump_destroys(uint32_t max_per_frame);
+	void release_text(TTF_Text *text);
+
 	TTF_TextEngine *engine{nullptr};
 	struct FontKey {
 		uint16_t font_id;

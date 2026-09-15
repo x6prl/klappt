@@ -707,6 +707,10 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 	}
 
 	{
+		ctx->text->pump_destroys(4);
+	}
+
+	{
 		KLAPPT_PROFILE_SCOPE_N("mobile_text_input_end_frame");
 		mobile_text_input_end_frame(ctx);
 	}
