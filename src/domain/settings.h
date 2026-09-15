@@ -20,11 +20,14 @@ struct Settings {
 	bool is_subdict_de{false};
 	bool is_subdict_en{false};
 	// behaviour
-	bool is_using_suggestions{true};
+	bool is_using_suggestions{false};
 	// displaying
 	bool is_mark_verb_aux_sein{true};
 	bool is_mark_verb_irregular{true};
-	bool is_show_ipa{true};
+	bool is_mark_verb_type{false};
+	bool is_mark_adj_type{false};
+	bool is_show_ipa{false};
+	bool is_show_origin{false};
 	bool is_show_noun_plural_as_suffix{false};
 	// modules
 	bool is_module_tts{true};

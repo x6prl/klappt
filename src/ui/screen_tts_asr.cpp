@@ -3,7 +3,6 @@
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_stdinc.h>
-#include <cstring>
 
 #include "screen_helpers.h"
 
@@ -12,9 +11,10 @@
 #include "app/worker.h"
 #include "base/str_view.h"
 #include "platform/neuro.h"
+
 #include "ui/components/button.h"
 #include "ui/components/text_input.h"
-#include "ui/dpi.h"
+#include "ui/sizes.h"
 #include "ui/themes.h"
 
 void screen_tts_asr_go(AppContext *ctx) {
@@ -26,15 +26,13 @@ void screen_tts_asr_go(AppContext *ctx) {
 }
 
 void screen_tts_asr_draw(AppContext *ctx) {
-	const auto header_height = dpi(40.0f);
-	const auto input_height = dpi(56.0f);
-	const auto btn_height = dpi(48.0f);
+	const auto section_height = sizes()->dim.min_touch_target;
 
 	CLAY(CLAY_ID("ScreenTTSAsr"),
 	     {
 			   .layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
-	                      .padding = CLAY_PADDING_ALL(udpi(16.0f)),
-	                      .childGap = udpi(14.0f),
+	                      .padding = sizes()->pad.screen,
+	                      .childGap = sizes()->space.md,
 	                      .layoutDirection = CLAY_TOP_TO_BOTTOM},
 		 }) {
 
@@ -42,14 +40,14 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			// Header
 			CLAY(CLAY_ID("TTSSectionHeader"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
-			                            CLAY_SIZING_FIXED(header_height)}}}) {
+			                            CLAY_SIZING_FIXED(section_height)}}}) {
 				draw_text("TTS - Text-to-Speech"_v, theme()->onSurface);
 			}
 
 			// TTS input field
 			CLAY(CLAY_ID("TTSInputSlot"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
-			                            CLAY_SIZING_FIXED(input_height)}}}) {
+			                            CLAY_SIZING_FIXED(section_height)}}}) {
 				auto tts_input_result = mobile_text_input(
 					  ctx, CLAY_ID("TTSInput"), &ctx->tts_input,
 					  "Enter text to speak..."_v);
@@ -58,7 +56,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			// TTS play button
 			CLAY(CLAY_ID("TTSSectionButtonSlot"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
-			                            CLAY_SIZING_FIXED(btn_height)}}}) {
+			                            CLAY_SIZING_FIXED(section_height)}}}) {
 				auto tts_btn =
 					  mobile_button(ctx, CLAY_ID("TTSPlayButton"), "Play"_v);
 				if (tts_btn.activated() && ctx->tts_input.size > 0) {
@@ -73,11 +71,11 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_FIXED(1.0f)}}});
 		}
-		if (ctx->settings.is_using_asr) {
+		if (ctx->settings.is_module_asr) {
 			// ASR header
 			CLAY(CLAY_ID("ASRSectionHeader"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
-			                            CLAY_SIZING_FIXED(header_height)}}}) {
+			                            CLAY_SIZING_FIXED(section_height)}}}) {
 				draw_text("ASR - Speech Recognition"_v, theme()->onSurface);
 			}
 
@@ -90,9 +88,9 @@ void screen_tts_asr_draw(AppContext *ctx) {
 				CLAY(CLAY_ID("ASRSectionButtonSlot"),
 				     {.layout = {
 							.sizing = {CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(btn_height)},
-							.padding = CLAY_PADDING_ALL(udpi(16.0f)),
-							.childGap = udpi(16.0f),
+				                       CLAY_SIZING_FIXED(section_height)},
+							.padding = sizes()->pad.card_compact,
+							.childGap = sizes()->space.md,
 							.childAlignment = {CLAY_ALIGN_X_CENTER,
 				                               CLAY_ALIGN_Y_CENTER},
 					  }}) {
@@ -160,7 +158,8 @@ void screen_tts_asr_draw(AppContext *ctx) {
 				CLAY(CLAY_ID("ASRResultSlot"),
 				     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 				                            CLAY_SIZING_GROW(1)},
-				                 .padding = CLAY_PADDING_ALL(udpi(8.0f))}}) {
+				                 .padding = sizes()->pad.card_compact}}) {
+					auto font_size = sizes()->font.body_md;
 					auto rec_start_ticks =
 						  ctx->audio_asr_tts_status.recording_start_ticks_ms;
 					if (ctx->audio_asr_tts_status.is_recording_button_pressed &&
@@ -169,11 +168,11 @@ void screen_tts_asr_draw(AppContext *ctx) {
 										ctx->arena_frame,
 										UI_Audio_ASR_TTS::ticks_diff_to_seconds(
 											  rec_start_ticks, ctx->ticks)),
-						          theme()->onSurfaceContainer, udpi(16));
+						          theme()->onSurfaceContainer, font_size);
 						ctx->anim();
 					} else if (ctx->asr_result.size > 0) {
 						draw_text(ctx->asr_result, theme()->onSurfaceContainer,
-						          udpi(16));
+						          font_size);
 					} else if (ctx->audio_asr_tts_status.is_asr_in_progress
 
 					           // UIAudioContext::TRUE ==
@@ -181,10 +180,10 @@ void screen_tts_asr_draw(AppContext *ctx) {
 					           // 		 &ctx->sound_ctx->is_asr_in_progress)
 					) {
 						draw_text("Performing transcription…"_v,
-						          theme()->onSurfaceContainer, udpi(16));
+						          theme()->onSurfaceContainer, font_size);
 					} else {
 						draw_text("No transcription yet."_v,
-						          theme()->onSurfaceContainer, udpi(16));
+						          theme()->onSurfaceContainer, font_size);
 					}
 				}
 
@@ -204,9 +203,9 @@ void screen_tts_asr_draw(AppContext *ctx) {
 				CLAY(CLAY_ID("ASRNotInitialized"),
 				     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 				                            CLAY_SIZING_GROW(1)},
-				                 .padding = CLAY_PADDING_ALL(udpi(8.0f))}}) {
+				                 .padding = sizes()->pad.card_compact}}) {
 					draw_text("Initializing ASR Engine"_v,
-					          theme()->onSurfaceContainer, udpi(48));
+					          theme()->onSurfaceContainer, sizes()->font.title_md);
 				}
 			}
 			// Section dividers

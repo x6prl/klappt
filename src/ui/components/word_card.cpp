@@ -1,8 +1,8 @@
 #include "word_card.h"
 
 #include <SDL3/SDL_log.h>
-#include <cstdint>
 
+#include "app/app_context.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
@@ -17,8 +17,43 @@
 
 namespace {
 
-void word_main(Clay_ElementId id, StrView pre, StrView main, StrView post,
+void word_main(Clay_ElementId id, AppContext *ctx, const Word &w,
                Clay_Color color, uint16_t font_size, uint16_t gap) {
+	StrView pre{};
+	StrView main{};
+	StrView post{};
+	switch (w.type) {
+	case WordType::Noun:
+		if (w.n.gender != Gender::none)
+			pre = gender_to_article_nominative_strview(w.n.gender);
+		main = w.n.lemma;
+		post = w.n.plural_suffix;
+		break;
+	case WordType::Verb:
+		main = w.v.infinitive;
+		if (ctx->settings.is_mark_verb_irregular &&
+		    grammar::is_irrregular(w.v)) {
+			post = "!"_v;
+		}
+		if (ctx->settings.is_mark_verb_aux_sein && grammar::is_aux_sein(w.v)) {
+			post = StrView::concat(ctx->arena_frame, post, "*"_v);
+		}
+		if(!post && ctx->settings.is_mark_verb_type) {
+			post = "ᵛ"_v;
+		}
+		break;
+	case WordType::Adj:
+		main = w.a.lemma;
+		if (ctx->settings.is_mark_adj_type) {
+			post = "ᵃ"_v;
+		}
+		break;
+	case WordType::Phrase:
+		main = w.p.text;
+		break;
+	default:
+		break;
+	}
 	CLAY(id, {
 				   .layout =
 						 {
@@ -44,8 +79,8 @@ void word_main(Clay_ElementId id, StrView pre, StrView main, StrView post,
 			CLAY_TEXT(main.to_clay_string(),
 			          CLAY_TEXT_CONFIG({
 							.textColor = color,
-							// .fontId = FontID::MAIN,
-							.fontId = FontID::MONOSPACE_REGULAR,
+							.fontId = FontID::MAIN,
+							// .fontId = FontID::MONOSPACE_REGULAR,
 							.fontSize = font_size,
 							.wrapMode = CLAY_TEXT_WRAP_NONE,
 					  }));
@@ -90,8 +125,8 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 
 } // namespace
 
-TapSwipeLongTap::State
-word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
+TapSwipeLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
+                                            const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_for_words_list");
 	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
 	auto is_usual_card = w.in_learning_list == 0;
@@ -122,36 +157,10 @@ word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 						   .width = CLAY_BORDER_OUTSIDE(border_width),
 					 },
 		 }) {
-		StrView pre_main{};
-		StrView main;
-		StrView post_main{};
-		switch (w.type) {
-		case WordType::Noun:
-			if (w.n.gender != Gender::none)
-				pre_main = gender_to_article_nominative_strview(w.n.gender);
-			main = w.n.lemma;
-			post_main = w.n.plural_suffix;
-			break;
-		case WordType::Verb:
-			main = w.v.infinitive;
-			if (grammar::is_aux_sein(w.v)) {
-				post_main = "*"_v;
-			}
-			// TODO: mark unregular verbs
-			break;
-		case WordType::Adj:
-			main = w.a.lemma;
-			break;
-		case WordType::Phrase:
-			main = w.p.text;
-			break;
-		default:
-			break;
-		}
 		auto col = is_usual_card ? theme()->onSurfaceContainer
 		                         : theme()->onSurfaceContainerHigh;
-		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
-		          col, sizes()->font.body_md, sizes()->space.xs);
+		word_main(CLAY_IDI("Main", w.word_id.value), ctx, w, col,
+		          sizes()->font.body_md, sizes()->space.xs);
 
 		auto tr_plain = w.translations_raw;
 		word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
@@ -167,7 +176,7 @@ word_card_for_words_list(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	return ret;
 }
 
-bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
+bool word_card_suggestions(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_tap");
 	bool ret{false};
 	auto is_usual_card = w.in_learning_list == 0;
@@ -195,32 +204,10 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	                                             : theme()->secondary,
 	                      .width = CLAY_BORDER_OUTSIDE(border_width)},
 		 }) {
-		StrView pre_main{};
-		StrView main;
-		StrView post_main{};
-		switch (w.type) {
-		case WordType::Noun:
-			if (w.n.gender != Gender::none)
-				pre_main = gender_to_article_nominative_strview(w.n.gender);
-			main = w.n.lemma;
-			post_main = w.n.plural_suffix;
-			break;
-		case WordType::Verb:
-			main = w.v.infinitive;
-			break;
-		case WordType::Adj:
-			main = w.a.lemma;
-			break;
-		case WordType::Phrase:
-			main = w.p.text;
-			break;
-		default:
-			break;
-		}
 		auto col = is_usual_card ? theme()->onSurfaceContainer
 		                         : theme()->onSurfaceContainerHigh;
-		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
-		          col, sizes()->font.body_md, sizes()->space.xs);
+		word_main(CLAY_IDI("Main", w.word_id.value), ctx, w, col,
+		          sizes()->font.body_md, sizes()->space.xs);
 
 		auto trs_plain = w.translations_raw;
 		word_second_col(ctx->arena_frame, CLAY_IDI("SecondCol", id.id),
@@ -235,8 +222,9 @@ bool word_card_tap(AppContext *ctx, Clay_ElementId id, const Word &w) {
 }
 
 // tapped, longtapped
-TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
-                                          const Word &w, int due_mark) {
+TapSwipeLongTap::State word_card_learning_list(AppContext *ctx,
+                                               Clay_ElementId id, const Word &w,
+                                               int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
 	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
 
@@ -258,31 +246,9 @@ TapSwipeLongTap::State word_card_with_due(AppContext *ctx, Clay_ElementId id,
 	           //                                         : theme()->secondary,
 	           // .width = CLAY_BORDER_OUTSIDE(udpi(1.f))},
 		 }) {
-		StrView pre_main{};
-		StrView main;
-		StrView post_main{};
-		switch (w.type) {
-		case WordType::Noun:
-			if (w.n.gender != Gender::none)
-				pre_main = gender_to_article_nominative_strview(w.n.gender);
-			main = w.n.lemma;
-			post_main = w.n.plural_suffix;
-			break;
-		case WordType::Verb:
-			main = w.v.infinitive;
-			break;
-		case WordType::Adj:
-			main = w.a.lemma;
-			break;
-		case WordType::Phrase:
-			main = w.p.text;
-			break;
-		default:
-			break;
-		}
 		auto col = theme()->onSurfaceContainer;
-		word_main(CLAY_IDI("Main", w.word_id.value), pre_main, main, post_main,
-		          col, sizes()->font.body_md, sizes()->space.xs);
+		word_main(CLAY_IDI("Main", w.word_id.value), ctx, w, col,
+		          sizes()->font.body_md, sizes()->space.xs);
 
 		CLAY(CLAY_IDI("SecondColWrapper", id.id),
 		     {

@@ -213,24 +213,42 @@ static void draw_noun_title(AppContext *ctx, const Noun &n) {
 			   .layout =
 					 {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
-						   .childGap = sizes()->space.md,
 						   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					 },
 		 }) {
+		auto gap = [](int i) {
+			CLAY(CLAY_IDI_LOCAL("Gap", i),
+			     {
+					   .layout =
+							 {
+								   .sizing =
+										 {
+											   CLAY_SIZING_FIXED(
+													 static_cast<float>(
+														   sizes()->space.sm)),
+											   CLAY_SIZING_GROW(0),
+										 },
+							 },
+				 }) {}
+		};
 		auto article = gender_to_article_nominative_strview(n.gender);
 		if (article && article != " "_v && article != " — "_v) {
 			draw_text(article, theme()->secondary, title_font_size);
 		}
-		draw_text(n.lemma, theme()->onSurface, title_font_size);
-		// TODO: do we want it?..
-		// draw_text(StrView::concat(ctx->arena_frame, " "_v, n.lemma),
-		//           theme()->onSurface, title_font_size);
-		// bool has_plural_suffix = n.plural_suffix;
-		// if (has_plural_suffix) {
-		// 	draw_text(
-		// 		  StrView::concat(ctx->arena_frame, ", "_v,
-		// n.plural_suffix), 		  theme()->secondary, title_font_size);
-		// }
+		gap(0);
+		if (ctx->settings.is_show_noun_plural_as_suffix) {
+			draw_text(n.lemma, theme()->onSurface, title_font_size);
+			bool has_plural_suffix = n.plural_suffix;
+			if (has_plural_suffix) {
+				gap(1);
+				// draw_text(StrView::concat(ctx->arena_frame, ", "_v,
+				//                           n.plural_suffix),
+				//           theme()->secondary, title_font_size);
+				draw_text(n.plural_suffix, theme()->secondary, title_font_size);
+			}
+		} else {
+			draw_text(n.lemma, theme()->onSurface, title_font_size);
+		}
 	}
 }
 
@@ -271,9 +289,12 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		} else if (grammar::is_plural_only(w.n)) {
 			badges.push(ctx->arena_frame, "Plural only"_v);
 		} else {
-			auto plural =
-				  grammar::noun_plural_with_article(ctx->arena_frame, w.n);
-			forms.push(ctx->arena_frame, {"Plural:"_v, plural});
+			if (!ctx->settings.is_show_noun_plural_as_suffix) {
+				// NOTE: plural form is already shown as a suffix
+				auto plural =
+					  grammar::noun_plural_with_article(ctx->arena_frame, w.n);
+				forms.push(ctx->arena_frame, {"Plural:"_v, plural});
+			}
 		}
 	} break;
 	case WordType::Verb: {
@@ -426,7 +447,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 									   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 								 },
 					 }) {
-					if (!word_payload.ipa.is_empty()) {
+					if (ctx->settings.is_show_ipa &&
+					    !word_payload.ipa.is_empty()) {
 						StrView ipa_joined =
 							  StrBuilder(word_payload.ipa)
 									.join(ctx->arena_frame, " · "_v);
@@ -940,35 +962,28 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 			}
 		}
 
-		// if (word_payload.etymology) {
-		// 	CLAY(CLAY_ID("EtymologyCard"),
-		// 	     {
-		// 			   .layout =
-		// 					 {
-		// 						   .sizing = {CLAY_SIZING_GROW(0),
-		// 	                                  CLAY_SIZING_FIT(0)},
-		// 						   .padding =
-		// 								 {
-		// 									   .left = udpi(10.f),
-		// 									   .right = udpi(10.f),
-		// 									   .top = udpi(8.f),
-		// 									   .bottom = udpi(8.f),
-		// 								 },
-		// 						   .childGap = udpi(3.f),
-		// 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		// 					 },
-		// 			   .backgroundColor = theme()->surfaceContainer,
-		// 			   .cornerRadius = CLAY_CORNER_RADIUS(dpi(8.f)),
-		// 		 }) {
-		// 		draw_text("Origin"_v, theme()->secondary,
-		// 		          static_cast<uint16_t>(udpi(11.f)));
-		//
-		// 		draw_text(word_payload.etymology,
-		// theme()->onSurfaceContainer,
-		// static_cast<uint16_t>(udpi(13.f)), FontID::MAIN,
-		// CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
-		// 	}
-		// }
+		if (ctx->settings.is_show_origin && word_payload.etymology) {
+			CLAY(CLAY_ID("EtymologyCard"),
+			     {
+					   .layout =
+							 {
+								   .sizing = {CLAY_SIZING_GROW(0),
+			                                  CLAY_SIZING_FIT(0)},
+								   .padding = sizes()->pad.card_compact,
+								   .childGap = sizes()->space.xs,
+								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+							 },
+					   .backgroundColor = theme()->surfaceContainer,
+					   .cornerRadius = sizes()->radius.sm,
+				 }) {
+				draw_text("Origin"_v, theme()->secondary,
+				          sizes()->font.label_sm);
+
+				draw_text(word_payload.etymology, theme()->onSurfaceContainer,
+				          sizes()->font.body_sm, FontID::MAIN,
+				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+			}
+		}
 	}
 }
 
@@ -1244,7 +1259,7 @@ void screen_word_view_draw(AppContext *ctx) {
 			}
 
 #if NEURO
-			if (ctx->settings.is_using_tts) {
+			if (ctx->settings.is_module_tts) {
 				auto play = mobile_icon_button<true>(ctx, CLAY_ID("PlayButton"),
 				                                     Icons::PLAY);
 				if (play.activated()) {

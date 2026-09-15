@@ -286,10 +286,10 @@ inline bool init_runtime_data(AppContext &ctx) {
 	KLAPPT_PROFILE_SCOPE_N("init_runtime_data");
 
 #if NEURO
-	if (ctx.settings.is_using_tts) {
+	if (ctx.settings.is_module_tts) {
 		init_tts(&ctx);
 	}
-	if (ctx.settings.is_using_asr) {
+	if (ctx.settings.is_module_asr) {
 		init_asr(&ctx);
 	}
 #endif

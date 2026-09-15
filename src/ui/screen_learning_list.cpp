@@ -76,7 +76,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 														: static_cast<int>(due -
 							                                               now);
 									}
-									auto tap_state = word_card_with_due(
+									auto tap_state = word_card_learning_list(
 										  ctx, CLAY_IDI("Word", index), w,
 										  due_mark);
 
@@ -87,7 +87,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 						                       TapSwipeLongTap::State::
 						                             LongTap) {
 #if NEURO
-										if (ctx->settings.is_using_tts) {
+										if (ctx->settings.is_module_tts) {
 											auto tts_string = word_tts_full(
 												  ctx->arena_screen(), w);
 											// worker_job_push(ctx, {.type =

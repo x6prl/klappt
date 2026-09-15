@@ -131,7 +131,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 			}
 		} else {
 			auto &word = ctx->suggestions_list[i - 1];
-			if (word_card_tap(ctx, CLAY_IDI("Suggestion", word.word_id.value),
+			if (word_card_suggestions(ctx, CLAY_IDI("Suggestion", word.word_id.value),
 			                  word)) {
 				word.in_learning_list = word.in_learning_list + 1;
 				word.in_learning_list %= 2;

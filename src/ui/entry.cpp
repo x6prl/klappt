@@ -222,7 +222,7 @@ void bottom_bar_layout(AppContext *ctx) {
 			// NOTE: skipping tts/asr screen
 			if (Screen::TTS_ASR == menu[i].second &&
 #if NEURO
-			    !ctx->settings.is_using_tts && !ctx->settings.is_using_asr
+			    !ctx->settings.is_module_tts && !ctx->settings.is_module_asr
 #else
 			    true
 #endif

@@ -115,7 +115,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 															uint16_t>(
 															card_gap)}}}) {
 										auto tap_state =
-											  word_card_for_words_list(
+											  word_card_dictionary(
 													ctx,
 													CLAY_IDI("Word", index), w);
 										if (tap_state ==
