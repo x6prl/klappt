@@ -236,6 +236,11 @@ static void step_draw_language(AppContext *ctx) {
 				}
 			});
 		}
+
+#ifdef __EMSCRIPTEN__
+		draw_text("This is a web version of klappt. On Android you can use a native one, which you can find in Play Store."_v, theme()->onSurface, title_size,
+		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+#endif
 	}
 }
 
