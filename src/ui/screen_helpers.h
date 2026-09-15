@@ -45,6 +45,9 @@ void screen_word_edit_draw(AppContext *ctx);
 void screen_onboarding_go(AppContext *ctx);
 void screen_onboarding_draw(AppContext *ctx);
 
+void screen_font_rendering_perf_go(AppContext *ctx);
+void screen_font_rendering_perf_draw(AppContext *ctx) ;
+
 #if NEURO
 void screen_tts_asr_go(AppContext *ctx);
 void screen_tts_asr_draw(AppContext *ctx);

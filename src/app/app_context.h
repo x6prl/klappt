@@ -40,6 +40,7 @@ enum class Screen {
 	WordEdit,
 	Onboarding,
 	TTS_ASR,
+	FontPerf,
 };
 
 inline const char *screen_name(Screen s) {

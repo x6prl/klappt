@@ -653,6 +653,11 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 #endif
 				break;
 			}
+			case Screen::FontPerf: {
+				KLAPPT_PROFILE_SCOPE_N("render_screen.FontPerf");
+				screen_font_rendering_perf_draw(ctx);
+				break;
+			}
 			}
 			CLAY(CLAY_ID("BottomNotsafeFiller"),
 			     {.layout =
