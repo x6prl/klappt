@@ -229,8 +229,8 @@ struct Exercises {
 	CommitResult commit(AppContext *ctx);
 
 	void reset() {
-		SDL_Log("=======> %s <========= this=%p arena=%p offset=%td "
-		        "exercises=%" PRSize " results=%" PRSize,
+		SDL_Log("=======> %s <========= this=%p arena=%p offset=%" PRSize
+		        " exercises=%" PRSize " results=%" PRSize,
 		        __PRETTY_FUNCTION__, static_cast<void *>(this),
 		        static_cast<void *>(a.data), a.offset, exercises.size,
 		        results.size);
