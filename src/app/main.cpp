@@ -394,10 +394,14 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 
 	auto text_cache = new TextCache{
-		  .engine = text_engine,
 		  .base_fonts = {ui_font, icons_font, monospace_regular_font,
 	                     monospace_bold_font, arabic_ui_font}};
 	m.lap().printus("create text cache");
+
+	{
+		text_cache->atlas_init(renderer);
+	}
+	m.lap().printus("text atlas init");
 
 	// set up the application data
 	auto ctx = new AppContext{

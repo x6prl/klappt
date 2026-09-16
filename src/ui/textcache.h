@@ -1,15 +1,13 @@
 #pragma once
 
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
+#include <clay/clay.h>
+
 #include "base/arr.h"
 #include "base/hash.h"
 #include "base/pair.h"
 #include "base/str_view.h"
-#include <cstdint>
-
-struct SDL_Renderer;
-struct TTF_Text;
-struct TTF_TextEngine;
-struct TTF_Font;
 
 namespace FontID {
 constexpr uint16_t MAIN{0u};
@@ -22,69 +20,71 @@ constexpr uint16_t COUNT{5u};
 
 struct TextCache {
 	using Idx = Hash;
-	struct TimestampSec {
-		uint32_t tss;
+	using Size = uint32_t;
+
+	constexpr static uint16_t PAGE_NONE = 0xFFFFu;
+	constexpr static uint16_t ATLAS_SIZE = 2048u;
+	constexpr static uint16_t FAST_FONT_MAX = 1u << 7; // up to size 128
+	constexpr static uint32_t FAST_ASCII_MAX = 128u;
+
+	// -------------------------------------------------------------------------
+	// Glyph Representation
+	// -------------------------------------------------------------------------
+	struct GlyphEntry {
+		uint32_t codepoint{0};
+		uint16_t font_id{0};
+		uint16_t font_size{0};
+		uint16_t page{PAGE_NONE};
+		uint16_t rx{0}, ry{0}; // Position in texture atlas
+		uint16_t w{0}, h{0};   // Size in pixels
+		int16_t minx{0};       // Left bearing offset from pen_x
+		int16_t maxy{0};       // Top offset relative to baseline
+		int16_t advance{0};    // Horizontal pen advance
+		bool loaded{false};
 	};
-	static TimestampSec tss_from_ticks(uint64_t t) {
-		return {static_cast<uint32_t>(t / 1000)};
+
+	// -------------------------------------------------------------------------
+	// Atlas Shelf Allocator
+	// -------------------------------------------------------------------------
+	struct AtlasPage {
+		constexpr static uint32_t SHELF_MAX = 128u;
+		SDL_Texture *tex{nullptr};
+		struct Shelf {
+			uint16_t y{0}, h{0}, x{0};
+		};
+		Shelf shelves[SHELF_MAX]{};
+		uint32_t shelf_count{0};
+		uint16_t current_y{0};
+	};
+
+	uint64_t current_ticks{0};
+	uint64_t frame_index{0};
+
+	void set_time(uint64_t ticks_ms) {
+		current_ticks = ticks_ms;
+		++frame_index;
 	}
 
-	// -------------------------------------------------------------------------
-	// TTF Text Cache
-	// -------------------------------------------------------------------------
-	constexpr static Idx TEXT_CACHE_HASHMAP_SIZE = 1u << 11;
-	constexpr static Idx MAX_OCCUPIED =
-		  (TEXT_CACHE_HASHMAP_SIZE * 3) / 4; // 75% load cap
-	constexpr static TimestampSec TEXT_TTL = {8u};
+	constexpr static uint32_t GLYPH_HASH_SIZE = 1u << 13;
+	constexpr static uint32_t GLYPH_POOL_MAX = GLYPH_HASH_SIZE / 2;
 
-	struct TextEntry {
-		Hash hash;              // 8B
-		uint32_t text_size;     // 12B
-		uint16_t font_id;       // 14B
-		uint16_t font_size;     // 16B
-		uint32_t color;         // 20B
-		TimestampSec timestamp; // 24B
-		TTF_Text *text;         // 32B
+	GlyphEntry glyph_pool[GLYPH_POOL_MAX]{};
+	uint32_t glyph_pool_count{1}; // Index 0 reserved for null
 
-		bool is_obsolete(TimestampSec t) const {
-			if (t.tss <= TEXT_TTL.tss) {
-				return false;
-			}
-			return timestamp.tss < (t.tss - TEXT_TTL.tss);
-		}
+	struct HashSlot {
+		uint32_t codepoint{0};
+		uint16_t font_id{0};
+		uint16_t font_size{0};
+		uint32_t pool_index{0}; // 0 = empty
 	};
+	HashSlot glyph_hash_table[GLYPH_HASH_SIZE]{};
+
+	const GlyphEntry
+		  *fast_ascii[FontID::COUNT][FAST_FONT_MAX][FAST_ASCII_MAX]{};
 
 	// -------------------------------------------------------------------------
-	// Measurement Cache
+	// Font Cache
 	// -------------------------------------------------------------------------
-	constexpr static Idx MEASURE_CACHE_SIZE = 1u << 10;
-	constexpr static Idx MEASURE_CACHE_FAST_PROBE = 4u;
-	// TODO: gather stats and maybe move out .text from MeasureEntry
-	struct MeasureEntry {
-		Hash hash{0};                     // 8B
-		uint16_t font_id{0};              // 10B
-		uint16_t font_size{0};            // 12B
-		uint16_t text_size{0};            // 14B
-		                                  // padding 2B
-		Clay_Dimensions dims{0.0f, 0.0f}; // 24B
-		char text[40]{};                  // 64
-	};
-
-	// -------------------------------------------------------------------------
-	// State
-	// -------------------------------------------------------------------------
-
-	uint64_t rng_state{0x853c49e6748fea9bULL}; // used for sampled eviction
-
-	// delay TTF destruction
-	constexpr static uint32_t DESTROY_QUEUE_MAX =
-		  1u << 12; // TODO: play with the value
-	TTF_Text *destroy_queue[DESTROY_QUEUE_MAX]{};
-	uint32_t destroy_queue_size{0};
-	void pump_destroys(uint32_t max_per_frame);
-	void release_text(TTF_Text *text);
-
-	TTF_TextEngine *engine{nullptr};
 	struct FontKey {
 		uint16_t font_id;
 		uint16_t font_size;
@@ -92,32 +92,40 @@ struct TextCache {
 	using FontEntry = Pair<FontKey, TTF_Font *>;
 	TTF_Font *base_fonts[FontID::COUNT]{};
 	Arr<FontEntry, 96> fonts{};
-
-	// TODO: gather fontsize statistics and add a shift?
-	constexpr static uint16_t FAST_FONT_MAX = 1u << 7;
 	TTF_Font *fast_fonts[FontID::COUNT][FAST_FONT_MAX]{};
 
-	TextEntry text_cache_data[TEXT_CACHE_HASHMAP_SIZE]{};
-	MeasureEntry measure_cache_data[MEASURE_CACHE_SIZE]{};
+	// -------------------------------------------------------------------------
+	// State
+	// -------------------------------------------------------------------------
+	AtlasPage atlas{};
+	SDL_BlendMode atlas_blend{SDL_BLENDMODE_BLEND};
 
-	TimestampSec current_time{0};
-	uint16_t active_count{0};
-
-	void set_time(uint64_t ticks_ms) {
-		current_time = tss_from_ticks(ticks_ms);
-	}
+	// -------------------------------------------------------------------------
+	// API
+	// -------------------------------------------------------------------------
+	void atlas_init(SDL_Renderer *r);
+	// void prewarm(const uint16_t PREWARM_SIZES[]);
 
 	TTF_Font *get_font(uint16_t font_id, uint16_t font_size);
+	int get_font_ascent(uint16_t font_id, uint16_t font_size);
+	int get_font_height(uint16_t font_id, uint16_t font_size);
 
-	Pair<Idx, Hash> htable_lookup(StrView str, uint16_t font_id,
-	                              uint16_t font_size, uint32_t color);
-	Idx htable_erase(Idx idx);
-	Idx lp_find_free_slot(Hash h, TimestampSec t);
-	void htable_swap(Idx a, Idx b);
+	const GlyphEntry *get_glyph(uint32_t codepoint, uint16_t font_id,
+	                            uint16_t font_size);
 
-	TTF_Text *get(StrView str, uint16_t font_id, uint16_t font_size,
-	              Clay_Color color);
 	Clay_Dimensions measure_text(Clay_StringSlice slice,
 	                             Clay_TextElementConfig *config);
-	void prewarm(float scale, SDL_Renderer *renderer);
+	void measure_string(StrView str, uint16_t font_id, uint16_t font_size,
+	                    int *out_w, int *out_h);
+
+	// Immediate string draw
+	void draw_string(SDL_Renderer *r, StrView str, uint16_t font_id,
+	                 uint16_t font_size, float x, float y, SDL_Color color);
+
+	// -------------------------------------------------------------------------
+	// Internals
+	// -------------------------------------------------------------------------
+	bool atlas_alloc(uint16_t w, uint16_t h, uint16_t &rx, uint16_t &ry);
+	const GlyphEntry *load_glyph(uint32_t codepoint, uint16_t font_id,
+	                             uint16_t font_size);
 };

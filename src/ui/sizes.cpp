@@ -12,6 +12,14 @@ constexpr float FONT_MULTIPLIERS[5] = {
 	  0.85f, 1.00f, 1.15f, 1.30f, 1.45f,
 };
 
+Sizes::u_t normalize_font_size(float font_sizef) {
+	Sizes::u_t font_size = static_cast<Sizes::u_t>(std::round(font_sizef));
+	if (font_size < 24u)
+		return font_size;
+	// round large fonts to 2
+	return (font_size + 1u) & ~1u;
+}
+
 Sizes sizes_create(float scale, DensityMode density,
                    FontScaleLevel font_scale) {
 	if (scale <= 0.1f) {
@@ -77,7 +85,7 @@ Sizes sizes_create(float scale, DensityMode density,
 	};
 
 	const auto to_font_t = [eff_font_scale](float sp) -> Sizes::u_t {
-		return static_cast<Sizes::u_t>(std::round(sp * eff_font_scale));
+		return normalize_font_size(sp * eff_font_scale);
 	};
 
 	Sizes s{

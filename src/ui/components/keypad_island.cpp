@@ -354,22 +354,21 @@ void keypad_island_commit(AppContext *ctx) {
 
 			// TEXT
 			auto label = labels[i];
-			TTF_Text *text{};
-			{
-				KLAPPT_PROFILE_SCOPE_N("keypad_island.text_cache_get");
-				text = ctx->text->get(label, FontID::MAIN, font_size,
-				                      color_text);
-			}
-			sample_lap(commit_stats.text_cache_get);
-			int width = 0;
-			int height = 0;
-			TTF_GetStringSize(font, label.data, label.size, &width, &height);
-			sample_lap(commit_stats.text_measure);
-			float tw = static_cast<float>(width);
-			float th = static_cast<float>(height);
-			float tx = round(cell.x + (cell.w - tw) / 2.f);
-			float ty = round(cell.y + (cell.h - th) / 2.f);
-			TTF_DrawRendererText(text, tx, ty);
+			int width = 0, height = 0;
+			ctx->text->measure_string(label, FontID::MAIN, font_size, &width,
+			                          &height);
+
+			const float tx =
+				  roundf(cell.x + (cell.w - static_cast<float>(width)) * 0.5f);
+			const float ty =
+				  roundf(cell.y + (cell.h - static_cast<float>(height)) * 0.5f);
+
+			const SDL_Color c{static_cast<Uint8>(color_text.r),
+			                  static_cast<Uint8>(color_text.g),
+			                  static_cast<Uint8>(color_text.b),
+			                  static_cast<Uint8>(color_text.a)};
+			ctx->text->draw_string(renderer, label, FontID::MAIN, font_size, tx,
+			                       ty, c);
 			sample_lap(commit_stats.text_draw);
 		}
 		/*

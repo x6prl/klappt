@@ -1,251 +1,97 @@
 #include "textcache.h"
 
-#include <algorithm>
-#include <iterator>
-
 #include <SDL3/SDL_log.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "SDL3/SDL_surface.h"
 #include "base/profiler.h"
 
 namespace {
+constexpr SDL_Color WHITE{255, 255, 255, 255};
 
-constexpr uint32_t clay_color_to_u32(Clay_Color c) {
-	return (uint32_t(c.r) << 24) | (uint32_t(c.g) << 16) |
-	       (uint32_t(c.b) << 8) | uint32_t(c.a);
-}
-constexpr Clay_Color clay_color_normalize(Clay_Color c) {
-	return {
-		  (float)c.r / 255.0f,
-		  (float)c.g / 255.0f,
-		  (float)c.b / 255.0f,
-		  (float)c.a / 255.0f,
-	};
-}
+// Murmur3
+uint32_t hash_glyph_key(uint32_t cp, uint16_t font_id, uint16_t font_size) {
+	uint32_t h = cp ^ (static_cast<uint32_t>(font_id) << 16) ^
+	             (static_cast<uint32_t>(font_size) << 21);
+	h ^= h >> 16;
+	h *= 0x85ebca6b;
+	h ^= h >> 13;
+	h *= 0xc2b2ae35;
+	h ^= h >> 16;
 
-bool is_arabic_font(uint16_t font_id) { return font_id == FontID::ARABIC_MAIN; }
-
-bool is_arabic_codepoint(uint32_t cp) {
-	return (cp >= 0x0600u && cp <= 0x06FFu) ||
-	       (cp >= 0x0750u && cp <= 0x077Fu) ||
-	       (cp >= 0x0870u && cp <= 0x089Fu) ||
-	       (cp >= 0x08A0u && cp <= 0x08FFu) ||
-	       (cp >= 0xFB50u && cp <= 0xFDFFu) ||
-	       (cp >= 0xFE70u && cp <= 0xFEFFu) ||
-	       (cp >= 0x10E60u && cp <= 0x10E7Fu) ||
-	       (cp >= 0x1EE00u && cp <= 0x1EEFFu);
-}
-
-bool str_contains_arabic(StrView str) {
-	KLAPPT_PROFILE_SCOPE_N("Text::str_contains_arabic");
-	const char *ptr = str.data;
-	size_t remaining = static_cast<size_t>(str.size);
-	while (remaining > 0) {
-		const auto cp = SDL_StepUTF8(&ptr, &remaining);
-		if (!cp) {
-			break;
-		}
-		if (is_arabic_codepoint(cp)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-uint16_t normalize_font_size(uint16_t font_size) {
-	if (font_size < 24) {
-		return font_size;
-	}
-	// round large fonts around 2px
-	return static_cast<uint16_t>(((font_size + 1u) / 2u) * 2u);
-}
-
-void configure_text_for_layout(TTF_Text *text, bool use_arabic_layout) {
-	if (!text) {
-		return;
-	}
-	if (use_arabic_layout) {
-		TTF_SetTextDirection(text, TTF_DIRECTION_RTL);
-		TTF_SetTextScript(text, TTF_StringToTag("Arab"));
-	} else {
-		TTF_SetTextDirection(text, TTF_DIRECTION_LTR);
-		TTF_SetTextScript(text, TTF_StringToTag("Latn"));
-	}
-}
-
-TextCache::Idx lp_home_index(Hash h, TextCache::Idx table_size) {
-	return h & (table_size - 1);
-}
-bool key_is_null(TextCache::TextEntry k) { return k.text == nullptr; }
-void key_set_null(TextCache::TextEntry *k) {
-	// NOTE: TTF_Text destruction is delayed
-	k->text = nullptr;
-}
-Hash htable_hash(const TextCache::TextEntry &d) { return d.hash; }
-bool key_cmp(TextCache::TextEntry &d, Hash hash, StrView str, uint16_t font_id,
-             uint16_t font_size, uint32_t color) {
-	if (!d.text) {
-		return false;
-	}
-	return d.hash == hash && str.size == d.text_size && font_id == d.font_id &&
-	       font_size == d.font_size && color == d.color &&
-	       (0 == std::memcmp(d.text->text, str.data, str.size));
+	return h;
 }
 } // namespace
 
-void TextCache::release_text(TTF_Text *text) {
-	if (!text)
-		return;
-	if (destroy_queue_size < DESTROY_QUEUE_MAX) {
-		destroy_queue[destroy_queue_size++] = text;
-		return;
-	}
-	TTF_DestroyText(text);
-}
+void TextCache::atlas_init(SDL_Renderer *r) {
+	assert(!atlas.tex);
 
-void TextCache::pump_destroys(uint32_t max_per_frame) {
-	KLAPPT_PROFILE_SCOPE_N("TextCache::pump_destroys");
-	const uint32_t n = SDL_min(max_per_frame, destroy_queue_size);
-	for (uint32_t i = 0; i < n; ++i) {
-		TTF_DestroyText(destroy_queue[--destroy_queue_size]);
-	}
-}
+	KLAPPT_PROFILE_SCOPE_N("TextCache::atlas_init");
 
-void TextCache::htable_swap(Idx a, Idx b) {
-	TextEntry tmp = text_cache_data[a];
-	text_cache_data[a] = text_cache_data[b];
-	text_cache_data[b] = tmp;
-}
+	atlas_blend = SDL_BLENDMODE_BLEND;
 
-Pair<TextCache::Idx, Hash> TextCache::htable_lookup(StrView str,
-                                                    uint16_t font_id,
-                                                    uint16_t font_size,
-                                                    uint32_t color) {
-	KLAPPT_PROFILE_SCOPE_N("TextCache::htable_lookup");
-	const auto h = hash_text(str, font_id, font_size, color);
-	const auto home = lp_home_index(h, TEXT_CACHE_HASHMAP_SIZE);
-	const TextCache::Idx mask = TEXT_CACHE_HASHMAP_SIZE - 1;
+	SDL_PropertiesID props = SDL_CreateProperties();
+	SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER,
+	                      SDL_PIXELFORMAT_RGBA32);
+	SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER,
+	                      SDL_TEXTUREACCESS_STATIC);
+	SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER,
+	                      ATLAS_SIZE);
+	SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER,
+	                      ATLAS_SIZE);
+	atlas.tex = SDL_CreateTextureWithProperties(r, props);
+	SDL_DestroyProperties(props);
 
-	for (TextCache::Idx step = 0; step < TEXT_CACHE_HASHMAP_SIZE; ++step) {
-		TextCache::Idx idx = (home + step) & mask;
-		if (key_is_null(text_cache_data[idx])) {
-			return {TEXT_CACHE_HASHMAP_SIZE, h};
-		}
-		if (key_cmp(text_cache_data[idx], h, str, font_id, font_size, color)) {
-			return {idx, h};
-		}
-	}
-	return {TEXT_CACHE_HASHMAP_SIZE, h};
-}
-
-TextCache::Idx TextCache::htable_erase(TextCache::Idx start_idx) {
-	KLAPPT_PROFILE_SCOPE_N("TextCache::htable_erase (COLD)");
-
-	const TextCache::Idx mask = TEXT_CACHE_HASHMAP_SIZE - 1;
-	auto hole = start_idx;
-	auto next = hole;
-
-	while (true) {
-		next = (next + 1) & mask;
-
-		if (key_is_null(text_cache_data[next]) || next == start_idx) {
-			break;
-		}
-
-		const TextCache::Idx home = lp_home_index(
-			  htable_hash(text_cache_data[next]), TEXT_CACHE_HASHMAP_SIZE);
-
-		if (((hole - home) & mask) < ((next - home) & mask)) {
-			htable_swap(hole, next);
-			hole = next;
-		}
-	}
-
-	// delay destruction
-	release_text(text_cache_data[hole].text);
-	// null the pointer
-	key_set_null(&text_cache_data[hole]);
-	if (active_count > 0) {
-		--active_count;
-	}
-	return hole;
-}
-
-TextCache::Idx TextCache::lp_find_free_slot(Hash h, TextCache::TimestampSec t) {
-	KLAPPT_PROFILE_SCOPE_N("TextCache::lp_find_free_slot (COLD)");
-	TextCache::Idx home = lp_home_index(h, TEXT_CACHE_HASHMAP_SIZE);
-
-	auto fast_rand = [this]() -> Idx {
-		rng_state ^= rng_state << 13;
-		rng_state ^= rng_state >> 7;
-		rng_state ^= rng_state << 17;
-		return static_cast<Idx>(rng_state);
-	};
-
-	if (active_count >= MAX_OCCUPIED) {
-		KLAPPT_PROFILE_SCOPE_N("TextCache::evict_sample");
-		constexpr Idx K = 16;
-		const Idx mask = TEXT_CACHE_HASHMAP_SIZE - 1;
-		Idx victim = TEXT_CACHE_HASHMAP_SIZE;
-		uint32_t oldest = UINT32_MAX;
-		for (Idx i = 0; i < K; ++i) {
-			const Idx idx = fast_rand() & mask;
-			const auto &e = text_cache_data[idx];
-			if (!key_is_null(e) && e.timestamp.tss < oldest) {
-				oldest = e.timestamp.tss;
-				victim = idx;
-			}
-		}
-		if (victim != TEXT_CACHE_HASHMAP_SIZE) {
-			htable_erase(victim);
-		}
-	}
-
-	TextCache::Idx oldest = home;
-
-	for (TextCache::Idx step = 0; step < TEXT_CACHE_HASHMAP_SIZE; ++step) {
-		const TextCache::Idx i = (home + step) & (TEXT_CACHE_HASHMAP_SIZE - 1);
-		if (key_is_null(text_cache_data[i])) {
-			return i;
-		}
-		if (text_cache_data[i].is_obsolete(t)) {
-			return htable_erase(i);
-		}
-		if (text_cache_data[i].timestamp.tss <
-		    text_cache_data[oldest].timestamp.tss) {
-			oldest = i;
-		}
-	}
-
-	{
-		// NOTE: never called during bench! TODO: think about it
-		KLAPPT_PROFILE_SCOPE_N("TextCache::lp_emergency_evict");
+	if (atlas.tex) {
+		SDL_SetTextureBlendMode(atlas.tex, atlas_blend);
+		SDL_SetTextureScaleMode(atlas.tex, SDL_SCALEMODE_LINEAR);
+	} else {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "TextCache full; evicting oldest entry");
-		htable_erase(oldest);
+		             "Glyph atlas texture allocation failed: %s",
+		             SDL_GetError());
+		exit(-6);
+	}
+}
 
-		// but probe from home
-		if (key_is_null(text_cache_data[home])) {
-			return home;
-		} else {
-			++home;
-		repeat:
-			for (; home < TEXT_CACHE_HASHMAP_SIZE; ++home) {
-				if (key_is_null(text_cache_data[home])) {
-					return home;
-				}
-			}
-			home = 0;
-			goto repeat;
+bool TextCache::atlas_alloc(uint16_t w, uint16_t h, uint16_t &rx,
+                            uint16_t &ry) {
+	// 1px border on each side
+	const uint16_t pw = w + 2;
+	const uint16_t ph = h + 2;
+
+	if (pw > ATLAS_SIZE || ph > ATLAS_SIZE) {
+		return false;
+	}
+
+	// 1. Pack horizontally
+	for (uint32_t s = 0; s < atlas.shelf_count; ++s) {
+		auto &sh = atlas.shelves[s];
+		if (ph <= sh.h && (static_cast<uint32_t>(sh.x) + pw) <= ATLAS_SIZE) {
+			rx = sh.x + 1;
+			ry = sh.y + 1;
+			sh.x += pw;
+			return true;
 		}
 	}
-	std::unreachable();
-	// unreachable since we removed one
+
+	// 2. Open a new shelf if vertical room remains
+	if (atlas.shelf_count < AtlasPage::SHELF_MAX &&
+	    (static_cast<uint32_t>(atlas.current_y) + ph) <= ATLAS_SIZE) {
+		auto &s = atlas.shelves[atlas.shelf_count++];
+		s.y = atlas.current_y;
+		s.h = ph;
+		s.x = pw;
+		rx = 1;
+		ry = atlas.current_y + 1;
+		atlas.current_y += ph;
+		return true;
+	}
+
+	SDL_LogError(SDL_LOG_CATEGORY_ERROR, "FATAL: Glyph Atlas completely full!");
+	return false;
 }
 
 TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
-	font_size = normalize_font_size(font_size);
-
 	if (font_id < FontID::COUNT && font_size < FAST_FONT_MAX) {
 		TTF_Font *cached = fast_fonts[font_id][font_size];
 		if (cached) {
@@ -253,244 +99,266 @@ TTF_Font *TextCache::get_font(uint16_t font_id, uint16_t font_size) {
 		}
 	}
 
-	auto it = fonts.begin();
-	{
-		KLAPPT_PROFILE_SCOPE_N("TextCache::Font::Search (COLD)");
-		for (; it != fonts.end() && it->second; ++it) {
-			if (it->first.font_size == font_size &&
-			    it->first.font_id == font_id) {
-				if (font_id < FontID::COUNT && font_size < FAST_FONT_MAX) {
-					fast_fonts[font_id][font_size] = it->second;
-				}
-				return it->second;
+	for (auto &it : fonts) {
+		if (it.second && it.first.font_size == font_size &&
+		    it.first.font_id == font_id) {
+			if (font_id < FontID::COUNT && font_size < FAST_FONT_MAX) {
+				fast_fonts[font_id][font_size] = it.second;
 			}
+			return it.second;
 		}
 	}
 
-	if (it != fonts.end()) {
-		KLAPPT_PROFILE_SCOPE_N("TextCache::Font::Create (COLD)");
-		KLAPPT_PROFILE_NAME_F("TextCache::Font::Create id=%u size=%u", font_id,
-		                      font_size);
+	for (auto &it : fonts) {
+		if (!it.second) {
+			TTF_Font *font = TTF_CopyFont(base_fonts[font_id]);
+			if (!font) {
+				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+				             "Cannot copy font id %u size %u: %s", font_id,
+				             font_size, SDL_GetError());
+				exit(-6);
+			}
+			TTF_SetFontSize(font, font_size);
+			TTF_SetFontHinting(font, TTF_HINTING_NONE);
 
-		TTF_Font *font = nullptr;
-		{
-			KLAPPT_PROFILE_SCOPE_N("TTF_CopyFont");
-			font = TTF_CopyFont(base_fonts[font_id]);
+			it.first = {font_id, font_size};
+			it.second = font;
+			if (font_id < FontID::COUNT && font_size < FAST_FONT_MAX) {
+				fast_fonts[font_id][font_size] = font;
+			}
+			return font;
 		}
-		if (!font) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "cannot create font size %u id %u: %s", font_size,
-			             font_id, SDL_GetError());
-			exit(-6);
-		}
-
-		TTF_SetFontSize(font, font_size);
-		// typedef enum TTF_HintingFlags {
-		// 	TTF_HINTING_INVALID = -1,
-		// 	TTF_HINTING_NORMAL, /**< Normal hinting applies standard
-		// 	                       grid-fitting. */
-		// 	TTF_HINTING_LIGHT,  /**< Light hinting applies subtle adjustments to
-		// 	                       improve rendering. */
-		// 	TTF_HINTING_MONO,   /**< Monochrome hinting adjusts the font for
-		// 	                       better rendering at lower resolutions. */
-		// 	TTF_HINTING_NONE, /**< No hinting, the font is rendered without any
-		// 	                     grid-fitting. */
-		// 	TTF_HINTING_LIGHT_SUBPIXEL /**< Light hinting with subpixel
-		// 	                              rendering for more precise font edges.
-		// 	                            */
-		// } TTF_HintingFlags;
-		TTF_SetFontHinting(font, TTF_HINTING_NONE); // TODO: play with
-
-		// TODO: think it over
-		if (is_arabic_font(font_id)) {
-			TTF_SetFontDirection(font, TTF_DIRECTION_RTL);
-			TTF_SetFontScript(font, TTF_StringToTag("Arab"));
-		} else {
-			// TTF_SetFontDirection(font, TTF_DIRECTION_LTR);
-			// TTF_SetFontScript(font, TTF_StringToTag("Latn"));
-		}
-
-		it->first = {font_id, font_size};
-		it->second = font;
-
-		if (font_id < FontID::COUNT && font_size < FAST_FONT_MAX) {
-			fast_fonts[font_id][font_size] = font;
-		}
-		return font;
-	} else {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "cannot create font size %u id %u: no space", font_size,
-		             font_id);
-		exit(-6);
 	}
+	SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Font cache capacity exhausted");
+	exit(-6);
 }
 
-TTF_Text *TextCache::get(StrView str, uint16_t font_id, uint16_t font_size,
-                         Clay_Color clay_color) {
-	KLAPPT_PROFILE_SCOPE_N("TextCache::get");
+int TextCache::get_font_ascent(uint16_t font_id, uint16_t font_size) {
+	TTF_Font *font = get_font(font_id, font_size);
+	return TTF_GetFontAscent(font);
+}
 
-	font_size = normalize_font_size(font_size);
-	const auto color = clay_color_to_u32(clay_color);
-	const auto [idx, hash] = htable_lookup(str, font_id, font_size, color);
+int TextCache::get_font_height(uint16_t font_id, uint16_t font_size) {
+	TTF_Font *font = get_font(font_id, font_size);
+	return TTF_GetFontHeight(font);
+}
 
-	if (idx == TEXT_CACHE_HASHMAP_SIZE) {
-		KLAPPT_PROFILE_SCOPE_N("TextCache::get [MISS]");
-		KLAPPT_PROFILE_ZONE_TEXT(str.data, str.size);
+const TextCache::GlyphEntry *TextCache::load_glyph(uint32_t codepoint,
+                                                   uint16_t font_id,
+                                                   uint16_t font_size) {
+	KLAPPT_PROFILE_SCOPE_N("TextCache::load_glyph");
 
-		auto font = get_font(font_id, font_size);
-		const bool use_arabic_layout =
-			  is_arabic_font(font_id) && str_contains_arabic(str);
-		auto *text = TTF_CreateText(engine, font, str.data, str.size);
-		configure_text_for_layout(text, use_arabic_layout);
-		auto ncolor = clay_color_normalize(clay_color);
-		TTF_SetTextColorFloat(text, ncolor.r, ncolor.g, ncolor.b, ncolor.a);
-
-		auto free_idx = lp_find_free_slot(hash, current_time);
-		if (free_idx != TEXT_CACHE_HASHMAP_SIZE) {
-			text_cache_data[free_idx] = {
-				  hash,    static_cast<uint32_t>(str.size),
-				  font_id, font_size,
-				  color,   current_time,
-				  text};
-			++active_count;
-		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "No space for the text cache!");
-			// TODO: evict some...
-			exit(-7);
-		}
-		return text;
-	} else {
-		text_cache_data[idx].timestamp = current_time;
-		return text_cache_data[idx].text;
+	if (glyph_pool_count >= GLYPH_POOL_MAX) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Glyph pool capacity exhausted!");
+		return nullptr;
 	}
+
+	TTF_Font *font = get_font(font_id, font_size);
+
+	int minx = 0, maxx = 0, miny = 0, maxy = 0, advance = 0;
+	if (!TTF_GetGlyphMetrics(font, codepoint, &minx, &maxx, &miny, &maxy,
+	                         &advance)) {
+		advance = font_size / 2;
+	}
+
+	GlyphEntry g{};
+	g.codepoint = codepoint;
+	g.font_id = font_id;
+	g.font_size = font_size;
+	g.minx = static_cast<int16_t>(minx);
+	g.maxy = static_cast<int16_t>(maxy);
+	g.advance = static_cast<int16_t>(advance);
+	g.loaded = true;
+
+	// NOTE: space characters return null
+	SDL_Surface *surf = TTF_RenderGlyph_Blended(font, codepoint, WHITE);
+	if (surf && surf->w > 0 && surf->h > 0) {
+		uint16_t rx = 0, ry = 0;
+		if (atlas_alloc(static_cast<uint16_t>(surf->w),
+		                static_cast<uint16_t>(surf->h), rx, ry)) {
+			SDL_Rect upload{rx, ry, surf->w, surf->h};
+			SDL_UpdateTexture(atlas.tex, &upload, surf->pixels, surf->pitch);
+
+			g.page = 0;
+			g.rx = rx;
+			g.ry = ry;
+			g.w = static_cast<uint16_t>(surf->w);
+			g.h = static_cast<uint16_t>(surf->h);
+		}
+		SDL_DestroySurface(surf);
+	}
+
+	const uint32_t pool_idx = glyph_pool_count++;
+	glyph_pool[pool_idx] = g;
+	const GlyphEntry *stable_ptr = &glyph_pool[pool_idx];
+
+	constexpr uint32_t mask = GLYPH_HASH_SIZE - 1;
+	uint32_t slot = hash_glyph_key(codepoint, font_id, font_size) & mask;
+	while (glyph_hash_table[slot].pool_index != 0) {
+		slot = (slot + 1) & mask;
+	}
+
+	glyph_hash_table[slot] = {.codepoint = codepoint,
+	                          .font_id = font_id,
+	                          .font_size = font_size,
+	                          .pool_index = pool_idx};
+
+	if (codepoint < FAST_ASCII_MAX && font_id < FontID::COUNT &&
+	    font_size < FAST_FONT_MAX) {
+		fast_ascii[font_id][font_size][codepoint] = stable_ptr;
+	}
+
+	return stable_ptr;
+}
+
+const TextCache::GlyphEntry *
+TextCache::get_glyph(uint32_t codepoint, uint16_t font_id, uint16_t font_size) {
+	if (codepoint < FAST_ASCII_MAX && font_id < FontID::COUNT &&
+	    font_size < FAST_FONT_MAX) {
+		const GlyphEntry *g = fast_ascii[font_id][font_size][codepoint];
+		if (g)
+			return g;
+		return load_glyph(codepoint, font_id, font_size);
+	}
+
+	// Non-ASCII path
+	constexpr uint32_t mask = GLYPH_HASH_SIZE - 1;
+	uint32_t slot = hash_glyph_key(codepoint, font_id, font_size) & mask;
+
+	while (glyph_hash_table[slot].pool_index != 0) {
+		const auto &entry = glyph_hash_table[slot];
+		if (entry.codepoint == codepoint && entry.font_id == font_id &&
+		    entry.font_size == font_size) {
+			return &glyph_pool[entry.pool_index];
+		}
+		slot = (slot + 1) & mask;
+	}
+
+	return load_glyph(codepoint, font_id, font_size);
 }
 
 Clay_Dimensions TextCache::measure_text(Clay_StringSlice slice,
                                         Clay_TextElementConfig *config) {
-	if (slice.length <= 0) {
+	if (slice.length <= 0) [[unlikely]] {
 		return {0.0f, static_cast<float>(config->fontSize)};
 	}
 
+	if (slice.length == 1 && slice.chars[0] == ' ') {
+		const auto font_size = config->fontSize;
+		const auto *g = get_glyph(' ', config->fontId, font_size);
+		return {static_cast<float>(g ? g->advance : (font_size / 3.0f)),
+		        static_cast<float>(font_size)};
+	}
+
 	KLAPPT_PROFILE_SCOPE_N("TextCache::measure_text");
-	const auto font_size = normalize_font_size(config->fontSize);
-	const StrView text{slice.chars, static_cast<Size>(slice.length)};
-	const Hash h = hash_text(text, config->fontId, font_size, 0);
+	const auto font_size = config->fontSize;
 
-	// NOTE: cache probe up to MEASURE_CACHE_FAST_PROBE times
-	const Idx home = lp_home_index(h, MEASURE_CACHE_SIZE);
-	const size_t check_size =
-		  std::min((size_t)slice.length, std::size(MeasureEntry{}.text));
+	float width = 0.0f;
+	const char *ptr = slice.chars;
+	size_t remaining = static_cast<size_t>(slice.length);
 
-	for (Idx step = 0; step < MEASURE_CACHE_FAST_PROBE; ++step) {
-		const Idx idx = (home + step) & (MEASURE_CACHE_SIZE - 1);
-		const auto &entry = measure_cache_data[idx];
-
-		if (entry.hash == h && entry.font_id == config->fontId &&
-		    entry.font_size == font_size && entry.text_size == slice.length) {
-			if (std::memcmp(entry.text, slice.chars, check_size) == 0) {
-				return entry.dims; // Hit!
-			}
-		}
-		if (entry.text_size == 0) {
+	while (remaining > 0) {
+		const Uint32 cp = SDL_StepUTF8(&ptr, &remaining);
+		if (!cp) [[unlikely]] {
 			break;
 		}
+		const auto *g = get_glyph(cp, config->fontId, font_size);
+		width += g ? static_cast<float>(g->advance)
+		           : (static_cast<float>(font_size) * 0.5f);
 	}
 
-	// NOTE: cache miss
-	{
-		KLAPPT_PROFILE_SCOPE_N("TextCache::measure_text [MISS]");
-		KLAPPT_PROFILE_ZONE_TEXT(slice.chars, slice.length);
+	return {width,
+	        static_cast<float>(get_font_height(config->fontId, font_size))};
+}
 
-		auto font = get_font(config->fontId, font_size);
-		int width = 0;
-		int height = 0;
-		{
-			// Измерение через HarfBuzz/FreeType внутри SDL_ttf
-			KLAPPT_PROFILE_SCOPE_N("TTF_GetStringSize");
-			if (!TTF_GetStringSize(font, slice.chars, slice.length, &width,
-			                       &height)) {
-				return {(float)slice.length * ((float)font_size / 2.f),
-				        static_cast<float>(font_size)};
+void TextCache::measure_string(StrView str, uint16_t font_id,
+                               uint16_t font_size, int *out_w, int *out_h) {
+	Clay_StringSlice slice{static_cast<int32_t>(str.size), str.data};
+	Clay_TextElementConfig config{.fontId = font_id, .fontSize = font_size};
+	const Clay_Dimensions dims = measure_text(slice, &config);
+	if (out_w)
+		*out_w = static_cast<int>(dims.width);
+	if (out_h)
+		*out_h = static_cast<int>(dims.height);
+}
+
+void TextCache::draw_string(SDL_Renderer *r, StrView str, uint16_t font_id,
+                            uint16_t font_size, float x, float y,
+                            SDL_Color color) {
+	float pen_x = SDL_roundf(x);
+	const float line_y = SDL_roundf(y);
+	const SDL_FColor fc{color.r / 255.0f, color.g / 255.0f, color.b / 255.0f,
+	                    color.a / 255.0f};
+
+	constexpr float PW = static_cast<float>(ATLAS_SIZE);
+	const char *ptr = str.data;
+	size_t remaining = str.size;
+
+	SDL_Vertex verts[4 * 64];
+	int inds[6 * 64];
+	int nv = 0, ni = 0;
+
+	while (remaining > 0) {
+		const Uint32 cp = SDL_StepUTF8(&ptr, &remaining);
+		if (!cp)
+			break;
+		const auto *g = get_glyph(cp, font_id, font_size);
+		if (!g)
+			continue;
+
+		if (g->w > 0 && g->h > 0) {
+			const float gx =
+				  pen_x + (g->minx < 0 ? static_cast<float>(g->minx) : 0.0f);
+			const float gy = line_y;
+			const float gw = static_cast<float>(g->w);
+			const float gh = static_cast<float>(g->h);
+
+			const float u0 = static_cast<float>(g->rx) / PW;
+			const float v0 = static_cast<float>(g->ry) / PW;
+			const float u1 = static_cast<float>(g->rx + g->w) / PW;
+			const float v1 = static_cast<float>(g->ry + g->h) / PW;
+
+			const int b = nv;
+			verts[nv++] = SDL_Vertex{{gx, gy}, fc, {u0, v0}};
+			verts[nv++] = SDL_Vertex{{gx + gw, gy}, fc, {u1, v0}};
+			verts[nv++] = SDL_Vertex{{gx + gw, gy + gh}, fc, {u1, v1}};
+			verts[nv++] = SDL_Vertex{{gx, gy + gh}, fc, {u0, v1}};
+
+			inds[ni++] = b;
+			inds[ni++] = b + 1;
+			inds[ni++] = b + 2;
+			inds[ni++] = b;
+			inds[ni++] = b + 2;
+			inds[ni++] = b + 3;
+
+			if (nv >= 4 * 60) {
+				SDL_RenderGeometry(r, atlas.tex, verts, nv, inds, ni);
+				nv = 0;
+				ni = 0;
 			}
 		}
+		pen_x += static_cast<float>(g->advance);
+	}
 
-		const Clay_Dimensions dims{static_cast<float>(width),
-		                           static_cast<float>(height)};
-
-		// NOTE: store calculated
-		Idx store_idx = home;
-		for (Idx step = 0; step < MEASURE_CACHE_FAST_PROBE; ++step) {
-			const Idx idx = (home + step) & (MEASURE_CACHE_SIZE - 1);
-			if (measure_cache_data[idx].text_size == 0) {
-				store_idx = idx;
-				break;
-			}
-		}
-		// if there is no empty slot, we put it right to the home position
-		// TODO: play with MEASURE_CACHE_FAST_PROBE
-
-		auto &dest = measure_cache_data[store_idx];
-		dest.hash = h;
-		dest.font_id = config->fontId;
-		dest.font_size = font_size;
-		dest.text_size = static_cast<uint16_t>(slice.length);
-		dest.dims = dims;
-		std::memcpy(dest.text, slice.chars, check_size);
-
-		return dims;
+	if (ni > 0) {
+		SDL_RenderGeometry(r, atlas.tex, verts, nv, inds, ni);
 	}
 }
 
-void TextCache::prewarm(float scale, SDL_Renderer *renderer) {
-	// TODO: think about it.............
-
-	// KLAPPT_PROFILE_SCOPE_N("TextCache::prewarm");
-	//
-	// static constexpr auto COMMON_GLYPHS = "abcdefghijklmnopqrstuvwxyz"
-	// 									  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	// 									  "0123456789"
-	// 									  " .,:;!?'\"-()[]/"_v;
-	//
-	// // TODO: gather stats((
-	// also NOTE: that we round big fonts
-	//
-	// uint16_t word_card_text_size = (static_cast<uint16_t>(scale * 13.f));
-	// uint16_t CARD_SIZES[] = {word_card_text_size}; //, udpi(20)};
-	// uint16_t FONTS[] = {
-	// 	  FontID::MONOSPACE_REGULAR, // word cart geman font
-	// 	  FontID::MAIN,              // word cart translation non-arabic
-	// };
-	//
-	// static Size i = 0;
-	// static Size j = 0;
-	// static Size offset = 0;
-	// for (; i < std::size(CARD_SIZES) ; ++i) {
-	// 	KLAPPT_PROFILE_SCOPE_N("TextCache::CARD_LOOP");
-	// 	for (j = 0; j < std::size(FONTS) ;) {
-	// 		KLAPPT_PROFILE_SCOPE_N("TextCache::CARD_FONT_LOOP");
-	// 		auto size = CARD_SIZES[i];
-	// 		auto font_id = FONTS[j];
-	// 		TTF_Font *font = get_font(font_id, size);
-	// 		if (!font)
-	// 			continue;
-	//
-	// 		auto shift = COMMON_GLYPHS.size / 8;
-	// 		TTF_Text *text =
-	// 			  TTF_CreateText(engine, font, COMMON_GLYPHS.data + offset,
-	// 		                     shift);
-	// 		if (text) {
-	// 			TTF_DrawRendererText(text, 0.0f, 0.0f);
-	// 			TTF_DestroyText(text);
-	// 		}
-	// 		if (offset + shift >= COMMON_GLYPHS.size) {
-	// 			offset = 0;
-	// 			++j;
-	// 			return;
-	// 		} else {
-	// 			offset += shift;
-	// 			return;
-	// 		}
-	// 	}
-	// }
-}
+// void TextCache::prewarm(const uint16_t PREWARM_SIZES[]) {
+// 	for (const auto fid :
+// 	     {FontID::MAIN, FontID::MONOSPACE_REGULAR, FontID::MONOSPACE_BOLD}) {
+// 		for (const auto sz : PREWARM_SIZES) {
+// 			// Bake ASCII printable characters 32..126
+// 			for (uint32_t c = 32; c <= 126; ++c) {
+// 				get_glyph(c, fid, sz);
+// 			}
+// 			// Common German characters
+// 			for (const uint32_t umlaut :
+// 			     {0x00E4u, 0x00F6u, 0x00FCu, 0x00C4u, 0x00D6u, 0x00DCu,
+// 			      0x00DFu}) { // ä, ö, ü, Ä, Ö, Ü, ß
+// 				get_glyph(umlaut, fid, sz);
+// 			}
+// 		}
+// 	}
+// }

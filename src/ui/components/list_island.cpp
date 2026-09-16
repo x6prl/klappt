@@ -212,25 +212,21 @@ void list_island_commit(AppContext *ctx) {
 				                           pressed_color);
 			}
 
-			TTF_Text *text{};
-			{
-				KLAPPT_PROFILE_SCOPE_N("list_island.text_cache_get");
-				text = ctx->text->get(pending.labels[i], FontID::MAIN,
-				                      font_size, pending.style.text);
-			}
-			int width = 0;
-			int height = 0;
-			{
-				KLAPPT_PROFILE_SCOPE_N("list_island.text_measure");
-				TTF_GetStringSize(font, pending.labels[i].data,
-				                  pending.labels[i].size, &width, &height);
-			}
-			const float tx = roundf(cell.x + (cell.w - width) * 0.5f);
-			const float ty = roundf(cell.y + (cell.h - height) * 0.5f);
-			{
-				KLAPPT_PROFILE_SCOPE_N("list_island.text_draw");
-				TTF_DrawRendererText(text, tx, ty);
-			}
+			int width = 0, height = 0;
+			ctx->text->measure_string(pending.labels[i], FontID::MAIN,
+			                          font_size, &width, &height);
+
+			const float tx =
+				  roundf(cell.x + (cell.w - static_cast<float>(width)) * 0.5f);
+			const float ty =
+				  roundf(cell.y + (cell.h - static_cast<float>(height)) * 0.5f);
+
+			const SDL_Color c{static_cast<Uint8>(pending.style.text.r),
+			                  static_cast<Uint8>(pending.style.text.g),
+			                  static_cast<Uint8>(pending.style.text.b),
+			                  static_cast<Uint8>(pending.style.text.a)};
+			ctx->text->draw_string(renderer, pending.labels[i], FontID::MAIN,
+			                       font_size, tx, ty, c);
 		}
 
 		SDL_SetRenderDrawColorFloat(renderer, divider_color.r, divider_color.g,
