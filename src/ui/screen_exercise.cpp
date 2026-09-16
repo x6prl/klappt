@@ -12,6 +12,7 @@
 #include "ui/components/list_island.h"
 #include "ui/sizes.h"
 #include "ui/themes.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 
@@ -103,12 +104,12 @@ void screen_exercise_draw(AppContext *ctx) {
 							 },
 					   .backgroundColor = theme()->surface,
 				 }) {
-				draw_text("No exercises due"_v, theme()->onSurface,
+				draw_text(tr()->screen_exercise_no_exercises_due, theme()->onSurface,
 				          sizes()->font.title_lg);
 
 				auto gen =
 					  mobile_button(ctx, CLAY_ID("GenExercises"),
-				                    "Add more words to the learning list"_v);
+				                    tr()->screen_exercise_add_more_words);
 				if (gen.activated()) {
 					screen_word_suggestions_go(ctx);
 				}

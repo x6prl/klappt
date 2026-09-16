@@ -1,0 +1,87 @@
+@singular_only
+en: Singular only
+ru: Только ед. ч.
+
+@plural_only
+en: Plural only
+ru: Только мн. ч.
+
+@indeclinable
+en: Indeclinable
+ru: Несклоняемое
+
+@in_learning_list
+en: In learning list
+ru: В списке изучения
+
+@phrase_words
+en: Words:
+ru: Слова:
+
+@examples
+en: Examples
+ru: Примеры
+
+@syn
+en: Syn:
+ru: Син:
+
+@ant
+en: Ant:
+ru: Ант:
+
+@hyp
+en: Hyp:
+ru: Гип:
+
+@origin
+en: Origin
+ru: Происхождение
+
+@mode_entire
+en: Entire
+ru: Целиком
+
+@mode_gaps
+en: Gaps
+ru: Пропуски
+
+@mode_chunks
+en: Chunks
+ru: Части
+
+@mode_compose
+en: Compose
+ru: Сборка
+
+@max_level
+en: Max level
+ru: Макс. уровень
+
+@due_new
+en: New
+ru: Новое
+
+@due_ready
+en: Ready to repeat
+ru: Готово к повторению
+
+@due_overdue
+en: Overdue
+ru: Просрочено
+
+@due_in
+en: Due in
+ru: Через
+
+@next_level_in
+en: Next level in 
+ru: Следующий уровень через 
+
+@reviews_count
+en:  review(s)
+ru:  повт.
+
+@mastered_max_level
+en: Mastered (Max level)
+ru: Освоено (макс. уровень)

@@ -22,7 +22,7 @@ void screen_settings_draw(AppContext *ctx) {
 	const auto trans_font = translation_font_id(ctx);
 
 	int settings_divider_counter{};
-	auto draw_setting_divider = [&settings_divider_counter, ctx]() {
+	auto draw_setting_divider = [&settings_divider_counter]() {
 		const float divider_h =
 			  std::max(1.0f, roundf(sizes()->scale)); // TODO: unify
 		auto div_color = theme()->outline;
@@ -101,7 +101,7 @@ void screen_settings_draw(AppContext *ctx) {
 	                                                            // to list?
 		 }) {
 
-		draw_section_header(CLAY_ID("SecApp"), "APPEARANCE & SCALING"_v);
+		draw_section_header(CLAY_ID("SecApp"), tr()->screen_settings_sec_appearance);
 
 		CLAY(CLAY_ID("ThemeRow"),
 		     {
@@ -157,7 +157,7 @@ void screen_settings_draw(AppContext *ctx) {
 					   .layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                                 CLAY_SIZING_FIT(0)}},
 				 }) {
-				draw_text("Text size"_v, theme()->onSurface, title_font_size,
+				draw_text(tr()->screen_settings_text_size, theme()->onSurface, title_font_size,
 				          trans_font);
 			}
 
@@ -232,7 +232,7 @@ void screen_settings_draw(AppContext *ctx) {
 					   .layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                                 CLAY_SIZING_FIT(0)}},
 				 }) {
-				draw_text("Density"_v, theme()->onSurface, title_font_size,
+				draw_text(tr()->screen_settings_density, theme()->onSurface, title_font_size,
 				          trans_font);
 			}
 
@@ -253,9 +253,9 @@ void screen_settings_draw(AppContext *ctx) {
 
 				auto current_density = ctx->settings.density;
 				Arr<Pair<DensityMode, StrView>, 3> d_options{{
-					  {DensityMode::Compact, "Compact"_v},
-					  {DensityMode::Normal, "Normal"_v},
-					  {DensityMode::Comfortable, "Spacious"_v},
+					  {DensityMode::Compact, tr()->screen_settings_density_compact},
+					  {DensityMode::Normal, tr()->screen_settings_density_normal},
+					  {DensityMode::Comfortable, tr()->screen_settings_density_spacious},
 				}};
 
 				int counter = 0;
@@ -314,7 +314,7 @@ void screen_settings_draw(AppContext *ctx) {
 			                                  CLAY_SIZING_FIT(0)},
 							 },
 				 }) {
-				draw_text("Default screen"_v, theme()->onSurface,
+				draw_text(tr()->screen_settings_default_screen, theme()->onSurface,
 				          title_font_size, trans_font);
 			}
 
@@ -332,8 +332,8 @@ void screen_settings_draw(AppContext *ctx) {
 				auto current_default =
 					  static_cast<Screen>(ctx->settings.default_screen);
 				Arr<Pair<Screen, StrView>, 2> options{
-					  {{Screen::Dictionary, "Wortschatz"_v},
-				       {Screen::Trainer, "Trainer"_v}}};
+					  {{Screen::Dictionary, tr()->screen_settings_screen_wortschatz},
+				       {Screen::Trainer, tr()->screen_settings_screen_trainer}}};
 
 				int counter = 0;
 				for (auto &[screen, label] : options) {
@@ -368,7 +368,7 @@ void screen_settings_draw(AppContext *ctx) {
 			}
 		}
 
-		draw_section_header(CLAY_ID("SecTrainer"), "LEARNING & TRAINER"_v);
+		draw_section_header(CLAY_ID("SecTrainer"), tr()->screen_settings_sec_trainer);
 
 		CLAY(CLAY_ID("RoundSizeRow"),
 		     {
@@ -442,12 +442,12 @@ void screen_settings_draw(AppContext *ctx) {
 
 		draw_switch_row(
 			  CLAY_ID("SuggestionsRow"), CLAY_ID("SuggestionsSwitch"),
-			  "Suggestions"_v, ctx->settings.is_using_suggestions,
+			  tr()->screen_settings_suggestions, ctx->settings.is_using_suggestions,
 			  [&](bool v) { ctx->settings.is_using_suggestions = v; });
 
-		draw_section_header(CLAY_ID("SecWordCard"), "DICTIONARY"_v);
+		draw_section_header(CLAY_ID("SecWordCard"), tr()->screen_settings_sec_dictionary);
 		draw_switch_row(CLAY_ID("MarkSeinRow"), CLAY_ID("MarkSeinSwitch"),
-		                "Mark auxiliary 'sein' with *"_v,
+		                tr()->screen_settings_mark_aux_sein,
 		                ctx->settings.is_mark_verb_aux_sein, [&](bool v) {
 							ctx->settings.is_mark_verb_aux_sein = v;
 						});
@@ -455,7 +455,7 @@ void screen_settings_draw(AppContext *ctx) {
 		draw_setting_divider();
 
 		draw_switch_row(CLAY_ID("MarkIrrRow"), CLAY_ID("MarkIrrSwitch"),
-		                "Mark irregular verbs with !"_v,
+		                tr()->screen_settings_mark_irregular,
 		                ctx->settings.is_mark_verb_irregular, [&](bool v) {
 							ctx->settings.is_mark_verb_irregular = v;
 						});
@@ -463,28 +463,28 @@ void screen_settings_draw(AppContext *ctx) {
 		draw_setting_divider();
 
 		draw_switch_row(CLAY_ID("MarkVerbTypeRow"),
-		                CLAY_ID("MarkVerbTypeSwitch"), "Mark verbs with ᵛ"_v,
+		                CLAY_ID("MarkVerbTypeSwitch"), tr()->screen_settings_mark_verb_type,
 		                ctx->settings.is_mark_verb_type,
 		                [&](bool v) { ctx->settings.is_mark_verb_type = v; });
 
 		draw_setting_divider();
 
 		draw_switch_row(CLAY_ID("MarkAdjTypeRow"), CLAY_ID("MarkAdjTypeSwitch"),
-		                "Mark adjectives with ᵃ"_v,
+		                tr()->screen_settings_mark_adj_type,
 		                ctx->settings.is_mark_adj_type,
 		                [&](bool v) { ctx->settings.is_mark_adj_type = v; });
 
-		draw_section_header(CLAY_ID("SecWordView"), "WORD DETAILS"_v);
+		draw_section_header(CLAY_ID("SecWordView"), tr()->screen_settings_sec_word_details);
 
 		draw_switch_row(CLAY_ID("ShowIPARow"), CLAY_ID("ShowIPASwitch"),
-		                "Show transcription"_v, ctx->settings.is_show_ipa,
+		                tr()->screen_settings_show_ipa, ctx->settings.is_show_ipa,
 		                [&](bool v) { ctx->settings.is_show_ipa = v; });
 
 		draw_setting_divider();
 
 		draw_switch_row(
 			  CLAY_ID("ShowOriginRow"), CLAY_ID("ShowOriginSwitch"),
-			  "Show the origin of a word"_v,
+			  tr()->screen_settings_show_origin,
 			  ctx->settings.is_show_origin,
 			  [&](bool v) { ctx->settings.is_show_origin = v; });
 
@@ -492,7 +492,7 @@ void screen_settings_draw(AppContext *ctx) {
 
 		draw_switch_row(
 			  CLAY_ID("NounPluralSuffixRow"), CLAY_ID("NounPluralSuffixSwitch"),
-			  "Show plural form as a suffix"_v,
+			  tr()->screen_settings_noun_plural_suffix,
 			  ctx->settings.is_show_noun_plural_as_suffix,
 			  [&](bool v) { ctx->settings.is_show_noun_plural_as_suffix = v; });
 
@@ -520,12 +520,12 @@ void screen_settings_draw(AppContext *ctx) {
 			sub_color.a = static_cast<uint8_t>(sub_color.a * 0.5f);
 			const uint16_t note_font_size = sizes()->font.label_sm;
 			draw_text(
-				  "This product includes data from Wiktionary (https://www.wiktionary.org/) licensed under CC BY-SA 4.0."_v,
+				  tr()->screen_settings_about_wiktionary,
 				  sub_color, note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 				  CLAY_TEXT_ALIGN_CENTER);
 
 			draw_text(
-				  "Extracted and transformed with Wiktextract and custom scripts."_v,
+				  tr()->screen_settings_about_wiktextract,
 				  sub_color, note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 				  CLAY_TEXT_ALIGN_CENTER);
 		}

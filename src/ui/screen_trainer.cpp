@@ -10,6 +10,7 @@
 #include "ui/components/button.h"
 #include "ui/sizes.h"
 #include "ui/themes.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 
@@ -86,7 +87,7 @@ void screen_trainer_draw(AppContext *ctx) {
 			 }) {
 
 			if (has_due) {
-				draw_text("Bereit zum Lernen?"_v, theme()->onSurface,
+				draw_text(tr()->screen_trainer_hero_ready_title, theme()->onSurface,
 				          sizes()->font.title_lg, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
@@ -98,7 +99,7 @@ void screen_trainer_draw(AppContext *ctx) {
 				          sizes()->font.display, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
-				draw_text("words ready for review"_v,
+				draw_text(tr()->screen_trainer_words_ready_for_review,
 				          theme()->onSurfaceContainer, sizes()->font.body_sm,
 				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 				          CLAY_TEXT_ALIGN_CENTER);
@@ -111,7 +112,7 @@ void screen_trainer_draw(AppContext *ctx) {
 				// CLAY_CORNER_RADIUS(dpi(8.f)),
 				// 	 }) {
 				// 	StrBuilder t_str{};
-				// 	t_str.push(ctx->arena_frame, "In learning: "_v);
+				// 	t_str.push(ctx->arena_frame, tr()->screen_trainer_in_learning);
 				// 	t_str.push(ctx->arena_frame,
 				// StrView::from_number(ctx->arena_frame, total_learning));
 				// 	draw_text(t_str.join(ctx->arena_frame),
@@ -120,7 +121,7 @@ void screen_trainer_draw(AppContext *ctx) {
 				// }
 
 			} else if (total_learning > 0) {
-				draw_text("Alles erledigt!"_v, theme()->onSurface,
+				draw_text(tr()->screen_trainer_hero_all_done_title, theme()->onSurface,
 				          sizes()->font.title_lg, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
@@ -130,7 +131,7 @@ void screen_trainer_draw(AppContext *ctx) {
 						   .backgroundColor = theme()->rightContainer,
 						   .cornerRadius = sizes()->radius.sm,
 					 }) {
-					draw_text("✓ All words reviewed for now"_v,
+					draw_text(tr()->screen_trainer_all_words_reviewed,
 					          theme()->onRightContainer, sizes()->font.body_md);
 				}
 
@@ -141,7 +142,7 @@ void screen_trainer_draw(AppContext *ctx) {
 						   .cornerRadius = sizes()->radius.sm,
 					 }) {
 					StrBuilder t_str{};
-					t_str.push(ctx->arena_frame, "In learning: "_v);
+					t_str.push(ctx->arena_frame, tr()->screen_trainer_in_learning);
 					t_str.push(ctx->arena_frame,
 					           StrView::from_number(ctx->arena_frame,
 					                                total_learning));
@@ -150,11 +151,11 @@ void screen_trainer_draw(AppContext *ctx) {
 					          sizes()->font.label_md);
 				}
 			} else {
-				draw_text("Keine Wörter im Training"_v, theme()->onSurface,
+				draw_text(tr()->screen_trainer_hero_empty_title, theme()->onSurface,
 				          sizes()->font.title_lg, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
-				draw_text("Add words from dictionary to start practicing"_v,
+				draw_text(tr()->screen_trainer_empty_hint,
 				          theme()->onSurfaceContainer, sizes()->font.body_sm,
 				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 				          CLAY_TEXT_ALIGN_CENTER);
@@ -175,7 +176,7 @@ void screen_trainer_draw(AppContext *ctx) {
 
 			if (has_due) {
 				auto start_btn = mobile_button(ctx, CLAY_ID("TrainStartBtn"),
-				                               "Start Training"_v,
+				                               tr()->screen_trainer_action_start_training,
 				                               mobile_button_style_primary());
 				if (start_btn.activated()) {
 					screen_exercise_go(ctx, false);
@@ -183,7 +184,7 @@ void screen_trainer_draw(AppContext *ctx) {
 			} else {
 				if (ctx->settings.is_using_suggestions) {
 					auto explore_btn = mobile_button(
-						  ctx, CLAY_ID("AddWordsBtn"), "Find new words"_v,
+						  ctx, CLAY_ID("AddWordsBtn"), tr()->screen_trainer_action_find_words,
 						  mobile_button_style_primary());
 					if (explore_btn.activated()) {
 						screen_word_suggestions_go(ctx);

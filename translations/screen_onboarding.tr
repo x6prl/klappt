@@ -1,0 +1,147 @@
+@asset_main_dict
+en: Main dictionary
+ru: Основной словарь
+
+@asset_tts
+en: Text-to-speech
+ru: Синтез речи
+
+@asset_asr
+en: Voice recognition
+ru: Распознавание речи
+
+@web_version_note
+en: This is a web version of klappt. On Android you can use a native one, which you can find in Play Store.
+ru: Это веб-версия klappt. На Android доступна нативная версия в Google Play.
+
+@download_dictionary
+en: Download dictionary
+ru: Скачивание словаря
+
+@download_dictionary_desc
+en: The offline dictionary will be installed on your device for fast lookup without internet.
+ru: Офлайн-словарь будет установлен на устройство для быстрого поиска без интернета.
+
+@action_download
+en: Download
+ru: Скачать
+
+@optional_resources
+en: Optional resources
+ru: Дополнительные модули
+
+@tts_label
+en: Text-to-speech
+ru: Синтез речи
+
+@tts_desc
+en: Offline pronunciation generation for words and phrases. ~80MB
+ru: Офлайн-озвучивание слов и фраз. ~80 МБ
+
+@asr_label
+en: Speech recognition
+ru: Распознавание речи
+
+@asr_desc
+en: Voice input training model. ~160MB
+ru: Модель для голосовых тренировок. ~160 МБ
+
+@action_continue
+en: Continue
+ru: Продолжить
+
+@card_style_title
+en: Word card style
+ru: Вид карточки слова
+
+@opt_mark_irr
+en: Mark irregular verbs !
+ru: Пометка неправильных глаголов !
+
+@opt_mark_irr_desc
+en: Shows ! next to verbs with irregular forms
+ru: Показывает ! рядом с неправильными глаголами
+
+@opt_mark_sein
+en: Mark 'sein' verbs
+ru: Пометка глаголов с 'sein'
+
+@opt_mark_sein_desc
+en: Shows * for verbs using 'sein' as auxiliary
+ru: Показывает * для глаголов, образующих перфект с 'sein'
+
+@opt_mark_verb_tag
+en: Verb marker tag
+ru: Значок глагола
+
+@opt_mark_verb_tag_desc
+en: Shows ᵛ tag next to verbs if no other verb marker is present
+ru: Показывает значок ᵛ рядом с глаголами, если нет других меток
+
+@opt_mark_adj_tag
+en: Adjective marker tag
+ru: Значок прилагательного
+
+@opt_mark_adj_tag_desc
+en: Shows ᵃ tag next to adjectives
+ru: Показывает значок ᵃ рядом с прилагательными
+
+@settings_customize_hint
+en: You can customize all these options later in Settings
+ru: Все эти параметры можно изменить позже в настройках
+
+@word_view_title
+en: Word details view
+ru: Вид деталей слова
+
+@opt_show_ipa
+en: Show IPA pronunciation
+ru: Показывать транскрипцию (IPA)
+
+@opt_show_ipa_desc
+en: Displays phonetic transcription guides like [buːx]
+ru: Показывает фонетическую транскрипцию вида [buːx]
+
+@opt_plural_header
+en: Plural in title header
+ru: Множ. число в заголовке
+
+@opt_plural_header_desc
+en: Displays plural directly in title header instead of forms row
+ru: Показывает форму множ. числа прямо в заголовке вместо отдельной строки
+
+@opt_show_origin
+en: Show word origin (etymology)
+ru: Показывать этимологию
+
+@opt_show_origin_desc
+en: Displays historical linguistic roots and origin notes
+ru: Показывает происхождение и исторические корни слова
+
+@default_screen_prompt
+en: What would you like to open on launch?
+ru: Что открывать при запуске?
+
+@def_screen_trainer
+en: Word Trainer
+ru: Тренажёр слов
+
+@def_screen_dictionary
+en: Dictionary & Search
+ru: Словарь и поиск
+
+@preparing_resources
+en: Preparing resources…
+ru: Подготовка ресурсов…
+
+@downloading_setup_desc
+en: Downloading and setting up offline dictionary
+ru: Скачивание и настройка офлайн-словаря
+
+@err_init_runtime
+en: Failed to init runtime data
+ru: Не удалось инициализировать данные
+
+@err_seed_words
+en: Seeding default learning list failed
+ru: Не удалось создать стартовый список слов

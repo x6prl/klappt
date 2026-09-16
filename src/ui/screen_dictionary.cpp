@@ -10,6 +10,7 @@
 #include "ui/components/word_card.h"
 #include "ui/sizes.h"
 #include "ui/tslt.h"
+#include "ui/trs.h"
 
 void screen_dictionary_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
@@ -80,7 +81,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
 			auto search = mobile_text_input(
 				  ctx, CLAY_ID("WordsSearch"), &ctx->dictionary_search,
-				  "Search words"_v, mobile_text_input_style_default(),
+				  tr()->screen_dictionary_search_words, mobile_text_input_style_default(),
 				  floating_button_clear_id);
 			if (search.changed || search.submitted || search.blurred) {
 				ctx->push_one_frame();

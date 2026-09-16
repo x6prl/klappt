@@ -1,0 +1,27 @@
+@all_answers_correct
+en: All answers correct!
+ru: Все ответы верны!
+
+@correct_answer
+en: ✓ Correct answer
+ru: ✓ Правильный ответ
+
+@expected_answer
+en: Expected answer
+ru: Ожидаемый ответ
+
+@your_answer
+en: Your answer
+ru: Ваш ответ
+
+@click_to_next
+en: click anywhere to review next
+ru: нажмите в любом месте, чтобы продолжить
+
+@err_word_state
+en: Word learning state error
+ru: Ошибка состояния изучения слова
+
+@err_save_state
+en: Cannot save learning state
+ru: Не удалось сохранить состояние изучения

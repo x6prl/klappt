@@ -1,0 +1,47 @@
+@tab_trainer
+en: Trainer
+ru: Тренажёр
+
+@tab_neuro
+en: Neuro
+ru: Нейро
+
+@tab_wortschatz
+en: Wortschatz
+ru: Wortschatz
+
+@tab_my_words
+en: My Words
+ru: Мои слова
+
+@title_summary
+en: Summary
+ru: Итоги
+
+@title_words
+en: Words
+ru: Слова
+
+@title_learning
+en: Learning
+ru: Изучение
+
+@title_suggestions
+en: Suggestions
+ru: Подбор слов
+
+@title_settings
+en: Settings
+ru: Настройки
+
+@title_edit
+en: Edit
+ru: Редактирование
+
+@title_tts_asr
+en: TTS/ASR
+ru: TTS/ASR
+
+@err_tts_asr_disabled
+en: TTS/ASR features are disabled
+ru: Функции TTS/ASR отключены

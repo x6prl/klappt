@@ -1,0 +1,31 @@
+@tts_header
+en: TTS - Text-to-Speech
+ru: TTS — Синтез речи
+
+@tts_input_placeholder
+en: Enter text to speak...
+ru: Введите текст для озвучивания...
+
+@action_play
+en: Play
+ru: Воспроизвести
+
+@asr_header
+en: ASR - Speech Recognition
+ru: ASR — Распознавание речи
+
+@action_record
+en: ● Record
+ru: ● Запись
+
+@transcription_in_progress
+en: Performing transcription…
+ru: Распознавание речи…
+
+@no_transcription
+en: No transcription yet.
+ru: Пока ничего не распознано.
+
+@asr_initializing
+en: Initializing ASR Engine
+ru: Инициализация модуля ASR

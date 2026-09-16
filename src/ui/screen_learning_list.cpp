@@ -9,6 +9,7 @@
 
 #include "ui/sizes.h"
 #include "ui/tslt.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 
@@ -28,7 +29,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
 			auto search =
 				  mobile_text_input(ctx, CLAY_ID("WordsSearch"),
-			                        &ctx->learning_search, "Search words"_v);
+			                        &ctx->learning_search, tr()->screen_learning_list_search_words);
 			if (search.changed || search.submitted || search.blurred) {
 				ctx->push_one_frame();
 			}

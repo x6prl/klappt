@@ -1,0 +1,15 @@
+@to_review
+en:  to review
+ru:  на повторение
+
+@action_review_all
+en: Review all
+ru: Повторить все
+
+@action_review_errors
+en: Review errors
+ru: Повторить ошибки
+
+@action_next_round
+en: Next round
+ru: Следующий раунд

@@ -18,6 +18,7 @@
 #include "ui/sizes.h"
 #include "ui/textcache.h"
 #include "ui/themes.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 
@@ -141,7 +142,7 @@ static StrView format_due_delta(Arena &a, Engine::Timestamp now,
 		const auto overdue = -delta;
 		const auto hours = overdue / (60 * 60);
 		const auto mins = (overdue / 60) % 60;
-		auto len = SDL_snprintf(buf, 64, "Overdue %lldh %lldm", hours, mins);
+		auto len = SDL_snprintf(buf, 64, StrView_Fmt " %lldh %lldm", StrView_Arg(tr()->screen_word_view_due_overdue), hours, mins);
 		return {buf, std::min<Size>(len, 63)};
 	}
 
@@ -149,20 +150,20 @@ static StrView format_due_delta(Arena &a, Engine::Timestamp now,
 	const auto hours = (delta / (60 * 60)) % 24;
 	const auto mins = (delta / 60) % 60;
 	auto len =
-		  SDL_snprintf(buf, 64, "Due in %lldd %lldh %lldm", days, hours, mins);
+		  SDL_snprintf(buf, 64, StrView_Fmt " %lldd %lldh %lldm", StrView_Arg(tr()->screen_word_view_due_in), days, hours, mins);
 	return {buf, std::min<Size>(len, 63)};
 }
 
 static StrView mode_name(Engine::Mode mode) {
 	switch (mode) {
 	case Engine::Mode::Entire:
-		return "Entire"_v;
+		return tr()->screen_word_view_mode_entire;
 	case Engine::Mode::Gaps:
-		return "Gaps"_v;
+		return tr()->screen_word_view_mode_gaps;
 	case Engine::Mode::Chunks:
-		return "Chunks"_v;
+		return tr()->screen_word_view_mode_chunks;
 	case Engine::Mode::Compose:
-		return "Compose"_v;
+		return tr()->screen_word_view_mode_compose;
 	case Engine::Mode::Count:
 		return "Count"_v;
 	}
@@ -173,7 +174,7 @@ static StrView successful_reviews_to_next_mode(Arena &a,
                                                const Engine::State &state) {
 	KLAPPT_PROFILE_SCOPE();
 	if (state.mode >= Engine::Mode::Compose) {
-		return "Max level"_v;
+		return tr()->screen_word_view_max_level;
 	}
 
 	Engine::State probe = state;
@@ -285,9 +286,9 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 	case WordType::Noun: {
 		word_class_name = noun_word_class_to_badge(word_payload.word_class);
 		if (grammar::is_singular_only(w.n)) {
-			badges.push(ctx->arena_frame, "Singular only"_v);
+			badges.push(ctx->arena_frame, tr()->screen_word_view_singular_only);
 		} else if (grammar::is_plural_only(w.n)) {
-			badges.push(ctx->arena_frame, "Plural only"_v);
+			badges.push(ctx->arena_frame, tr()->screen_word_view_plural_only);
 		} else {
 			if (!ctx->settings.is_show_noun_plural_as_suffix) {
 				// NOTE: plural form is already shown as a suffix
@@ -312,7 +313,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 	case WordType::Adj: {
 		word_class_name = adj_word_class_to_badge(word_payload.word_class);
 		if (w.a.is_indeclinable) {
-			badges.push(ctx->arena_frame, "Indeclinable"_v);
+			badges.push(ctx->arena_frame, tr()->screen_word_view_indeclinable);
 		} else if ((w.a.comparative || w.a.superlative)) {
 			if (w.a.comparative) {
 				forms.push(ctx->arena_frame, {"Kompar.:"_v, w.a.comparative});
@@ -400,7 +401,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 			badge_style_template.backgroundColor = theme()->surfaceContainer;
 			if (w.in_learning_list > 0) {
 				CLAY(CLAY_ID("StatusBadge"), badge_style_template) {
-					draw_text("In learning list"_v, theme()->onSurfaceContainer,
+					draw_text(tr()->screen_word_view_in_learning_list, theme()->onSurfaceContainer,
 					          sizes()->font.label_sm);
 				}
 			}
@@ -723,7 +724,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							 },
 				 }) {
-				draw_text("Words:"_v, theme()->outline, sizes()->font.label_md);
+				draw_text(tr()->screen_word_view_phrase_words, theme()->outline, sizes()->font.label_md);
 				for (Size k{0}; k < word_payload.words.size; ++k) {
 					CLAY(CLAY_IDI("KeywordPill", k),
 					     {
@@ -752,7 +753,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					   .backgroundColor = theme()->outline,
 				 }) {}
 
-			draw_text("Examples"_v, theme()->onSurfaceContainer,
+			draw_text(tr()->screen_word_view_examples, theme()->onSurfaceContainer,
 			          sizes()->font.title_md);
 
 			CLAY(CLAY_ID("ExamplesList"),
@@ -855,7 +856,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text("Syn:"_v, theme()->outline,
+							draw_text(tr()->screen_word_view_syn, theme()->outline,
 							          sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("SynTextCol"),
@@ -898,7 +899,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text("Ant:"_v, theme()->outline,
+							draw_text(tr()->screen_word_view_ant, theme()->outline,
 							          sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("AntTextCol"),
@@ -941,7 +942,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text("Hyp:"_v, theme()->outline,
+							draw_text(tr()->screen_word_view_hyp, theme()->outline,
 							          sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("HyperTextCol"),
@@ -976,7 +977,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					   .backgroundColor = theme()->surfaceContainer,
 					   .cornerRadius = sizes()->radius.sm,
 				 }) {
-				draw_text("Origin"_v, theme()->secondary,
+				draw_text(tr()->screen_word_view_origin, theme()->secondary,
 				          sizes()->font.label_sm);
 
 				draw_text(word_payload.etymology, theme()->onSurfaceContainer,
@@ -1040,11 +1041,11 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			Clay_Color due_fg{};
 
 			if (is_new) {
-				due_str = "New"_v;
+				due_str = tr()->screen_word_view_due_new;
 				due_bg = theme()->surfaceContainer;
 				due_fg = theme()->onSurfaceContainer;
 			} else if (is_overdue) {
-				due_str = "Ready to repeat"_v;
+				due_str = tr()->screen_word_view_due_ready;
 				due_bg = theme()->wrongContainer;
 				due_fg = theme()->onWrongContainer;
 			} else {
@@ -1098,11 +1099,11 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 		if (s.mode < Engine::Mode::Compose) {
 			const auto left =
 				  successful_reviews_to_next_mode(ctx->arena_frame, s);
-			draw_text(StrBuilder::concat(ctx->arena_frame, "Next level in "_v,
-			                             left, " review(s)"_v),
+			draw_text(StrBuilder::concat(ctx->arena_frame, tr()->screen_word_view_next_level_in,
+			                             left, tr()->screen_word_view_reviews_count),
 			          theme()->onSurfaceContainer, sizes()->font.label_md);
 		} else {
-			draw_text("Mastered (Max level)"_v, theme()->onSurfaceContainer,
+			draw_text(tr()->screen_word_view_mastered_max_level, theme()->onSurfaceContainer,
 			          sizes()->font.label_md);
 		}
 	}

@@ -1,20 +1,104 @@
 @dark_theme
 en: Dark theme
-ar: المظهر الداكن
 ru: Темная тема
-tr: Koyu tema
+
 @exercises_per_round
 en: Exercises per round
-ar: التمارين في كل جولة
 ru: Упражнений за раунд
-tr: Tur başına alıştırma
+
 @language
 en: Language
-ar: اللغة
 ru: Язык
-tr: Dil
+
 @language_changed_exit
 en: Language changed. Restarting app
-ar: تم تغيير اللغة. جار إعادة تشغيل التطبيق
 ru: Язык изменен. Перезапуск приложения
-tr: Dil değiştirildi. Uygulama yeniden başlatılıyor
+
+@sec_appearance
+en: APPEARANCE & SCALING
+ru: ВНЕШНИЙ ВИД И МАСШТАБ
+
+@text_size
+en: Text size
+ru: Размер текста
+
+@density
+en: Density
+ru: Плотность
+
+@density_compact
+en: Compact
+ru: Компактный
+
+@density_normal
+en: Normal
+ru: Обычный
+
+@density_spacious
+en: Spacious
+ru: Просторный
+
+@default_screen
+en: Default screen
+ru: Экран по умолчанию
+
+@screen_wortschatz
+en: Wortschatz
+ru: Wortschatz
+
+@screen_trainer
+en: Trainer
+ru: Тренажёр
+
+@sec_trainer
+en: LEARNING & TRAINER
+ru: ОБУЧЕНИЕ И ТРЕНАЖЁР
+
+@suggestions
+en: Suggestions
+ru: Подсказки
+
+@sec_dictionary
+en: DICTIONARY
+ru: СЛОВАРЬ
+
+@mark_aux_sein
+en: Mark auxiliary 'sein' with *
+ru: Помечать вспомогательный глагол «sein» знаком *
+
+@mark_irregular
+en: Mark irregular verbs with !
+ru: Помечать неправильные глаголы знаком !
+
+@mark_verb_type
+en: Mark verbs with ᵛ
+ru: Помечать глаголы знаком ᵛ
+
+@mark_adj_type
+en: Mark adjectives with ᵃ
+ru: Помечать прилагательные знаком ᵃ
+
+@sec_word_details
+en: WORD DETAILS
+ru: ДЕТАЛИ СЛОВА
+
+@show_ipa
+en: Show transcription
+ru: Показывать транскрипцию
+
+@show_origin
+en: Show the origin of a word
+ru: Показывать происхождение слова
+
+@noun_plural_suffix
+en: Show plural form as a suffix
+ru: Показывать множественное число суффиксом
+
+@about_wiktionary
+en: This product includes data from Wiktionary (https://www.wiktionary.org/) licensed under CC BY-SA 4.0.
+ru: Этот продукт использует данные Викисловаря (https://www.wiktionary.org/), доступные по лицензии CC BY-SA 4.0.
+
+@about_wiktextract
+en: Extracted and transformed with Wiktextract and custom scripts.
+ru: Извлечено и преобразовано с помощью Wiktextract и собственных скриптов.
+

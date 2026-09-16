@@ -6,6 +6,7 @@
 #include "ui/components/button.h"
 #include "ui/sizes.h"
 #include "ui/themes.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 
@@ -171,7 +172,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 						r_text.push(ctx->arena_frame,
 						            StrView::from_number(ctx->arena_frame,
 						                                 to_review));
-						r_text.push(ctx->arena_frame, " to review"_v);
+						r_text.push(ctx->arena_frame, tr()->screen_exercise_summary_to_review);
 
 						draw_text(r_text.join(ctx->arena_frame),
 						          theme()->onSurfaceContainerHigh,
@@ -197,7 +198,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 			const bool has_errors = (to_review > 0);
 
 			auto sec_btn =
-				  mobile_button(ctx, CLAY_ID("SummarySecBtn"), "Review all"_v);
+				  mobile_button(ctx, CLAY_ID("SummarySecBtn"), tr()->screen_exercise_summary_action_review_all);
 
 			if (sec_btn.activated()) {
 				ctx->exercises.build_result_reviews(ctx->arena_frame, false);
@@ -208,7 +209,7 @@ void screen_exercise_summary_draw(AppContext *ctx) {
 
 			auto main_btn =
 				  mobile_button(ctx, CLAY_ID("SummaryMainBtn"),
-			                    has_errors ? "Review errors"_v : "Next round"_v,
+			                    has_errors ? tr()->screen_exercise_summary_action_review_errors : tr()->screen_exercise_summary_action_next_round,
 			                    mobile_button_style_primary());
 
 			if (main_btn.activated()) {

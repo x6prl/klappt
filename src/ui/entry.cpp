@@ -186,13 +186,13 @@ void bottom_bar_layout(AppContext *ctx) {
 	auto screen_to_screen_name = [](Screen s) -> StrView {
 		switch (s) {
 		case Screen::Trainer:
-			return "Trainer"_v;
+			return tr()->entry_tab_trainer;
 		case Screen::TTS_ASR:
-			return "Neuro"_v;
+			return tr()->entry_tab_neuro;
 		case Screen::Dictionary:
-			return "Wortschatz"_v;
+			return tr()->entry_tab_wortschatz;
 		case Screen::LearningList:
-			return "My Words"_v;
+			return tr()->entry_tab_my_words;
 		default:
 			break;
 		}
@@ -583,7 +583,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::ExerciceResultSummary: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.ExerciseSummary");
-				app_bar_layout(ctx, "Summary"_v);
+				app_bar_layout(ctx, tr()->entry_title_summary);
 				screen_exercise_summary_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
@@ -597,27 +597,27 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::Dictionary: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordsList");
-				app_bar_layout(ctx, "Words"_v);
+				app_bar_layout(ctx, tr()->entry_title_words);
 				screen_dictionary_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
 			}
 			case Screen::LearningList: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.LearningList");
-				app_bar_layout(ctx, "Learning"_v);
+				app_bar_layout(ctx, tr()->entry_title_learning);
 				screen_learning_list_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
 			}
 			case Screen::WordSuggestions: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordSuggestions");
-				app_bar_layout(ctx, "Suggestions"_v);
+				app_bar_layout(ctx, tr()->entry_title_suggestions);
 				screen_word_suggestions_draw(ctx);
 				break;
 			}
 			case Screen::Settings: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Settings");
-				app_bar_layout(ctx, "Settings"_v);
+				app_bar_layout(ctx, tr()->entry_title_settings);
 				screen_settings_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
@@ -631,7 +631,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			}
 			case Screen::WordEdit: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.WordEdit");
-				app_bar_layout(ctx, "Edit"_v);
+				app_bar_layout(ctx, tr()->entry_title_edit);
 				screen_word_edit_draw(ctx);
 				bottom_bar_layout(ctx);
 				break;
@@ -644,11 +644,11 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 			case Screen::TTS_ASR: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.TTSAsr");
 #if NEURO
-				app_bar_layout(ctx, "TTS/ASR"_v);
+				app_bar_layout(ctx, tr()->entry_title_tts_asr);
 				screen_tts_asr_draw(ctx);
 				bottom_bar_layout(ctx);
 #else
-				ctx->app_status.push_error("TTS/ASR features are disabled"_v);
+				ctx->app_status.push_error(tr()->entry_err_tts_asr_disabled);
 				screen_trainer_go(ctx);
 #endif
 				break;

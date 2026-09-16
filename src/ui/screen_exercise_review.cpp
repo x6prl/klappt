@@ -9,6 +9,7 @@
 #include "ui/components/button.h"
 #include "ui/sizes.h"
 #include "ui/themes.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 #include <SDL3/SDL_log.h>
@@ -25,7 +26,7 @@ bool promote_current_review_word_mode(AppContext *ctx) {
 	Engine::State state{};
 	auto [success, found] = ctx->states.get(review.word_id, state);
 	if (!success || !found) {
-		ctx->app_status.push_error("Word learning state error"_v);
+		ctx->app_status.push_error(tr()->screen_exercise_review_err_word_state);
 		return false;
 	}
 	if (state.mode >= Engine::Mode::Compose) {
@@ -53,7 +54,7 @@ bool promote_current_review_word_mode(AppContext *ctx) {
 	state.refresh_due(std::time(nullptr));
 
 	if (!ctx->states.set(review.word_id, state)) {
-		ctx->app_status.push_error("Cannot save learning state"_v);
+		ctx->app_status.push_error(tr()->screen_exercise_review_err_save_state);
 		return false;
 	}
 
@@ -124,8 +125,6 @@ static void draw_wrapped_diff_tokens(AppContext *ctx,
 		  std::max(100.0f, ctx->display_width - horizontal_insets);
 
 	auto get_token_width = [&](StrView token) -> float {
-		if (!token || token.size == 0)
-			return 0.0f;
 		auto slice = CLAY__INIT(Clay_StringSlice){
 			  .length = static_cast<int32_t>(token.size),
 			  .chars = token.data,
@@ -250,7 +249,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						 },
 				   .backgroundColor = theme()->surface,
 			 }) {
-			draw_text("All answers correct!"_v, theme()->onSurface,
+			draw_text(tr()->screen_exercise_review_all_answers_correct, theme()->onSurface,
 			          sizes()->font.title_lg);
 		}
 		return;
@@ -383,7 +382,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 							   .backgroundColor = theme()->rightContainer,
 							   .cornerRadius = sizes()->radius.sm,
 						 }) {
-						draw_text("✓ Correct answer"_v,
+						draw_text(tr()->screen_exercise_review_correct_answer,
 						          theme()->onRightContainer,
 						          sizes()->font.label_md);
 					}
@@ -407,7 +406,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				}
 
 			} else {
-				draw_text("Expected answer"_v, label_color,
+				draw_text(tr()->screen_exercise_review_expected_answer, label_color,
 				          sizes()->font.label_md);
 				CLAY(CLAY_ID("ExpectedBox"),
 				     {
@@ -432,7 +431,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 					}
 				}
 
-				draw_text("Your answer"_v, label_color,
+				draw_text(tr()->screen_exercise_review_your_answer, label_color,
 				          sizes()->font.label_md);
 				CLAY(CLAY_ID("ActualBox"),
 				     {
@@ -486,7 +485,7 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				// if (next_btn.activated()) {
 				// 	ctx->exercises.next_result();
 				// }
-				draw_text("click anywhere to review next"_v, theme()->outline,
+				draw_text(tr()->screen_exercise_review_click_to_next, theme()->outline,
 				          sizes()->font.body_md);
 			}
 			if (Clay_Hovered() &&

@@ -13,6 +13,7 @@
 #include "ui/sizes.h"
 #include "ui/themes.h"
 #include "ui/translations/langs.h"
+#include "ui/trs.h"
 
 #include "screen_helpers.h"
 
@@ -106,7 +107,7 @@ static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 
 static bool run_download_and_unpack_tr_asset(AppContext *ctx) {
 	return check_and_run_download_and_unpack(
-		  ctx, "Main dictionary"_v, AssetsDL::Type::XAPIAN_TR,
+		  ctx, tr()->screen_onboarding_asset_main_dict, AssetsDL::Type::XAPIAN_TR,
 		  [](AppContext *_) { return true; });
 }
 
@@ -115,11 +116,11 @@ static bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	auto ret = true;
 	ret = ret &&
 	      check_and_run_download_and_unpack(
-				ctx, "Text-to-speech"_v, AssetsDL::Type::OPTIONAL_TTS,
+				ctx, tr()->screen_onboarding_asset_tts, AssetsDL::Type::OPTIONAL_TTS,
 				[](AppContext *ctx) { return ctx->settings.is_module_tts; });
 	ret = ret &&
 	      check_and_run_download_and_unpack(
-				ctx, "Voice recognition"_v, AssetsDL::Type::OPTIONAL_ASR,
+				ctx, tr()->screen_onboarding_asset_asr, AssetsDL::Type::OPTIONAL_ASR,
 				[](AppContext *ctx) { return ctx->settings.is_module_asr; });
 	return ret;
 }
@@ -200,7 +201,7 @@ static void step_draw_language(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Choose your language"_v, theme()->onSurface, title_size,
+		draw_text("Choose your language\nВыберите язык"_v, theme()->onSurface, title_size,
 		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		CLAY(CLAY_ID("LangOptionsGroup"),
@@ -238,7 +239,7 @@ static void step_draw_language(AppContext *ctx) {
 		}
 
 #ifdef __EMSCRIPTEN__
-		draw_text("This is a web version of klappt. On Android you can use a native one, which you can find in Play Store."_v, theme()->onSurface, title_size,
+		draw_text(tr()->screen_onboarding_web_version_note, theme()->onSurface, title_size,
 		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 #endif
 	}
@@ -262,24 +263,24 @@ static void step_draw_main_asset_download(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Download dictionary"_v, theme()->onSurface, title_size,
+		draw_text(tr()->screen_onboarding_download_dictionary, theme()->onSurface, title_size,
 		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		auto sub_col = theme()->onSurface;
 		sub_col.a = static_cast<uint8_t>(sub_col.a * 0.65f);
 		draw_text(
-			  "The offline dictionary will be installed on your device for fast lookup without internet."_v,
+			  tr()->screen_onboarding_download_dictionary_desc,
 			  sub_col, sizes()->font.body_sm, FontID::MAIN,
 			  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		auto discl_col = theme()->onSurface;
 		discl_col.a = static_cast<uint8_t>(discl_col.a * 0.45f);
 		draw_text(
-			  "This product includes data from Wiktionary (wiktionary.org) licensed under CC BY-SA 4.0."_v,
+			  tr()->screen_settings_about_wiktionary,
 			  discl_col, sizes()->font.label_sm, FontID::MAIN,
 			  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
-		auto dlbtn = mobile_button(ctx, CLAY_ID("DLStartBtn"), "Download"_v,
+		auto dlbtn = mobile_button(ctx, CLAY_ID("DLStartBtn"), tr()->screen_onboarding_action_download,
 		                           mobile_button_style_primary());
 		if (dlbtn.activated()) {
 			(void)run_download_and_unpack_tr_asset(ctx);
@@ -307,26 +308,26 @@ static void step_draw_optional_assets(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Optional resources"_v, theme()->onSurface, title_size,
+		draw_text(tr()->screen_onboarding_optional_resources, theme()->onSurface, title_size,
 		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		draw_option_row(
-			  ctx, CLAY_ID("TTSOpt"), "Text-to-speech"_v,
-			  "Offline pronunciation generation for words and phrases. ~80MB"_v,
+			  ctx, CLAY_ID("TTSOpt"), tr()->screen_onboarding_tts_label,
+			  tr()->screen_onboarding_tts_desc,
 			  ctx->settings.is_module_tts, [ctx](bool val) {
 				  ctx->settings.is_module_tts = val;
 				  ctx->settings.save(ctx->arena_frame);
 			  });
 
-		draw_option_row(ctx, CLAY_ID("ASROpt"), "Speech recognition"_v,
-		                "Voice input training model. ~160MB"_v,
+		draw_option_row(ctx, CLAY_ID("ASROpt"), tr()->screen_onboarding_asr_label,
+		                tr()->screen_onboarding_asr_desc,
 		                ctx->settings.is_module_asr, [ctx](bool val) {
 							ctx->settings.is_module_asr = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
 		auto next_btn =
-			  mobile_button(ctx, CLAY_ID("AssetsNextBtn"), "Continue"_v,
+			  mobile_button(ctx, CLAY_ID("AssetsNextBtn"), tr()->screen_onboarding_action_continue,
 		                    mobile_button_style_primary());
 		if (next_btn.activated()) {
 			run_download_and_unpack_optional_assets(ctx);
@@ -354,7 +355,7 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Word card style"_v, theme()->onSurface, title_size,
+		draw_text(tr()->screen_onboarding_card_style_title, theme()->onSurface, title_size,
 		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		CLAY(CLAY_ID("ListPreviewBox"),
@@ -440,30 +441,30 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 		}
 
 		draw_option_row(ctx, CLAY_ID("OptMarkIrr"),
-		                "Mark irregular verbs (!)"_v,
-		                "Shows '!' next to verbs with irregular forms"_v,
+		                tr()->screen_onboarding_opt_mark_irr,
+		                tr()->screen_onboarding_opt_mark_irr_desc,
 		                ctx->settings.is_mark_verb_irregular, [ctx](bool val) {
 							ctx->settings.is_mark_verb_irregular = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
-		draw_option_row(ctx, CLAY_ID("OptMarkSein"), "Mark 'sein' verbs (*)"_v,
-		                "Shows '*' for verbs using 'sein' as auxiliary"_v,
+		draw_option_row(ctx, CLAY_ID("OptMarkSein"), "Mark 'sein' verbs"_v,
+		                "Shows * for verbs using 'sein' as auxiliary"_v,
 		                ctx->settings.is_mark_verb_aux_sein, [ctx](bool val) {
 							ctx->settings.is_mark_verb_aux_sein = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
-		draw_option_row(ctx, CLAY_ID("OptMarkVerbTag"), "Verb marker tag (ᵛ)"_v,
-		                "Shows small 'ᵛ' tag next to regular verbs"_v,
+		draw_option_row(ctx, CLAY_ID("OptMarkVerbTag"), tr()->screen_onboarding_opt_mark_verb_tag,
+		                tr()->screen_onboarding_opt_mark_verb_tag_desc,
 		                ctx->settings.is_mark_verb_type, [ctx](bool val) {
 							ctx->settings.is_mark_verb_type = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
 		draw_option_row(ctx, CLAY_ID("OptMarkAdjTag"),
-		                "Adjective marker tag (ᵃ)"_v,
-		                "Shows small 'ᵃ' tag next to adjectives"_v,
+		                tr()->screen_onboarding_opt_mark_adj_tag,
+		                tr()->screen_onboarding_opt_mark_adj_tag_desc,
 		                ctx->settings.is_mark_adj_type, [ctx](bool val) {
 							ctx->settings.is_mark_adj_type = val;
 							ctx->settings.save(ctx->arena_frame);
@@ -471,12 +472,12 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 
 		auto hint_col = theme()->onSurface;
 		hint_col.a = static_cast<uint8_t>(hint_col.a * 0.45f);
-		draw_text("You can customize all these options later in Settings"_v,
+		draw_text(tr()->screen_onboarding_settings_customize_hint,
 		          hint_col, sizes()->font.label_sm, FontID::MAIN,
 		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		auto next_btn =
-			  mobile_button(ctx, CLAY_ID("CardStyleNextBtn"), "Continue"_v,
+			  mobile_button(ctx, CLAY_ID("CardStyleNextBtn"), tr()->screen_onboarding_action_continue,
 		                    mobile_button_style_primary());
 		if (next_btn.activated()) {
 			onboarding_advance(ctx, 1);
@@ -502,7 +503,7 @@ static void step_draw_word_view_settings(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Word details view"_v, theme()->onSurface, title_size,
+		draw_text(tr()->screen_onboarding_word_view_title, theme()->onSurface, title_size,
 		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		CLAY(CLAY_ID("ViewPreviewCard"),
@@ -609,24 +610,24 @@ static void step_draw_word_view_settings(AppContext *ctx) {
 			}
 		}
 
-		draw_option_row(ctx, CLAY_ID("OptShowIPA"), "Show IPA pronunciation"_v,
-		                "Displays phonetic transcription guides like [buːx]"_v,
+		draw_option_row(ctx, CLAY_ID("OptShowIPA"), tr()->screen_onboarding_opt_show_ipa,
+		                tr()->screen_onboarding_opt_show_ipa_desc,
 		                ctx->settings.is_show_ipa, [ctx](bool val) {
 							ctx->settings.is_show_ipa = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
 		draw_option_row(
-			  ctx, CLAY_ID("OptPluralSuffix"), "Plural in title header"_v,
-			  "Displays plural directly in title header instead of forms row"_v,
+			  ctx, CLAY_ID("OptPluralSuffix"), tr()->screen_onboarding_opt_plural_header,
+			  tr()->screen_onboarding_opt_plural_header_desc,
 			  ctx->settings.is_show_noun_plural_as_suffix, [ctx](bool val) {
 				  ctx->settings.is_show_noun_plural_as_suffix = val;
 				  ctx->settings.save(ctx->arena_frame);
 			  });
 
 		draw_option_row(
-			  ctx, CLAY_ID("OptShowOrigin"), "Show word origin (etymology)"_v,
-			  "Displays historical linguistic roots and origin notes"_v,
+			  ctx, CLAY_ID("OptShowOrigin"), tr()->screen_onboarding_opt_show_origin,
+			  tr()->screen_onboarding_opt_show_origin_desc,
 			  ctx->settings.is_show_origin, [ctx](bool val) {
 				  ctx->settings.is_show_origin = val;
 				  ctx->settings.save(ctx->arena_frame);
@@ -634,12 +635,12 @@ static void step_draw_word_view_settings(AppContext *ctx) {
 
 		auto hint_col = theme()->onSurface;
 		hint_col.a = static_cast<uint8_t>(hint_col.a * 0.45f);
-		draw_text("You can customize all these options later in Settings"_v,
+		draw_text(tr()->screen_onboarding_settings_customize_hint,
 		          hint_col, sizes()->font.label_sm, FontID::MAIN,
 		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		auto next_btn =
-			  mobile_button(ctx, CLAY_ID("ViewStyleNextBtn"), "Continue"_v,
+			  mobile_button(ctx, CLAY_ID("ViewStyleNextBtn"), tr()->screen_onboarding_action_continue,
 		                    mobile_button_style_primary());
 		if (next_btn.activated()) {
 			onboarding_advance(ctx, 1);
@@ -665,13 +666,13 @@ static void step_draw_default_screen(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("What would you like to open on launch?"_v,
+		draw_text(tr()->screen_onboarding_default_screen_prompt,
 		          theme()->onSurface, title_size, FontID::MAIN,
 		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		Arr<Pair<Screen, StrView>, 2> options{{
-			  {Screen::Trainer, "Word Trainer"_v},
-			  {Screen::Dictionary, "Dictionary & Search"_v},
+			  {Screen::Trainer, tr()->screen_onboarding_def_screen_trainer},
+			  {Screen::Dictionary, tr()->screen_onboarding_def_screen_dictionary},
 		}};
 
 		int counter = 0;
@@ -723,13 +724,13 @@ static void step_draw_downloading_and_setup(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Preparing resources…"_v, theme()->onSurface,
+		draw_text(tr()->screen_onboarding_preparing_resources, theme()->onSurface,
 		          sizes()->font.title_md, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 		          CLAY_TEXT_ALIGN_CENTER);
 
 		auto sub_col = theme()->onSurface;
 		sub_col.a = static_cast<uint8_t>(sub_col.a * 0.6f);
-		draw_text("Downloading and setting up offline dictionary"_v, sub_col,
+		draw_text(tr()->screen_onboarding_downloading_setup_desc, sub_col,
 		          sizes()->font.body_sm, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 		          CLAY_TEXT_ALIGN_CENTER);
 
@@ -749,11 +750,11 @@ static void finish_onboarding_and_start(AppContext *ctx) {
 
 	if (!init_runtime_data(*ctx)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to init runtime data");
-		ctx->app_status.push_error("Failed to init runtime data"_v);
+		ctx->app_status.push_error(tr()->screen_onboarding_err_init_runtime);
 	}
 	if (ctx->words && ctx->words->size == 0 &&
 	    !seed_default_learning_list(*ctx)) {
-		ctx->app_status.push_error("Seeding default learning list failed"_v);
+		ctx->app_status.push_error(tr()->screen_onboarding_err_seed_words);
 	}
 
 	screen_trainer_go(ctx);

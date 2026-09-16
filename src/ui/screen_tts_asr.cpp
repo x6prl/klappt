@@ -16,6 +16,7 @@
 #include "ui/components/text_input.h"
 #include "ui/sizes.h"
 #include "ui/themes.h"
+#include "ui/trs.h"
 
 void screen_tts_asr_go(AppContext *ctx) {
 	ctx->mobile_text_input.activate_text_input = true;
@@ -41,7 +42,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			CLAY(CLAY_ID("TTSSectionHeader"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_FIXED(section_height)}}}) {
-				draw_text("TTS - Text-to-Speech"_v, theme()->onSurface);
+				draw_text(tr()->screen_tts_asr_tts_header, theme()->onSurface);
 			}
 
 			// TTS input field
@@ -50,7 +51,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			                            CLAY_SIZING_FIXED(section_height)}}}) {
 				auto tts_input_result = mobile_text_input(
 					  ctx, CLAY_ID("TTSInput"), &ctx->tts_input,
-					  "Enter text to speak..."_v);
+					  tr()->screen_tts_asr_tts_input_placeholder);
 			}
 
 			// TTS play button
@@ -58,7 +59,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_FIXED(section_height)}}}) {
 				auto tts_btn =
-					  mobile_button(ctx, CLAY_ID("TTSPlayButton"), "Play"_v);
+					  mobile_button(ctx, CLAY_ID("TTSPlayButton"), tr()->screen_tts_asr_action_play);
 				if (tts_btn.activated() && ctx->tts_input.size > 0) {
 					run_tts(ctx, ctx->tts_input.view());
 					// worker_job_push(ctx, Job{.type = Job::Type::TTS,
@@ -76,7 +77,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			CLAY(CLAY_ID("ASRSectionHeader"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_FIXED(section_height)}}}) {
-				draw_text("ASR - Speech Recognition"_v, theme()->onSurface);
+				draw_text(tr()->screen_tts_asr_asr_header, theme()->onSurface);
 			}
 
 			bool is_asr_initialized =
@@ -121,7 +122,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 					}
 					auto asr_btn =
 						  mobile_button(ctx, CLAY_ID("ASRRecordButton"),
-					                    "● Record"_v, btn_style);
+					                    tr()->screen_tts_asr_action_record, btn_style);
 					// static bool recording = false;
 					// SDL_Log(" ======================+>>>> %s %s <<",
 					//         asr_btn.held ? "HELD" : "", recording ? "REC" :
@@ -179,10 +180,10 @@ void screen_tts_asr_draw(AppContext *ctx) {
 					           //          SDL_GetAtomicInt(
 					           // 		 &ctx->sound_ctx->is_asr_in_progress)
 					) {
-						draw_text("Performing transcription…"_v,
+						draw_text(tr()->screen_tts_asr_transcription_in_progress,
 						          theme()->onSurfaceContainer, font_size);
 					} else {
-						draw_text("No transcription yet."_v,
+						draw_text(tr()->screen_tts_asr_no_transcription,
 						          theme()->onSurfaceContainer, font_size);
 					}
 				}
@@ -204,7 +205,7 @@ void screen_tts_asr_draw(AppContext *ctx) {
 				     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 				                            CLAY_SIZING_GROW(1)},
 				                 .padding = sizes()->pad.card_compact}}) {
-					draw_text("Initializing ASR Engine"_v,
+					draw_text(tr()->screen_tts_asr_asr_initializing,
 					          theme()->onSurfaceContainer, sizes()->font.title_md);
 				}
 			}
