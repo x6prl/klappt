@@ -267,6 +267,9 @@ int SDLCALL WorkerThread(void *userdata) {
 
 int SDLCALL AudioWorkerThread(void *userdata) {
 	KLAPPT_PROFILE_THREAD("audio");
+	if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Audio Thread: Cannot init audio");
+	};
 	worker_thread_generic<AudioJob>(
 		  userdata,
 		  [](AppContext *ctx) -> JobQueue<AudioJob> * {

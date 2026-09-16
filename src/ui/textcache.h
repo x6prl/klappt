@@ -5,6 +5,7 @@
 #include <clay/clay.h>
 
 #include "base/arr.h"
+#include "base/dyn_arr.h"
 #include "base/hash.h"
 #include "base/pair.h"
 #include "base/str_view.h"
@@ -104,7 +105,7 @@ struct TextCache {
 	// API
 	// -------------------------------------------------------------------------
 	void atlas_init(SDL_Renderer *r);
-	// void prewarm(const uint16_t PREWARM_SIZES[]);
+	void prewarm(DynArr<uint16_t> sizes);
 
 	TTF_Font *get_font(uint16_t font_id, uint16_t font_size);
 	int get_font_ascent(uint16_t font_id, uint16_t font_size);

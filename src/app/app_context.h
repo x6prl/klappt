@@ -134,6 +134,8 @@ struct AppContext {
 	JobQueue<NeuroJob> neuro_worker_job_queue{};
 #endif
 
+	SDL_Semaphore *fonts_ready_sem{};
+
 	// uint64_t last_ticks[10]{};
 	// uint64_t last_ticksef[10]{};
 

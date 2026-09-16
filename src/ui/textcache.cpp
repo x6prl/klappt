@@ -345,20 +345,19 @@ void TextCache::draw_string(SDL_Renderer *r, StrView str, uint16_t font_id,
 	}
 }
 
-// void TextCache::prewarm(const uint16_t PREWARM_SIZES[]) {
-// 	for (const auto fid :
-// 	     {FontID::MAIN, FontID::MONOSPACE_REGULAR, FontID::MONOSPACE_BOLD}) {
-// 		for (const auto sz : PREWARM_SIZES) {
-// 			// Bake ASCII printable characters 32..126
-// 			for (uint32_t c = 32; c <= 126; ++c) {
-// 				get_glyph(c, fid, sz);
-// 			}
-// 			// Common German characters
-// 			for (const uint32_t umlaut :
-// 			     {0x00E4u, 0x00F6u, 0x00FCu, 0x00C4u, 0x00D6u, 0x00DCu,
-// 			      0x00DFu}) { // ä, ö, ü, Ä, Ö, Ü, ß
-// 				get_glyph(umlaut, fid, sz);
-// 			}
-// 		}
-// 	}
-// }
+void TextCache::prewarm(DynArr<uint16_t> sizes) {
+	for (const auto fid : {FontID::MAIN}) {
+		for (const auto sz : sizes) {
+			// Bake ASCII printable characters 32..126
+			for (uint32_t c = 32; c <= 126; ++c) {
+				get_glyph(c, fid, sz);
+			}
+			// Common German characters
+			for (const uint32_t umlaut :
+			     {0x00E4u, 0x00F6u, 0x00FCu, 0x00C4u, 0x00D6u, 0x00DCu,
+			      0x00DFu}) { // ä, ö, ü, Ä, Ö, Ü, ß
+				get_glyph(umlaut, fid, sz);
+			}
+		}
+	}
+}

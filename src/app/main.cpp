@@ -36,6 +36,7 @@
 #endif // !__EMSCRIPTEN__
 #include "ui/entry.h"
 #include "ui/textcache.h"
+#include "ui/sizes.h"
 
 #if HOTRELOAD
 #include "app/hotreload.h"
@@ -161,20 +162,60 @@ static void WaitForProfilerConnection() {
 }
 #endif
 
-SDL_Renderer *create_renderer(SDL_Window *window) {
+static void load_fonts_job() {
+	auto *ctx = tctx()->app_ctx;
+	auto base_pathv = get_app_base_path();
+	auto base_path =
+		  std::filesystem::path({base_pathv.data, (size_t)base_pathv.size});
 
+	const auto ui_path = (base_path / "Inter-Regular.ttf").string();
+	const auto arabic_path = (base_path / "ReadexPro-Regular.ttf").string();
+	const auto icons_path =
+		  (base_path / "Font-Awesome-7-Free-Solid-900.otf").string();
+
+	ctx->text->base_fonts[FontID::MAIN] =
+		  TTF_OpenFont(ui_path.c_str(), sizes()->font.body_md);
+	ctx->text->base_fonts[FontID::ARABIC_MAIN] =
+		  TTF_OpenFont(arabic_path.c_str(), sizes()->font.body_sm);
+	ctx->text->base_fonts[FontID::ICONS] =
+		  TTF_OpenFont(icons_path.c_str(), sizes()->dim.icon_sm);
+
+	// unblock UI init
+	SDL_SignalSemaphore(ctx->fonts_ready_sem);
+	SDL_Log("Thread Worker: base fonts loaded");
+
+	// deferred fonts
+	const auto mono_reg_path =
+		  (base_path / "JetBrainsMono-Regular.ttf").string();
+	const auto mono_bold_path = (base_path / "JetBrainsMono-Bold.ttf").string();
+
+	ctx->text->base_fonts[FontID::MONOSPACE_REGULAR] =
+		  TTF_OpenFont(mono_reg_path.c_str(), 48);
+	ctx->text->base_fonts[FontID::MONOSPACE_BOLD] =
+		  TTF_OpenFont(mono_bold_path.c_str(), 48);
+	SDL_Log("Thread Worker: deffered fonts loaded");
+}
+
+SDL_Renderer *create_renderer(SDL_Window *window) {
+#ifdef __ANDROID__
+	SDL_Renderer *renderer = SDL_CreateRenderer(window, "opengles2");
+	if (renderer) {
+		SDL_Log("opengles2 renderer created");
+		return renderer;
+	}
+#endif
+
+	Measure m{"create_renderer"};
 	const int num_drivers = SDL_GetNumRenderDrivers();
 	SDL_Log("Found %d renderers", num_drivers);
 	for (int i = 0; i < num_drivers; ++i) {
 		const char *driver = SDL_GetRenderDriver(i);
 		SDL_Log("\t%d: [%s]", i, driver);
 	}
+	m.lap().printus("enum_and_log_drivers");
 
 	constexpr const char *preferred_drivers[] = {
-#ifdef __ANDROID__ // vulkan gives a crash on re-opening
-		  "opengles2", "gpu",
-#endif
-		  "vulkan",    "gpu", "opengles2", "opengl",
+		  "gpu", "vulkan", "opengl", "opengles2", "software",
 	};
 
 	constexpr int num_preferred =
@@ -185,10 +226,13 @@ SDL_Renderer *create_renderer(SDL_Window *window) {
 
 		SDL_Log("Trying renderer: [%s]", driver);
 
-		SDL_Renderer *renderer = SDL_CreateRenderer(window, driver);
+		renderer = SDL_CreateRenderer(window, driver);
+		m.lap().printus(driver);
+
 		if (renderer) {
 			SDL_Log("Successfully created renderer: [%s]",
 			        SDL_GetRendererName(renderer));
+			m.total().printus("total");
 			return renderer;
 		}
 
@@ -197,13 +241,15 @@ SDL_Renderer *create_renderer(SDL_Window *window) {
 
 	SDL_Log("All preferred renderers failed; trying SDL default");
 
-	SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
+	renderer = SDL_CreateRenderer(window, nullptr);
+	m.lap().printus("fallback_default_renderer");
 
 	if (renderer) {
 		SDL_Log("Created default renderer: [%s]",
 		        SDL_GetRendererName(renderer));
 	}
 
+	m.total().printus("total");
 	return renderer;
 }
 
@@ -231,209 +277,98 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	KLAPPT_PROFILE_SCOPE_N("SDL_AppInit");
 	KLAPPT_PROFILE_THREAD("main");
 	Measure m{__FUNCTION__};
-	// init the library, here we make a window so we only need the Video
-	// capabilities.
-	{
-		SDL_SetHint(SDL_HINT_ORIENTATIONS, "Portrait");
-		KLAPPT_PROFILE_SCOPE_N("SDL_Init");
-		if (not SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-			return SDL_Fail();
-		}
-	}
-	m.lap().printus("SDL_Init");
-#if defined(TRACY_ENABLE)
-	{
-		KLAPPT_PROFILE_SCOPE_N("WaitForProfilerConnection");
-		WaitForProfilerConnection();
-	}
-	m.lap().printus("Tracy connected");
-#endif
 
-	// init TTf
-	{
-		KLAPPT_PROFILE_SCOPE_N("TTF_Init");
-		if (not TTF_Init()) {
-			return SDL_Fail();
-		}
-	}
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "Portrait");
+	// TODO: think about putting it to 0
+	// SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
+	if (!SDL_Init(SDL_INIT_VIDEO))
+		return SDL_Fail();
+	m.lap().printus("SDL_Init");
+	if (!TTF_Init())
+		return SDL_Fail();
 	m.lap().printus("TTF_Init");
 
-	// init Mixer
-	// if (not MIX_Init()) {
-	//	return SDL_Fail();
-	// }
-
-	// create a window
-
-	SDL_Window *window{};
-	{
-		KLAPPT_PROFILE_SCOPE_N("CreateWindow");
-		window = SDL_CreateWindow(
-			  "klappt", WINDOW_START_WIDTH, WINDOW_START_HEIGHT,
-			  SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY
-			  // Well, using fullscreen implies dancing
-		      // around safe area during text input //
-		      // #ifdef ANDROID | SDL_WINDOW_FULLSCREEN
-		      // #endif // ANDROID
-
-		);
-	}
-	// 0, 0,
-	// SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE);
-	if (not window) {
-		return SDL_Fail();
-	}
-	m.lap().printus("create window");
-
-#ifdef __EMSCRIPTEN__
-	SDL_SetWindowFillDocument(window, true);
-#endif // __EMSCRIPTEN__
-
-	// create a renderer
-	SDL_Renderer *renderer = nullptr;
-	{
-		KLAPPT_PROFILE_SCOPE_N("CreateRenderer");
-		renderer = create_renderer(window);
-
-		if (!renderer) {
-			SDL_LogCritical(SDL_LOG_CATEGORY_RENDER,
-			                "Failed to create any SDL_Renderer: %s",
-			                SDL_GetError());
-			exit(-1);
-		}
-	}
-	if (not renderer) {
-		return SDL_Fail();
-	}
-	m.lap().printus("create renderer");
-
-	// load the fonts
-	auto base_pathv = get_app_base_path();
-	auto base_path =
-		  std::filesystem::path({base_pathv.data, (size_t)base_pathv.size});
-
-	const auto ui_font_path = base_path / "Inter-Regular.ttf";
-	const auto arabic_ui_font_path = base_path / "ReadexPro-Regular.ttf";
-	const auto icons_font_path =
-		  base_path / "Font-Awesome-7-Free-Solid-900.otf";
-	const auto monospace_regular_font_path =
-		  base_path / "JetBrainsMono-Regular.ttf";
-	const auto monospace_bold_font_path = base_path / "JetBrainsMono-Bold.ttf";
-	TTF_Font *ui_font{};
-	TTF_Font *arabic_ui_font{};
-	TTF_Font *icons_font{};
-	TTF_Font *monospace_regular_font{};
-	TTF_Font *monospace_bold_font{};
-	{
-		KLAPPT_PROFILE_SCOPE_N("LoadFonts");
-		ui_font = TTF_OpenFont(ui_font_path.string().c_str(), 48);
-		arabic_ui_font = TTF_OpenFont(arabic_ui_font_path.string().c_str(), 48);
-		icons_font = TTF_OpenFont(icons_font_path.string().c_str(), 128);
-		monospace_regular_font =
-			  TTF_OpenFont(monospace_regular_font_path.string().c_str(), 48);
-		monospace_bold_font =
-			  TTF_OpenFont(monospace_bold_font_path.string().c_str(), 48);
-	}
-	if (not ui_font or not arabic_ui_font or not icons_font or
-	    not monospace_regular_font or not monospace_bold_font) {
-		return SDL_Fail();
-	}
-	m.lap().printus("load fonts");
-
-	// print some information about the window
-	int width, height, bbwidth, bbheight;
-	SDL_ShowWindow(window);
-	{
-		SDL_GetWindowSize(window, &width, &height);
-		SDL_GetWindowSizeInPixels(window, &bbwidth, &bbheight);
-		SDL_Log("Window size: %ix%i", width, height);
-		SDL_Log("Backbuffer size: %ix%i", bbwidth, bbheight);
-		if (width != bbwidth) {
-			SDL_Log("This is a highdpi environment.");
-		}
-	}
-
-	auto text_cache = new TextCache{
-		  .base_fonts = {ui_font, icons_font, monospace_regular_font,
-	                     monospace_bold_font, arabic_ui_font}};
-	m.lap().printus("create text cache");
-
-	{
-		text_cache->atlas_init(renderer);
-	}
-	m.lap().printus("text atlas init");
-
-	// set up the application data
+	auto text_cache = new TextCache{};
 	auto ctx = new AppContext{
-		  .window = window,
-		  .renderer = renderer,
-		  .scale = SDL_GetWindowDisplayScale(window),
-		  .display_width = static_cast<float>(width),
 		  .ticks = SDL_GetTicks(),
-		  // .clay_arena = clay_arena,
 		  .text = text_cache,
 		  .current = 0,
 		  .stack = {Screen::Onboarding},
-		  // .track = mixerTrack,
 		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
+		  .fonts_ready_sem = SDL_CreateSemaphore(0),
 	};
-	// ctx->tts_input.data =
-	// ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
-	// ctx->dictionary_search.data =
-	// ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
-	// ctx->learning_search.data =
-	// ctx->arena.pushN<char>(MobileTextInputBuffer::MAX_SIZE);
 	ctx->downloads = DynArr<DownloadData>{
 		  .data = ctx->arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
 		  .size = 0,
 		  .reserved = NetContext::MAX_REQUESTS,
 	};
 	*appstate = ctx;
-	m.lap().printus("create app context");
-	// {
-	// KLAPPT_PROFILE_SCOPE_N("PrewarmTextCache");
-	// ctx->text->prewarm(ctx->scale, renderer);
-	// }
-	// m.lap().printus("prewarm fonts");
-// load app_hotreload
-#if HOTRELOAD
-#if __ANDROID__
-	constexpr const char ANDROID_PACKAGED_MODULE_NAME[] = "libapp_hotreload.so";
-	const char *initial_hotreload_path = ANDROID_PACKAGED_MODULE_NAME;
+	m.lap().printus("AppContext created");
+
+	thread_local ThreadContext tctx_var = {.app_ctx = ctx};
+	_tctx = &tctx_var;
+
+	// starting the worker thread
+	SDL_Thread *worker = SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
+	if (!worker) {
+		SDL_LogError(SDL_LOG_CATEGORY_CUSTOM, "SDL_CreateThread failed: %s",
+		             SDL_GetError());
+	}
+	m.lap().printus("worker started");
+
+#ifdef __ANDROID__
+	SDL_Window *window = SDL_CreateWindow(
+		  "klappt", 0, 0, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 #else
-	const char *initial_hotreload_path = HOTRELOAD_MODULE_PATH;
+	SDL_Window *window = SDL_CreateWindow(
+		  "klappt", WINDOW_START_WIDTH, WINDOW_START_HEIGHT,
+		  SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 #endif
-	bool healthy{};
-	{
-		KLAPPT_PROFILE_SCOPE_N("LoadHotreloadModule");
-		auto [hotreload_healthy, reloaded] = hotreload(initial_hotreload_path);
-		healthy = hotreload_healthy;
-		(void)reloaded;
-	}
-	if (!healthy) {
-		SDL_LogError(SDL_LOG_CATEGORY_CUSTOM,
-		             "Failed to load hotreload module from %s",
-		             initial_hotreload_path);
-		return SDL_APP_FAILURE;
-	}
-	m.lap().printus("hotreload");
+	if (!window)
+		return SDL_Fail();
+	m.lap().printus("window created");
+
+	int width, height;
+	SDL_ShowWindow(window);
+	SDL_GetWindowSize(window, &width, &height);
+
+	ctx->window = window;
+	ctx->scale = SDL_GetWindowDisplayScale(window);
+	ctx->display_width = static_cast<float>(width);
+	m.lap().printus("window values received");
+
+	sizes_set_scale(ctx->scale, ctx->settings.density,
+	                ctx->settings.font_scale);
+	m.lap().printus("font sizes calculated");
+
+	Worker::job_push(ctx, Job{
+								.id = -10,
+								.func = load_fonts_job,
+						  });
+	m.lap().printus("font job queued");
+
+#ifdef __EMSCRIPTEN__
+	SDL_SetWindowFillDocument(window, true);
 #endif
 
-	{
-		KLAPPT_PROFILE_SCOPE_N("ui_clay_init");
-		ui_clay_init(ctx);
-	}
+	SDL_Renderer *renderer = create_renderer(window);
+	if (!renderer)
+		return SDL_Fail();
+	m.lap().printus("renderer created");
+
+	ctx->renderer = renderer;
+
+	text_cache->atlas_init(renderer);
+	m.lap().printus("text atlas init");
+
+	ui_clay_init(ctx);
 	m.lap().printus("ui clay init");
 
-	SDL_SetRenderVSync(renderer, -1); // enable vysnc
-
-	// redraw only on events
+	SDL_SetRenderVSync(renderer, -1);
 	SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "waitevent");
 	constexpr auto UI_UPDATE_EVENT_TIME_MS = 1000;
-	// add timer event to allow animations
 	SDL_AddTimer(UI_UPDATE_EVENT_TIME_MS, WakeUpTimer, nullptr);
-	m.lap().printus("render loop setup");
 
 	FileLoader settings_file{};
 	auto g = ctx->arena_frame.guard();
@@ -443,118 +378,59 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot decode settings.dat");
 			ctx->app_status.set_exit_with_error(
 				  "cannot decode settings file"_v);
-		} else {
-			SDL_Log("settings.dat found and loaded");
 		}
-	} else {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot load settings.dat");
 	}
-	m.lap().printus("load settings");
+	ui_settings_init(ctx);
 
-	{
-		KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
-		ui_settings_init(ctx);
-	}
-	m.lap().printus("ui settings init");
-#ifdef TRACY_ENABLE
-	SDL_Log("Tracy enabled: going ");
-	ctx->go(Screen::FontPerf);
-#else
 	if (ctx->settings.onboarding_stage < 0) {
-		if (!init_runtime_data(*ctx)) {
+		if (!init_runtime_data(*ctx))
 			return SDL_APP_FAILURE;
-		}
-		m.lap().printus("runtime data initialized");
 		ctx->go(static_cast<Screen>(ctx->settings.default_screen));
 	}
-#endif
+	m.lap().printus("runtime data initialized");
 
-	{ // setup workers
-		SDL_Thread *worker =
-			  SDL_CreateThread(WorkerThread, "WorkerThread", ctx);
-		if (!worker) {
-			SDL_Log("SDL_CreateThread failed: %s", SDL_GetError());
-		}
-		auto init_other_workers_job = []() {
-			auto ctx = tctx()->app_ctx;
+	// Launch remaining background workers
+	auto init_other_workers_job = []() {
+		auto ctx = tctx()->app_ctx;
 #if NEURO
-			SDL_CreateThread(NeuroWorkerThread, "NeuroWorkerThread", ctx);
-#endif // NEURO
-			SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
+		SDL_CreateThread(NeuroWorkerThread, "NeuroWorkerThread", ctx);
+#endif
+		SDL_CreateThread(AudioWorkerThread, "AudioWorkerThread", ctx);
 #ifndef __EMSCRIPTEN__
-			SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
-#endif // !__EMSCRIPTEN__
-		};
-		Worker::job_push(ctx, Job{.id = -2, .func = init_other_workers_job});
+		SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
+#endif
+	};
+	Worker::job_push(ctx, Job{.id = -2, .func = init_other_workers_job});
+	m.lap().printus("backgroun workers run");
 
-		thread_local ThreadContext tctx_var = {
-			  .app_ctx = ctx,
-		};
-		_tctx = &tctx_var;
-
-#ifdef __EMSCRIPTEN__
-		init_browser_back_handler();
-
-		EM_ASM_INT(FS.mkdir('/assets'); FS.mount(IDBFS, {}, '/assets'););
-		EM_ASM_INT(FS.syncfs(
-			  true, function(err) {
-				  if (err)
-					  console.error("IDBFS sync error:", err);
-			  }););
-		EM_ASM_INT(FS.syncfs(
-			  false, function(err) { console.log("Saved to IndexedDB"); }));
-		web_netctx_init(ctx); // TODO: refactor(
-
-#endif // __EMSCRIPTEN__
-
-		// worker_job_push(ctx, {.type = Job::Type::INIT});
-		// SDL_Thread *net_worker =
-		// SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
-		// net_worker_job_push(ctx, {.type = NetJob::Type::INIT});
+	// sync with base font loading
+	{
+		SDL_Log("Syncing with font loader...");
+		Measure mw{"WaitFonts"};
+		SDL_WaitSemaphore(ctx->fonts_ready_sem);
+		SDL_DestroySemaphore(ctx->fonts_ready_sem);
+		ctx->fonts_ready_sem = nullptr;
+		mw.lap().printus("Font sync complete");
 	}
 
-	// if (is_gen_dbs) {
-	//	auto timestamp = SDL_GetTicks();
-	//	ctx->ticks = timestamp;
-	//	Worker::job_push(
-	//		  ctx, {.func = []() {
-	//			  {
-	//				  auto rs_path = "/home/x/src/klappt-resources/"_v;
-	//				  SDL_Log("===> ru");
-	//				  WordStore ws{};
-	//				  auto word_store_path =
-	//						StrView::concat(tctx()->a, rs_path,
-	//										AssetsDL::word_store_leaf(lang_ru));
-	//				  ws.open(word_store_path, "ru"_v);
-	//				  txt_to_xapian(ws, "/home/x/downloads/wiki/e0/ru.txt"_v,
-	//								tctx()->app_ctx->ticks);
-	//				  SDL_Log(" <===> ru FINISHED <===>");
-	//			  }
-	//		  }});
-	//
-	//	auto rs_path = "/home/x/src/klappt-resources/"_v;
-	//	{
-	//		SDL_Log("===> en");
-	//		WordStore ws{};
-	//		auto word_store_path =
-	//			  StrView::concat(ctx->arena_frame, rs_path,
-	//							  AssetsDL::word_store_leaf(lang_en));
-	//		ws.open(word_store_path, "en"_v);
-	//		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/en.txt"_v, timestamp);
-	//	}
-	//	// TODO:
-	//	if (false) {
-	//		WordStore ws{};
-	//		SDL_Log("tr");
-	//		auto word_store_path =
-	//			  StrView::concat(ctx->arena_frame, rs_path,
-	//							  AssetsDL::word_store_leaf(lang_tr));
-	//		ws.open(word_store_path, "tr"_v);
-	//		txt_to_xapian(ws, "/home/x/downloads/wiki/e0/tr.txt"_v, timestamp);
-	//	}
-	//	SDL_Log("finished");
-	//	exit(0);
-	// }
+	// NOTE: too slow :c
+	if (false) {
+		Measure mw{"TextCache prewarm"};
+		auto &a = ctx->arena_frame;
+		auto g = a.guard();
+		auto s = DynArr<uint16_t>::with(
+			  a,
+			  //
+			  sizes()->font.body_md // takes 834 ms
+
+			  // ,sizes()->font.body_sm
+		      // ,sizes()->font.label_md, sizes()->font.label_sm
+		      // ,sizes()->font.title_md, sizes()->font.title_lg
+		      //
+		);
+		ctx->text->prewarm(s);
+		mw.lap().printms("completed");
+	}
 
 	SDL_Log("Application started successfully!");
 	m.total().printus("total");
@@ -666,7 +542,8 @@ extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	//   // prevent the music from abruptly ending.
 	// MIX_StopTrack(ctx->track, MIX_TrackMSToFrames(ctx->track, 1000));
 	// std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-	//   // Mix_FreeMusic(app->music); // this call blocks until the music has
+	//   // Mix_FreeMusic(app->music); // this call blocks until the music
+	//   has
 	//   // finished fading
 	//   SDL_CloseAudioDevice(ctx->audioDevice);
 	//

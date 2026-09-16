@@ -307,8 +307,6 @@ extern "C" void ui_clay_init(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_clay_init");
 	clay_init(ctx);
 	Clay_SetMeasureTextFunction(measure_text_sdl, ctx->text);
-	sizes_set_scale(ctx->scale, ctx->settings.density,
-	                ctx->settings.font_scale);
 }
 
 extern "C" void ui_settings_init(AppContext *ctx) {
