@@ -1,20 +1,32 @@
 package org.viktorfilinkov.klappt;
 
+import android.os.Handler;
+import android.os.Message;
+import java.lang.reflect.Field;
 import org.libsdl.app.SDLActivity;
 
 public class KlapptActivity extends SDLActivity {
 
-    // /*
-    //  * If your main C/C++ library is not named "main" (e.g. libklappt.so),
-    //  * specify your library name(s) here:
-    //  */
-    // @Override
-    // protected String[] getLibraries() {
-    //     return new String[] {
-    //         "SDL3",
-    //         // "SDL3_image",
-    //         // "SDL3_mixer",
-    //         "klappt"      // replace with your native library name (without "lib" or ".so")
-    //     };
-    // }
+    private Handler mCmdHandler = null;
+
+    @Override
+    protected boolean sendCommand(int command, Object data) {
+        // Bypass the hardcoded getContext().wait(500) inside SDLActivity.java
+        if (command == COMMAND_CHANGE_WINDOW_STYLE) {
+            try {
+                if (mCmdHandler == null) {
+                    Field field = SDLActivity.class.getDeclaredField("commandHandler");
+                    field.setAccessible(true);
+                    mCmdHandler = (Handler) field.get(this);
+                }
+                if (mCmdHandler != null) {
+                    Message msg = mCmdHandler.obtainMessage();
+                    msg.arg1 = command;
+                    msg.obj = data;
+                    return mCmdHandler.sendMessage(msg);
+                }
+            } catch (Throwable ignored) {}
+        }
+        return super.sendCommand(command, data);
+    }
 }
