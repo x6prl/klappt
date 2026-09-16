@@ -339,46 +339,6 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		return SDL_Fail();
 	}
 	m.lap().printus("load fonts");
-	TTF_TextEngine *text_engine = nullptr;
-	{
-		KLAPPT_PROFILE_SCOPE_N("CreateTextEngine");
-
-		SDL_PropertiesID props = SDL_CreateProperties();
-		SDL_SetPointerProperty(
-			  props, TTF_PROP_RENDERER_TEXT_ENGINE_RENDERER_POINTER, renderer);
-		SDL_SetNumberProperty(
-			  props, TTF_PROP_RENDERER_TEXT_ENGINE_ATLAS_TEXTURE_SIZE_NUMBER,
-			  2048);
-		text_engine = TTF_CreateRendererTextEngineWithProperties(props);
-		SDL_DestroyProperties(props);
-		if (!text_engine) {
-			SDL_Log("TTF_CreateRendererTextEngine FALLBACK");
-			text_engine = TTF_CreateRendererTextEngine(renderer); // Fallback
-		} else {
-			SDL_Log("TTF_CreateRendererTextEngine SUPER");
-		}
-	}
-	m.lap().printus("create text engine");
-
-	// init SDL Mixer
-	// MIX_Mixer *mixer =
-	//	  MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
-	// if (mixer == nullptr) {
-	//	return SDL_Fail();
-	// }
-
-	// auto mixerTrack = MIX_CreateTrack(mixer);
-
-	// load the music
-	// auto musicPath = basePath / "the_entertainer.ogg";
-	// auto music = MIX_LoadAudio(mixer, musicPath.string().c_str(), false);
-	// if (not music) {
-	//	return SDL_Fail();
-	// }
-
-	// play the music (does not loop)
-	// MIX_SetTrackAudio(mixerTrack, music);
-	// MIX_PlayTrack(mixerTrack, 0);
 
 	// print some information about the window
 	int width, height, bbwidth, bbheight;
@@ -496,7 +456,10 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		ui_settings_init(ctx);
 	}
 	m.lap().printus("ui settings init");
-
+#ifdef TRACY_ENABLE
+	SDL_Log("Tracy enabled: going ");
+	ctx->go(Screen::FontPerf);
+#else
 	if (ctx->settings.onboarding_stage < 0) {
 		if (!init_runtime_data(*ctx)) {
 			return SDL_APP_FAILURE;
@@ -504,6 +467,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		m.lap().printus("runtime data initialized");
 		ctx->go(static_cast<Screen>(ctx->settings.default_screen));
 	}
+#endif
 
 	{ // setup workers
 		SDL_Thread *worker =
@@ -593,7 +557,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	// }
 
 	SDL_Log("Application started successfully!");
-	m.lap().printus("total");
+	m.total().printus("total");
 
 	return SDL_APP_CONTINUE;
 }
