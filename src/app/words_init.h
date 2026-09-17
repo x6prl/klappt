@@ -34,30 +34,29 @@ inline void save_words_dat(Arena &scratch, const Settings &settings,
 	}
 }
 
-inline bool sync_learning_words_to_store(Arena &scratch, WordStore &store,
+inline void sync_learning_words_to_store(Arena &scratch, const WordStore &store,
                                          Words &words, bool &changed) {
-    for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
-        auto &word = words[ref];
+	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+		auto &word = words[ref];
 
-        // Guard against any empty or Nil words
-        if (word.word_id.value == 0 || word.type == WordType::Nil) {
-            words.remove_by_ref(ref);
-            changed = true;
-            continue;
-        }
+		// Guard against any empty or Nil words
+		if (word.word_id.value == 0 || word.type == WordType::Nil) {
+			words.remove_by_ref(ref);
+			changed = true;
+			continue;
+		}
 
-        auto previous_id = word.word_id;
-        if (!store.find_and_fill_word_id(scratch, word)) {
-            SDL_Log("Word ID %" PRSize " not found in store, removing from list",
-                    word.word_id.value);
-            words.remove_by_ref(ref);
-            changed = true;
-            continue; // Continue syncing remaining words
-        }
+		if (!store.find_word(scratch, word)) {
+			SDL_Log("Word ID %" PRSize
+			        " not found in store, removing from list",
+			        word.word_id.value);
+			words.remove_by_ref(ref);
+			changed = true;
+			continue;
+		}
 
-        changed = changed || (word.word_id != previous_id);
-    }
-    return true;
+		changed = changed;
+	}
 }
 
 inline bool sync_learning_words_to_states(Engine::States &states,
@@ -170,8 +169,7 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
                                              Words &words,
                                              WordStore &word_store,
                                              Engine::States &states) {
-	constexpr int8_t LEARNING_LIST_ID = 1;
-	word.in_learning_list = LEARNING_LIST_ID;
+	word.in_learning_list = true;
 	auto word_ref = words.add();
 	if (word_ref != Words::null_index()) {
 		words[word_ref] = word;
@@ -373,12 +371,8 @@ inline bool init_runtime_data(AppContext &ctx) {
 	}
 
 	bool words_list_changed = false;
-	if (!sync_learning_words_to_store(ctx.arena_frame, ctx.word_store,
-	                                  *ctx.words, words_list_changed)) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-		             "Syncing learning list to Xapian failed");
-		return false;
-	}
+	sync_learning_words_to_store(ctx.arena_frame, ctx.word_store, *ctx.words,
+	                             words_list_changed);
 	m.lap().printus("sync words snapshot");
 
 	Size added_states = 0;

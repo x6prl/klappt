@@ -216,8 +216,8 @@ inline bool decode_entry_payload(const unsigned char *&cursor,
 	word = {};
 	word.word_id = WordId{raw_word_id};
 	word.type = type;
-	word.was_learned = (flags & (1 << 5)) ? 1 : 0;
-	word.in_learning_list = (flags & (1 << 4)) ? 1 : 0;
+	word.was_learned = (flags & (1 << 5)) ? true : false;
+	word.in_learning_list = (flags & (1 << 4)) ? true : false;
 	word.popularity = popularity;
 	word.lang_id = lang_id;
 	word.v.separable_prefix_size = separable_prefix_size;

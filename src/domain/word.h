@@ -46,8 +46,8 @@ static_assert(sizeof(Verb) >= sizeof(Phrase));
 struct Word {
 	WordId word_id{0};
 	WordType type{WordType::Nil};
-	bool in_learning_list{0};
-	bool was_learned{0};
+	bool in_learning_list{false};
+	bool was_learned{false};
 	uint8_t popularity{0};
 	int8_t lang_id{0}; // -1 for `de`, others — like in Lang
 

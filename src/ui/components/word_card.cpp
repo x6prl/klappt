@@ -129,7 +129,7 @@ TapSwipeLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
                                             const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_for_words_list");
 	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
-	auto is_usual_card = w.in_learning_list == 0;
+	auto is_usual_card = !w.in_learning_list;
 
 	uint16_t border_width =
 		  is_usual_card ? 0u
@@ -179,7 +179,7 @@ TapSwipeLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
 bool word_card_suggestions(AppContext *ctx, Clay_ElementId id, const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_tap");
 	bool ret{false};
-	auto is_usual_card = w.in_learning_list == 0;
+	auto is_usual_card = !w.in_learning_list;
 
 	uint16_t border_width =
 		  is_usual_card ? 0u

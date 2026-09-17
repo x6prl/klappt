@@ -119,6 +119,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 						add_word_to_learning_list(
 							  ctx->arena_frame, &w_copy, ctx->words,
 							  &ctx->word_store, &ctx->states, &ctx->app_status);
+						word = w_copy;
 					}
 					m.lap().printus("xapian and states");
 					save_words_dat(ctx->arena_frame, ctx->settings,
@@ -131,8 +132,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 			auto &word = ctx->suggestions_list[i - 1];
 			if (word_card_suggestions(
 					  ctx, CLAY_IDI("Suggestion", word.word_id.value), word)) {
-				word.in_learning_list = word.in_learning_list + 1;
-				word.in_learning_list %= 2;
+				word.in_learning_list = !word.in_learning_list;
 				SDL_Log("clicked");
 			}
 		}

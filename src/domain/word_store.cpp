@@ -374,8 +374,8 @@ bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc,
 	return true;
 }
 
-bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
-                        const Word &candidate, WordId &word_id) {
+bool find_existing_word(Arena &scratch, const Xapian::WritableDatabase &db,
+                        const Word &candidate) {
 	KLAPPT_PROFILE_SCOPE_N("word_store.find_existing_word");
 	const auto hash = word_hash(scratch, candidate);
 	const auto term = content_hash_term(scratch, hash);
@@ -389,42 +389,46 @@ bool find_existing_word(Arena &scratch, Xapian::WritableDatabase &db,
 		                             static_cast<Size>(data.size()), stored)) {
 			continue;
 		}
+		if (candidate.word_id != stored.word_id) {
+			continue;
+		}
 		if (!word_has_same_lexeme(stored, candidate)) {
 			continue;
 		}
+		return true;
 
-		word_id = stored.word_id;
+		// auto s = word_to_lexeme_str(scratch, scratch, stored);
+		// SDL_Log("searching for %llu: %llu>>> " StrView_Fmt,
+		//         candidate.word_id.value, stored.word_id.value,
+		//         StrView_Arg(s));
 
-		auto merged = stored;
-		bool is_changed = false;
-		auto merged_translations =
-			  merge_unique_items(scratch, stored.translations_raw,
-		                         candidate.translations_raw, ';');
-		if (merged_translations != stored.translations_raw) {
-			merged.translations_raw = merged_translations;
-			is_changed = true;
-		}
-		const auto merged_learning_list =
-			  candidate.in_learning_list > stored.in_learning_list
-					? candidate.in_learning_list
-					: stored.in_learning_list;
-		if (merged_learning_list != stored.in_learning_list) {
-			merged.in_learning_list = merged_learning_list;
-			is_changed = true;
-		}
-		if (is_changed) {
-			merged.word_id = word_id;
-			Xapian::Document merged_doc;
-			if (build_document(scratch, merged, merged_doc)) {
-				db.begin_transaction();
-				db.replace_document(word_id_term(scratch, word_id), merged_doc);
-				db.commit_transaction();
-#ifdef __EMSCRIPTEN__
-				web_persist_sync();
-#endif
-			}
-		}
-		return word_id.value != 0;
+		// 		word_id = stored.word_id;
+		//
+		// 		auto merged = stored;
+		// 		bool is_changed = false;
+		// 		auto merged_translations =
+		// 			  merge_unique_items(scratch, stored.translations_raw,
+		// 		                         candidate.translations_raw, ';');
+		// 		if (merged_translations != stored.translations_raw) {
+		// 			merged.translations_raw = merged_translations;
+		// 			is_changed = true;
+		// 		}
+		// 		const bool merged_learning_list =
+		// 			  candidate.in_learning_list || stored.in_learning_list;
+		// 		if (merged_learning_list != stored.in_learning_list) {
+		// 			merged.in_learning_list = merged_learning_list;
+		// 			is_changed = true;
+		// 		}
+		// 		if (is_changed) {
+		// 			merged.word_id = word_id;
+		// 			Xapian::Document merged_doc;
+		// 			if (build_document(scratch, merged, merged_doc)) {
+		// 				db.begin_transaction();
+		// 				db.replace_document(word_id_term(scratch, word_id),
+		// merged_doc); 				db.commit_transaction(); #ifdef
+		// __EMSCRIPTEN__ 				web_persist_sync(); #endif
+		// 			}
+		// 		}
 	}
 
 	return false;
@@ -609,15 +613,13 @@ bool WordStore::search_mset(StrView query, Size start, Size count,
 }
 
 // TODO: add another arena param
-bool WordStore::find_and_fill_word_id(Arena &scratch, Word &word) {
+bool WordStore::find_word(Arena &scratch, Word &word) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::ensure_word");
 	if (word.type == WordType::Nil || !db)
 		return false;
 
 	try {
-		WordId existing_id;
-		if (find_existing_word(scratch, *db, word, existing_id)) {
-			word.word_id = existing_id;
+		if (find_existing_word(scratch, *db, word)) {
 			return true;
 		}
 	} catch (const Xapian::Error &e) {
@@ -724,7 +726,7 @@ void WordStore::save(Arena &scratch, Word &word, bool mark_dirty) {
 }
 
 void WordStore::set_was_learned(Arena &scratch, Word &word) {
-	word.was_learned = 1;
+	word.was_learned = true;
 	save(scratch, word, false);
 }
 
@@ -842,7 +844,7 @@ Size WordStore::get_random_unlearned_words(Arena &scratch, Arena &out_arena,
 
 			// filter
 			if (word.type == WordType::Phrase || word.type == WordType::Nil ||
-			    word.in_learning_list != 0 || word.was_learned != 0) {
+			    word.in_learning_list || word.was_learned) {
 				continue;
 			}
 
@@ -912,8 +914,8 @@ Size WordStore::get_smart_suggestions(Arena &scratch, Arena &out_arena,
 					continue;
 				}
 
-				if (word.type == WordType::Phrase ||
-				    word.in_learning_list != 0 || word.was_learned != 0) {
+				if (word.type == WordType::Phrase || word.in_learning_list ||
+				    word.was_learned) {
 					continue;
 				}
 

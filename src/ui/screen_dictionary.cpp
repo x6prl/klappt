@@ -122,7 +122,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 								            //                  StrView_Arg(
 								            // 			  w.translations_raw));
 											toggle_word_from_learning_list_and_save_words_dat(
-												  ctx, ctx->arena_frame, &w);
+												  ctx, &w);
 										} else if (tap_state ==
 							                       TapSwipeLongTap::Tap) {
 											screen_word_view_push(ctx,

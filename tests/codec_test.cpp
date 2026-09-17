@@ -14,7 +14,7 @@ static void test_codec() {
 	Word w0{
 		  .word_id = {1},
 		  .type = WordType::Verb,
-		  .in_learning_list = 1,
+		  .in_learning_list = true,
 		  .v = v,
 		  .json_payload = {},
 	};

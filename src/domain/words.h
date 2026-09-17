@@ -30,7 +30,13 @@ struct Words {
 	Size next_free = 1;
 	Size size = 0;
 
-	constexpr WordRef begin() const { return {1}; }
+	constexpr WordRef begin() const {
+        int32_t val = 1;
+        while (val < static_cast<int32_t>(next_free) && !used[val]) {
+            ++val;
+        }
+        return {val};
+    }
 	constexpr WordRef end() const { return {(int32_t)next_free}; }
 
 	WordRef add() {

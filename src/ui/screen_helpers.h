@@ -4,9 +4,9 @@
 
 #include "app/app_context.h"
 #include "app/app_status.h"
-#include "app/themes.h"
 #include "app/sizes.h"
 #include "app/textcache.h"
+#include "app/themes.h"
 #include "app/words_init.h"
 #include "base/arena.h"
 #include "base/shuffle.h"
@@ -98,15 +98,14 @@ inline void add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,
                                       WordStore *word_store,
                                       Engine::States *states,
                                       AppStatus *app_status) {
-	uint8_t LEARNING_LIST_ID = 1;
-	word->in_learning_list = LEARNING_LIST_ID;
+	word->in_learning_list = true;
 
 	auto word_ref = words->add();
 	if (word_ref != Words::null_index()) {
 		(*words)[word_ref] = *word;
 		word_store->save(tmparena, *word);
 		auto rollback_added_word = [&] {
-			word->in_learning_list = 0;
+			word->in_learning_list = false;
 			words->remove_by_ref(word_ref);
 			word_store->save(tmparena, *word);
 		};
@@ -131,20 +130,20 @@ inline void add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,
 inline void remove_word_from_learning_list(Arena &tmparena, Word *word,
                                            Words *words,
                                            WordStore *word_store) {
-	word->in_learning_list = 0;
+	word->in_learning_list = false;
 	words->remove_by_id(word->word_id);
 	word_store->save(tmparena, *word);
 }
 
 inline void toggle_word_from_learning_list_and_save_words_dat(AppContext *ctx,
-                                                              Arena &tmparena,
                                                               Word *word) {
-	word->in_learning_list = word->in_learning_list ^ 1u;
-	auto w_copy = word_clone(ctx->arena, *word);
-	if (0 != word->in_learning_list) {
-		add_word_to_learning_list(ctx->arena_frame, word, ctx->words,
+	word->in_learning_list = !word->in_learning_list;
+	if (word->in_learning_list) {
+		auto w_copy = word_clone(ctx->arena, *word);
+		add_word_to_learning_list(ctx->arena_frame, &w_copy, ctx->words,
 		                          &ctx->word_store, &ctx->states,
 		                          &ctx->app_status);
+		*word = w_copy;
 	} else {
 		remove_word_from_learning_list(ctx->arena_frame, word, ctx->words,
 		                               &ctx->word_store);

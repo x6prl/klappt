@@ -395,7 +395,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 			}
 
 			badge_style_template.backgroundColor = theme()->surfaceContainer;
-			if (w.in_learning_list > 0) {
+			if (w.in_learning_list) {
 				CLAY(CLAY_ID("StatusBadge"), badge_style_template) {
 					draw_text(tr()->screen_word_view_in_learning_list, theme()->onSurfaceContainer,
 					          sizes()->font.label_sm);
@@ -1247,7 +1247,7 @@ void screen_word_view_draw(AppContext *ctx) {
 												   : Icons::SAVE);
 			if (add_or_remove_btn.activated()) {
 				toggle_word_from_learning_list_and_save_words_dat(
-					  ctx, ctx->arena_frame, &state.word_copy);
+					  ctx, &state.word_copy);
 			}
 			auto back_button = mobile_icon_button<false>(
 				  ctx, CLAY_ID_LOCAL("BackButton"), Icons::BACK);
