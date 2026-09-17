@@ -4,8 +4,6 @@
 #include <SDL3/SDL_properties.h>
 
 #include "ui/components/button.h"
-#include "ui/textcache.h"
-#include "ui/themes.h"
 #include "ui/translations/langs.h"
 
 #ifdef __EMSCRIPTEN__

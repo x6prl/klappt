@@ -1,6 +1,4 @@
 #include "entry.h"
-#include "app/worker.h"
-#include "ui/sizes.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -16,6 +14,8 @@
 
 #include "app/app_context.h"
 #include "app/event_codes.h"
+#include "app/sdlcr.h"
+#include "app/worker.h"
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
@@ -30,11 +30,7 @@
 #include "components/list_island.h"
 #include "components/text_input.h"
 
-#include "sdlcr.h"
-#include "textcache.h"
-#include "themes.h"
 #include "trs.h"
-#include "tslt.h"
 
 namespace {
 constexpr Uint32 animation_timer_interval_ms = 4;
@@ -312,7 +308,6 @@ extern "C" void ui_clay_init(AppContext *ctx) {
 extern "C" void ui_settings_init(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
 	SDL_Log("UI SETTINGS INIT");
-	theme_set(ctx->settings.theme_type);
 	set_language(ctx->settings.tr_language);
 }
 

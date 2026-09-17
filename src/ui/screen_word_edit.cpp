@@ -3,8 +3,6 @@
 #include "ui/components/switch_button.h"
 #include "ui/components/text_input.h"
 
-#include "ui/sizes.h"
-
 namespace {
 
 static StrView word_type_name(WordType type) {

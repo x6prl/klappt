@@ -1,3 +1,5 @@
+#include "screen_helpers.h"
+
 #include "app/app_context.h"
 #include "app/words_init.h"
 #include "app/worker.h"
@@ -10,12 +12,7 @@
 #include "ui/components/net_download_row.h"
 #include "ui/components/switch_button.h"
 
-#include "ui/sizes.h"
-#include "ui/themes.h"
-#include "ui/translations/langs.h"
 #include "ui/trs.h"
-
-#include "screen_helpers.h"
 
 namespace {
 
@@ -107,21 +104,23 @@ static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 
 static bool run_download_and_unpack_tr_asset(AppContext *ctx) {
 	return check_and_run_download_and_unpack(
-		  ctx, tr()->screen_onboarding_asset_main_dict, AssetsDL::Type::XAPIAN_TR,
-		  [](AppContext *_) { return true; });
+		  ctx, tr()->screen_onboarding_asset_main_dict,
+		  AssetsDL::Type::XAPIAN_TR, [](AppContext *_) { return true; });
 }
 
 #if NEURO
 static bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	auto ret = true;
-	ret = ret &&
-	      check_and_run_download_and_unpack(
-				ctx, tr()->screen_onboarding_asset_tts, AssetsDL::Type::OPTIONAL_TTS,
-				[](AppContext *ctx) { return ctx->settings.is_module_tts; });
-	ret = ret &&
-	      check_and_run_download_and_unpack(
-				ctx, tr()->screen_onboarding_asset_asr, AssetsDL::Type::OPTIONAL_ASR,
-				[](AppContext *ctx) { return ctx->settings.is_module_asr; });
+	ret = ret && check_and_run_download_and_unpack(
+					   ctx, tr()->screen_onboarding_asset_tts,
+					   AssetsDL::Type::OPTIONAL_TTS, [](AppContext *ctx) {
+						   return ctx->settings.is_module_tts;
+					   });
+	ret = ret && check_and_run_download_and_unpack(
+					   ctx, tr()->screen_onboarding_asset_asr,
+					   AssetsDL::Type::OPTIONAL_ASR, [](AppContext *ctx) {
+						   return ctx->settings.is_module_asr;
+					   });
 	return ret;
 }
 
@@ -201,8 +200,9 @@ static void step_draw_language(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text("Choose your language\nВыберите язык"_v, theme()->onSurface, title_size,
-		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text("Choose your language\nВыберите язык"_v, theme()->onSurface,
+		          title_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
 		CLAY(CLAY_ID("LangOptionsGroup"),
 		     {
@@ -239,8 +239,9 @@ static void step_draw_language(AppContext *ctx) {
 		}
 
 #ifdef __EMSCRIPTEN__
-		draw_text(tr()->screen_onboarding_web_version_note, theme()->onSurface, title_size,
-		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_web_version_note, theme()->onSurface,
+		          title_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 #endif
 	}
 }
@@ -263,24 +264,24 @@ static void step_draw_main_asset_download(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text(tr()->screen_onboarding_download_dictionary, theme()->onSurface, title_size,
-		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_download_dictionary,
+		          theme()->onSurface, title_size, FontID::MAIN,
+		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		auto sub_col = theme()->onSurface;
 		sub_col.a = static_cast<uint8_t>(sub_col.a * 0.65f);
-		draw_text(
-			  tr()->screen_onboarding_download_dictionary_desc,
-			  sub_col, sizes()->font.body_sm, FontID::MAIN,
-			  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_download_dictionary_desc, sub_col,
+		          sizes()->font.body_sm, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
 		auto discl_col = theme()->onSurface;
 		discl_col.a = static_cast<uint8_t>(discl_col.a * 0.45f);
-		draw_text(
-			  tr()->screen_settings_about_wiktionary,
-			  discl_col, sizes()->font.label_sm, FontID::MAIN,
-			  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_settings_about_wiktionary, discl_col,
+		          sizes()->font.label_sm, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
-		auto dlbtn = mobile_button(ctx, CLAY_ID("DLStartBtn"), tr()->screen_onboarding_action_download,
+		auto dlbtn = mobile_button(ctx, CLAY_ID("DLStartBtn"),
+		                           tr()->screen_onboarding_action_download,
 		                           mobile_button_style_primary());
 		if (dlbtn.activated()) {
 			(void)run_download_and_unpack_tr_asset(ctx);
@@ -308,27 +309,29 @@ static void step_draw_optional_assets(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text(tr()->screen_onboarding_optional_resources, theme()->onSurface, title_size,
-		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_optional_resources,
+		          theme()->onSurface, title_size, FontID::MAIN,
+		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
-		draw_option_row(
-			  ctx, CLAY_ID("TTSOpt"), tr()->screen_onboarding_tts_label,
-			  tr()->screen_onboarding_tts_desc,
-			  ctx->settings.is_module_tts, [ctx](bool val) {
-				  ctx->settings.is_module_tts = val;
-				  ctx->settings.save(ctx->arena_frame);
-			  });
+		draw_option_row(ctx, CLAY_ID("TTSOpt"),
+		                tr()->screen_onboarding_tts_label,
+		                tr()->screen_onboarding_tts_desc,
+		                ctx->settings.is_module_tts, [ctx](bool val) {
+							ctx->settings.is_module_tts = val;
+							ctx->settings.save(ctx->arena_frame);
+						});
 
-		draw_option_row(ctx, CLAY_ID("ASROpt"), tr()->screen_onboarding_asr_label,
+		draw_option_row(ctx, CLAY_ID("ASROpt"),
+		                tr()->screen_onboarding_asr_label,
 		                tr()->screen_onboarding_asr_desc,
 		                ctx->settings.is_module_asr, [ctx](bool val) {
 							ctx->settings.is_module_asr = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
-		auto next_btn =
-			  mobile_button(ctx, CLAY_ID("AssetsNextBtn"), tr()->screen_onboarding_action_continue,
-		                    mobile_button_style_primary());
+		auto next_btn = mobile_button(ctx, CLAY_ID("AssetsNextBtn"),
+		                              tr()->screen_onboarding_action_continue,
+		                              mobile_button_style_primary());
 		if (next_btn.activated()) {
 			run_download_and_unpack_optional_assets(ctx);
 			onboarding_advance(ctx, 1);
@@ -355,8 +358,9 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text(tr()->screen_onboarding_card_style_title, theme()->onSurface, title_size,
-		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_card_style_title, theme()->onSurface,
+		          title_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
 		CLAY(CLAY_ID("ListPreviewBox"),
 		     {
@@ -455,7 +459,8 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 							ctx->settings.save(ctx->arena_frame);
 						});
 
-		draw_option_row(ctx, CLAY_ID("OptMarkVerbTag"), tr()->screen_onboarding_opt_mark_verb_tag,
+		draw_option_row(ctx, CLAY_ID("OptMarkVerbTag"),
+		                tr()->screen_onboarding_opt_mark_verb_tag,
 		                tr()->screen_onboarding_opt_mark_verb_tag_desc,
 		                ctx->settings.is_mark_verb_type, [ctx](bool val) {
 							ctx->settings.is_mark_verb_type = val;
@@ -472,13 +477,13 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 
 		auto hint_col = theme()->onSurface;
 		hint_col.a = static_cast<uint8_t>(hint_col.a * 0.45f);
-		draw_text(tr()->screen_onboarding_settings_customize_hint,
-		          hint_col, sizes()->font.label_sm, FontID::MAIN,
-		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_settings_customize_hint, hint_col,
+		          sizes()->font.label_sm, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
-		auto next_btn =
-			  mobile_button(ctx, CLAY_ID("CardStyleNextBtn"), tr()->screen_onboarding_action_continue,
-		                    mobile_button_style_primary());
+		auto next_btn = mobile_button(ctx, CLAY_ID("CardStyleNextBtn"),
+		                              tr()->screen_onboarding_action_continue,
+		                              mobile_button_style_primary());
 		if (next_btn.activated()) {
 			onboarding_advance(ctx, 1);
 		}
@@ -503,8 +508,9 @@ static void step_draw_word_view_settings(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text(tr()->screen_onboarding_word_view_title, theme()->onSurface, title_size,
-		          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_word_view_title, theme()->onSurface,
+		          title_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
 		CLAY(CLAY_ID("ViewPreviewCard"),
 		     {
@@ -610,38 +616,40 @@ static void step_draw_word_view_settings(AppContext *ctx) {
 			}
 		}
 
-		draw_option_row(ctx, CLAY_ID("OptShowIPA"), tr()->screen_onboarding_opt_show_ipa,
+		draw_option_row(ctx, CLAY_ID("OptShowIPA"),
+		                tr()->screen_onboarding_opt_show_ipa,
 		                tr()->screen_onboarding_opt_show_ipa_desc,
 		                ctx->settings.is_show_ipa, [ctx](bool val) {
 							ctx->settings.is_show_ipa = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
-		draw_option_row(
-			  ctx, CLAY_ID("OptPluralSuffix"), tr()->screen_onboarding_opt_plural_header,
-			  tr()->screen_onboarding_opt_plural_header_desc,
-			  ctx->settings.is_show_noun_plural_as_suffix, [ctx](bool val) {
-				  ctx->settings.is_show_noun_plural_as_suffix = val;
-				  ctx->settings.save(ctx->arena_frame);
-			  });
+		draw_option_row(ctx, CLAY_ID("OptPluralSuffix"),
+		                tr()->screen_onboarding_opt_plural_header,
+		                tr()->screen_onboarding_opt_plural_header_desc,
+		                ctx->settings.is_show_noun_plural_as_suffix,
+		                [ctx](bool val) {
+							ctx->settings.is_show_noun_plural_as_suffix = val;
+							ctx->settings.save(ctx->arena_frame);
+						});
 
-		draw_option_row(
-			  ctx, CLAY_ID("OptShowOrigin"), tr()->screen_onboarding_opt_show_origin,
-			  tr()->screen_onboarding_opt_show_origin_desc,
-			  ctx->settings.is_show_origin, [ctx](bool val) {
-				  ctx->settings.is_show_origin = val;
-				  ctx->settings.save(ctx->arena_frame);
-			  });
+		draw_option_row(ctx, CLAY_ID("OptShowOrigin"),
+		                tr()->screen_onboarding_opt_show_origin,
+		                tr()->screen_onboarding_opt_show_origin_desc,
+		                ctx->settings.is_show_origin, [ctx](bool val) {
+							ctx->settings.is_show_origin = val;
+							ctx->settings.save(ctx->arena_frame);
+						});
 
 		auto hint_col = theme()->onSurface;
 		hint_col.a = static_cast<uint8_t>(hint_col.a * 0.45f);
-		draw_text(tr()->screen_onboarding_settings_customize_hint,
-		          hint_col, sizes()->font.label_sm, FontID::MAIN,
-		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_settings_customize_hint, hint_col,
+		          sizes()->font.label_sm, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+		          CLAY_TEXT_ALIGN_CENTER);
 
-		auto next_btn =
-			  mobile_button(ctx, CLAY_ID("ViewStyleNextBtn"), tr()->screen_onboarding_action_continue,
-		                    mobile_button_style_primary());
+		auto next_btn = mobile_button(ctx, CLAY_ID("ViewStyleNextBtn"),
+		                              tr()->screen_onboarding_action_continue,
+		                              mobile_button_style_primary());
 		if (next_btn.activated()) {
 			onboarding_advance(ctx, 1);
 		}
@@ -672,7 +680,8 @@ static void step_draw_default_screen(AppContext *ctx) {
 
 		Arr<Pair<Screen, StrView>, 2> options{{
 			  {Screen::Trainer, tr()->screen_onboarding_def_screen_trainer},
-			  {Screen::Dictionary, tr()->screen_onboarding_def_screen_dictionary},
+			  {Screen::Dictionary,
+		       tr()->screen_onboarding_def_screen_dictionary},
 		}};
 
 		int counter = 0;
@@ -724,9 +733,9 @@ static void step_draw_downloading_and_setup(AppContext *ctx) {
 			   .cornerRadius = sizes()->radius.lg,
 		 }) {
 
-		draw_text(tr()->screen_onboarding_preparing_resources, theme()->onSurface,
-		          sizes()->font.title_md, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
-		          CLAY_TEXT_ALIGN_CENTER);
+		draw_text(tr()->screen_onboarding_preparing_resources,
+		          theme()->onSurface, sizes()->font.title_md, FontID::MAIN,
+		          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 		auto sub_col = theme()->onSurface;
 		sub_col.a = static_cast<uint8_t>(sub_col.a * 0.6f);

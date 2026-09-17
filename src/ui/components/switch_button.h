@@ -1,7 +1,6 @@
 #pragma once
 
 #include "button.h"
-#include "ui/themes.h"
 
 inline bool switch_button(AppContext *ctx, Clay_ElementId id, bool is_turned_on,
                           float height = 0.0f) {

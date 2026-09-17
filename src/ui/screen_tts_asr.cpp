@@ -1,10 +1,7 @@
 #if NEURO
+#include "screen_helpers.h"
 
 #include <SDL3/SDL_audio.h>
-#include <SDL3/SDL_log.h>
-#include <SDL3/SDL_stdinc.h>
-
-#include "screen_helpers.h"
 
 #include "app/app_context.h"
 #include "app/audio_context.h"
@@ -14,8 +11,7 @@
 
 #include "ui/components/button.h"
 #include "ui/components/text_input.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
+
 #include "ui/trs.h"
 
 void screen_tts_asr_go(AppContext *ctx) {
@@ -58,8 +54,8 @@ void screen_tts_asr_draw(AppContext *ctx) {
 			CLAY(CLAY_ID("TTSSectionButtonSlot"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_FIXED(section_height)}}}) {
-				auto tts_btn =
-					  mobile_button(ctx, CLAY_ID("TTSPlayButton"), tr()->screen_tts_asr_action_play);
+				auto tts_btn = mobile_button(ctx, CLAY_ID("TTSPlayButton"),
+				                             tr()->screen_tts_asr_action_play);
 				if (tts_btn.activated() && ctx->tts_input.size > 0) {
 					run_tts(ctx, ctx->tts_input.view());
 					// worker_job_push(ctx, Job{.type = Job::Type::TTS,
@@ -120,9 +116,9 @@ void screen_tts_asr_draw(AppContext *ctx) {
 							ctx->tts_input.data[ctx->asr_result.size] = '\0';
 						}
 					}
-					auto asr_btn =
-						  mobile_button(ctx, CLAY_ID("ASRRecordButton"),
-					                    tr()->screen_tts_asr_action_record, btn_style);
+					auto asr_btn = mobile_button(
+						  ctx, CLAY_ID("ASRRecordButton"),
+						  tr()->screen_tts_asr_action_record, btn_style);
 					// static bool recording = false;
 					// SDL_Log(" ======================+>>>> %s %s <<",
 					//         asr_btn.held ? "HELD" : "", recording ? "REC" :
@@ -180,8 +176,9 @@ void screen_tts_asr_draw(AppContext *ctx) {
 					           //          SDL_GetAtomicInt(
 					           // 		 &ctx->sound_ctx->is_asr_in_progress)
 					) {
-						draw_text(tr()->screen_tts_asr_transcription_in_progress,
-						          theme()->onSurfaceContainer, font_size);
+						draw_text(
+							  tr()->screen_tts_asr_transcription_in_progress,
+							  theme()->onSurfaceContainer, font_size);
 					} else {
 						draw_text(tr()->screen_tts_asr_no_transcription,
 						          theme()->onSurfaceContainer, font_size);
@@ -206,7 +203,8 @@ void screen_tts_asr_draw(AppContext *ctx) {
 				                            CLAY_SIZING_GROW(1)},
 				                 .padding = sizes()->pad.card_compact}}) {
 					draw_text(tr()->screen_tts_asr_asr_initializing,
-					          theme()->onSurfaceContainer, sizes()->font.title_md);
+					          theme()->onSurfaceContainer,
+					          sizes()->font.title_md);
 				}
 			}
 			// Section dividers

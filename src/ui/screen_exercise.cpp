@@ -1,20 +1,16 @@
-#include "domain/exercises.h"
-
-#include <SDL3/SDL_log.h>
+#include "screen_helpers.h"
 
 #include "app/app_context.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
+#include "domain/exercises.h"
 #include "domain/word.h"
 
 #include "ui/components/button.h"
 #include "ui/components/list_island.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
-#include "ui/trs.h"
 
-#include "screen_helpers.h"
+#include "ui/trs.h"
 
 namespace {
 
@@ -104,12 +100,11 @@ void screen_exercise_draw(AppContext *ctx) {
 							 },
 					   .backgroundColor = theme()->surface,
 				 }) {
-				draw_text(tr()->screen_exercise_no_exercises_due, theme()->onSurface,
-				          sizes()->font.title_lg);
+				draw_text(tr()->screen_exercise_no_exercises_due,
+				          theme()->onSurface, sizes()->font.title_lg);
 
-				auto gen =
-					  mobile_button(ctx, CLAY_ID("GenExercises"),
-				                    tr()->screen_exercise_add_more_words);
+				auto gen = mobile_button(ctx, CLAY_ID("GenExercises"),
+				                         tr()->screen_exercise_add_more_words);
 				if (gen.activated()) {
 					screen_word_suggestions_go(ctx);
 				}

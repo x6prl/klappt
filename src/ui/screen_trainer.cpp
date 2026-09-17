@@ -1,3 +1,5 @@
+#include "screen_helpers.h"
+
 #include "app/app_context.h"
 #include "base/dyn_arr.h"
 #include "base/pair.h"
@@ -8,11 +10,8 @@
 #include "domain/word.h"
 
 #include "ui/components/button.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
-#include "ui/trs.h"
 
-#include "screen_helpers.h"
+#include "ui/trs.h"
 
 void screen_trainer_go(AppContext *ctx) { ctx->go(Screen::Trainer); }
 
@@ -87,9 +86,10 @@ void screen_trainer_draw(AppContext *ctx) {
 			 }) {
 
 			if (has_due) {
-				draw_text(tr()->screen_trainer_hero_ready_title, theme()->onSurface,
-				          sizes()->font.title_lg, FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				draw_text(tr()->screen_trainer_hero_ready_title,
+				          theme()->onSurface, sizes()->font.title_lg,
+				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 
 				StrBuilder count_str{};
 				count_str.push(
@@ -112,7 +112,8 @@ void screen_trainer_draw(AppContext *ctx) {
 				// CLAY_CORNER_RADIUS(dpi(8.f)),
 				// 	 }) {
 				// 	StrBuilder t_str{};
-				// 	t_str.push(ctx->arena_frame, tr()->screen_trainer_in_learning);
+				// 	t_str.push(ctx->arena_frame,
+				// tr()->screen_trainer_in_learning);
 				// 	t_str.push(ctx->arena_frame,
 				// StrView::from_number(ctx->arena_frame, total_learning));
 				// 	draw_text(t_str.join(ctx->arena_frame),
@@ -121,9 +122,10 @@ void screen_trainer_draw(AppContext *ctx) {
 				// }
 
 			} else if (total_learning > 0) {
-				draw_text(tr()->screen_trainer_hero_all_done_title, theme()->onSurface,
-				          sizes()->font.title_lg, FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				draw_text(tr()->screen_trainer_hero_all_done_title,
+				          theme()->onSurface, sizes()->font.title_lg,
+				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 
 				CLAY(CLAY_ID("AllDoneBadge"),
 				     {
@@ -142,7 +144,8 @@ void screen_trainer_draw(AppContext *ctx) {
 						   .cornerRadius = sizes()->radius.sm,
 					 }) {
 					StrBuilder t_str{};
-					t_str.push(ctx->arena_frame, tr()->screen_trainer_in_learning);
+					t_str.push(ctx->arena_frame,
+					           tr()->screen_trainer_in_learning);
 					t_str.push(ctx->arena_frame,
 					           StrView::from_number(ctx->arena_frame,
 					                                total_learning));
@@ -151,9 +154,10 @@ void screen_trainer_draw(AppContext *ctx) {
 					          sizes()->font.label_md);
 				}
 			} else {
-				draw_text(tr()->screen_trainer_hero_empty_title, theme()->onSurface,
-				          sizes()->font.title_lg, FontID::MAIN,
-				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+				draw_text(tr()->screen_trainer_hero_empty_title,
+				          theme()->onSurface, sizes()->font.title_lg,
+				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_CENTER);
 
 				draw_text(tr()->screen_trainer_empty_hint,
 				          theme()->onSurfaceContainer, sizes()->font.body_sm,
@@ -175,17 +179,19 @@ void screen_trainer_draw(AppContext *ctx) {
 			 }) {
 
 			if (has_due) {
-				auto start_btn = mobile_button(ctx, CLAY_ID("TrainStartBtn"),
-				                               tr()->screen_trainer_action_start_training,
-				                               mobile_button_style_primary());
+				auto start_btn =
+					  mobile_button(ctx, CLAY_ID("TrainStartBtn"),
+				                    tr()->screen_trainer_action_start_training,
+				                    mobile_button_style_primary());
 				if (start_btn.activated()) {
 					screen_exercise_go(ctx, false);
 				}
 			} else {
 				if (ctx->settings.is_using_suggestions) {
-					auto explore_btn = mobile_button(
-						  ctx, CLAY_ID("AddWordsBtn"), tr()->screen_trainer_action_find_words,
-						  mobile_button_style_primary());
+					auto explore_btn =
+						  mobile_button(ctx, CLAY_ID("AddWordsBtn"),
+					                    tr()->screen_trainer_action_find_words,
+					                    mobile_button_style_primary());
 					if (explore_btn.activated()) {
 						screen_word_suggestions_go(ctx);
 					}

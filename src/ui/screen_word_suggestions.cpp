@@ -1,4 +1,4 @@
-#include <SDL3/SDL_log.h>
+#include "screen_helpers.h"
 
 #include "app/app_context.h"
 #include "app/words_init.h"
@@ -10,10 +10,6 @@
 #include "ui/components/button.h"
 #include "ui/components/lists.h"
 #include "ui/components/word_card.h"
-#include "ui/sizes.h"
-
-#include "screen_helpers.h"
-#include "ui/textcache.h"
 
 namespace {
 constexpr Size SUGGESTIONS_COUNT = 10;
@@ -106,8 +102,9 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 						if (!word.in_learning_list) {
 							continue;
 						}
+						auto w_copy = word_clone(ctx->arena, word);
 						add_word_to_learning_list(
-							  ctx->arena_frame, &word, ctx->words,
+							  ctx->arena_frame, &w_copy, ctx->words,
 							  &ctx->word_store, &ctx->states, &ctx->app_status);
 					}
 					m.lap().printus("xapian and states");
@@ -118,8 +115,9 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 				} else if (add_all_res.activated()) {
 					Measure m{"adding new words"};
 					for (auto &word : ctx->suggestions_list) {
+						auto w_copy = word_clone(ctx->arena, word);
 						add_word_to_learning_list(
-							  ctx->arena_frame, &word, ctx->words,
+							  ctx->arena_frame, &w_copy, ctx->words,
 							  &ctx->word_store, &ctx->states, &ctx->app_status);
 					}
 					m.lap().printus("xapian and states");
@@ -131,8 +129,8 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 			}
 		} else {
 			auto &word = ctx->suggestions_list[i - 1];
-			if (word_card_suggestions(ctx, CLAY_IDI("Suggestion", word.word_id.value),
-			                  word)) {
+			if (word_card_suggestions(
+					  ctx, CLAY_IDI("Suggestion", word.word_id.value), word)) {
 				word.in_learning_list = word.in_learning_list + 1;
 				word.in_learning_list %= 2;
 				SDL_Log("clicked");

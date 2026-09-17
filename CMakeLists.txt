@@ -397,6 +397,9 @@ set(APP_UI_IMPL_FILES
 )
 set(APP_CORE_FILES
     src/app/worker.cpp
+    src/app/sizes.cpp
+    src/app/themes.cpp
+    src/app/textcache.cpp
     src/platform/net_worker.cpp
 )
 set(APP_PLATFORM_FILES
@@ -416,7 +419,6 @@ set(APP_DOMAIN_FILES
     src/domain/grammar.cpp
     src/domain/engine.cpp
     src/domain/exercises.cpp
-    # src/domain/wparser.cpp
     src/domain/word_store.cpp
     src/domain/tokenizer.cpp
 )
@@ -474,11 +476,6 @@ if(USE_HOTRELOAD)
     add_library(app_hotreload SHARED
         ${APP_HOTRELOAD_FILES}
         ${APP_UI_IMPL_FILES}
-        # ${APP_CORE_FILES}
-        # ${APP_UI_IMPL_FILES}
-        # ${APP_BASE_FILES}
-        # ${APP_DOMAIN_FILES}
-        # ${APP_PLATFORM_FILES}
     )
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_compile_options(${EXECUTABLE_NAME} PRIVATE

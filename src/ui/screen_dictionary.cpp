@@ -1,15 +1,14 @@
-#include <SDL3/SDL_log.h>
+#include "screen_helpers.h"
 
 #include "app/app_context.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "screen_helpers.h"
+
 #include "ui/components/button.h"
 #include "ui/components/lists.h"
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
-#include "ui/sizes.h"
-#include "ui/tslt.h"
+
 #include "ui/trs.h"
 
 void screen_dictionary_go(AppContext *ctx) {
@@ -81,8 +80,8 @@ void screen_dictionary_draw(AppContext *ctx) {
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
 			auto search = mobile_text_input(
 				  ctx, CLAY_ID("WordsSearch"), &ctx->dictionary_search,
-				  tr()->screen_dictionary_search_words, mobile_text_input_style_default(),
-				  floating_button_clear_id);
+				  tr()->screen_dictionary_search_words,
+				  mobile_text_input_style_default(), floating_button_clear_id);
 			if (search.changed || search.submitted || search.blurred) {
 				ctx->push_one_frame();
 			}
@@ -115,10 +114,8 @@ void screen_dictionary_draw(AppContext *ctx) {
 													  .bottom = static_cast<
 															uint16_t>(
 															card_gap)}}}) {
-										auto tap_state =
-											  word_card_dictionary(
-													ctx,
-													CLAY_IDI("Word", index), w);
+										auto tap_state = word_card_dictionary(
+											  ctx, CLAY_IDI("Word", index), w);
 										if (tap_state ==
 							                TapSwipeLongTap::LongTap) {
 											// SDL_Log(StrView_Fmt,

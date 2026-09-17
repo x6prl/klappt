@@ -17,6 +17,7 @@ struct AssetsDL {
 #elif __ANDROID__
 #ifndef TRACY_ENABLE
 	// static constexpr auto HOST = "http://172.25.16.46:8000/"_v;
+	// static constexpr auto HOST = "http://10.42.0.1:8000/"_v;
 	static constexpr auto HOST =
 		  "https://github.com/x6prl/klappt-resources/releases/latest/download/"_v;
 #else

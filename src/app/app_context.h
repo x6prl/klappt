@@ -9,6 +9,8 @@
 
 #include "app/app_status.h"
 #include "app/audio_context.h"
+#include "app/textcache.h"
+#include "app/tslt.h"
 #include "app/worker.h"
 #include "base/arena.h"
 #include "base/dyn_arr.h"
@@ -24,8 +26,6 @@
 #include "ui/components/text_input_state.h"
 #include "ui/components/word_edit_state.h"
 #include "ui/components/word_view_state.h"
-#include "ui/textcache.h"
-#include "ui/tslt.h"
 
 enum class Screen {
 	Trainer = 0,
@@ -69,6 +69,8 @@ inline const char *screen_name(Screen s) {
 		return "Onboarding";
 	case Screen::TTS_ASR:
 		return "TTS/ASR";
+	case Screen::FontPerf:
+		return "FontPerf";
 	}
 	return "Unknown";
 }

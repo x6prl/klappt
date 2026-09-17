@@ -3,10 +3,10 @@
 #include <SDL3/SDL_log.h>
 
 #include "app/assets_dl.h"
+#include "app/sizes.h"
+#include "app/themes.h"
 #include "base/str_view.h"
 #include "platform/files.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
 #include "ui/translations/langs.h"
 
 struct Settings {

@@ -8,9 +8,9 @@
 
 #include "render_helpers.h"
 
+#include "app/sizes.h"
+#include "app/themes.h"
 #include "base/profiler.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
 
 namespace {
 

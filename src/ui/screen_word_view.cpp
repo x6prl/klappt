@@ -1,10 +1,8 @@
-#include <SDL3/SDL_log.h>
-#include <SDL3/SDL_stdinc.h>
+#include "screen_helpers.h"
 
 #include <simdjson/simdjson.h>
 
 #include "app/app_context.h"
-
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
@@ -13,14 +11,12 @@
 #include "domain/word.h"
 #include "domain/word_payload.h"
 #include "platform/neuro.h"
+
 #include "ui/components/button.h"
 #include "ui/components/lists.h"
-#include "ui/sizes.h"
-#include "ui/textcache.h"
-#include "ui/themes.h"
+
 #include "ui/trs.h"
 
-#include "screen_helpers.h"
 
 namespace {
 

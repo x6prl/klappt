@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -17,6 +18,8 @@
 #include "app/app_context.h"
 #include "app/event_codes.h"
 #include "app/net_context.h"
+#include "app/sizes.h"
+#include "app/textcache.h"
 #include "app/words_init.h"
 #include "app/worker.h"
 #include "base/dyn_arr.h"
@@ -35,8 +38,6 @@
 #include "platform/net_worker.h"
 #endif // !__EMSCRIPTEN__
 #include "ui/entry.h"
-#include "ui/textcache.h"
-#include "ui/sizes.h"
 
 #if HOTRELOAD
 #include "app/hotreload.h"
@@ -197,8 +198,9 @@ static void load_fonts_job() {
 }
 
 SDL_Renderer *create_renderer(SDL_Window *window) {
+	SDL_Renderer *renderer{};
 #ifdef __ANDROID__
-	SDL_Renderer *renderer = SDL_CreateRenderer(window, "opengles2");
+	renderer = SDL_CreateRenderer(window, "opengles2");
 	if (renderer) {
 		SDL_Log("opengles2 renderer created");
 		return renderer;
@@ -338,9 +340,25 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	ctx->display_width = static_cast<float>(width);
 	m.lap().printus("window values received");
 
-	sizes_set_scale(ctx->scale, ctx->settings.density,
-	                ctx->settings.font_scale);
-	m.lap().printus("font sizes calculated");
+	FileLoader settings_file{};
+	auto g = ctx->arena_frame.guard();
+	if (settings_file.load_from_writable(ctx->arena_frame, "settings.dat"_v)) {
+		if (!Settings::decode(settings_file.data, settings_file.size,
+		                      &ctx->settings)) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot decode settings.dat");
+			ctx->app_status.set_exit_with_error(
+				  "cannot decode settings file"_v);
+		}
+	}
+	m.lap().printus("settings loaded");
+
+	// set up theme and sizes
+	{
+		sizes_set_scale(ctx->scale, ctx->settings.density,
+		                ctx->settings.font_scale);
+		theme_set(ctx->settings.theme_type);
+	}
+	m.lap().printus("themes and sizes are set");
 
 	Worker::job_push(ctx, Job{
 								.id = -10,
@@ -352,35 +370,42 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	SDL_SetWindowFillDocument(window, true);
 #endif
 
-	SDL_Renderer *renderer = create_renderer(window);
-	if (!renderer)
-		return SDL_Fail();
+	{
+		SDL_Renderer *renderer = create_renderer(window);
+		if (!renderer) {
+			ctx->app_status.set_exit_with_error("cannot create renderer"_v);
+			return SDL_Fail();
+		}
+		// turn off vsync
+		SDL_SetRenderVSync(renderer, -1);
+		ctx->renderer = renderer;
+	}
 	m.lap().printus("renderer created");
 
-	ctx->renderer = renderer;
-
-	text_cache->atlas_init(renderer);
+	text_cache->atlas_init(ctx->renderer);
 	m.lap().printus("text atlas init");
 
+#ifdef HOTRELOAD
+	auto [healthy, reloaded] = hotreload(HOTRELOAD_MODULE_PATH);
+	if (!healthy) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed loading %s",
+		             HOTRELOAD_MODULE_PATH);
+		ctx->app_status.set_exit_with_error("cannot load hotreaload module"_v);
+		return SDL_Fail();
+	}
+	m.lap().printus("hotreload module loaded");
+#endif
+
 	ui_clay_init(ctx);
+	ui_settings_init(ctx);
+
 	m.lap().printus("ui clay init");
 
-	SDL_SetRenderVSync(renderer, -1);
+	// set event based rendering
 	SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "waitevent");
+	// set a timer to render 1 fps
 	constexpr auto UI_UPDATE_EVENT_TIME_MS = 1000;
 	SDL_AddTimer(UI_UPDATE_EVENT_TIME_MS, WakeUpTimer, nullptr);
-
-	FileLoader settings_file{};
-	auto g = ctx->arena_frame.guard();
-	if (settings_file.load_from_writable(ctx->arena_frame, "settings.dat"_v)) {
-		if (!Settings::decode(settings_file.data, settings_file.size,
-		                      &ctx->settings)) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cannot decode settings.dat");
-			ctx->app_status.set_exit_with_error(
-				  "cannot decode settings file"_v);
-		}
-	}
-	ui_settings_init(ctx);
 
 	if (ctx->settings.onboarding_stage < 0) {
 		if (!init_runtime_data(*ctx))

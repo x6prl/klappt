@@ -7,8 +7,6 @@
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 
-#include "ui/sizes.h"
-#include "ui/tslt.h"
 #include "ui/trs.h"
 
 #include "screen_helpers.h"

@@ -3,17 +3,17 @@
 #include <SDL3/SDL_log.h>
 
 #include "app/app_context.h"
+#include "app/sizes.h"
+#include "app/textcache.h"
+#include "app/themes.h"
+#include "app/tslt.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/grammar.h"
 #include "domain/word.h"
 #include "ui/components/button.h"
-#include "ui/sizes.h"
-#include "ui/textcache.h"
-#include "ui/themes.h"
 #include "ui/translations/langs.h"
-#include "ui/tslt.h"
 
 namespace {
 
@@ -38,7 +38,7 @@ void word_main(Clay_ElementId id, AppContext *ctx, const Word &w,
 		if (ctx->settings.is_mark_verb_aux_sein && grammar::is_aux_sein(w.v)) {
 			post = StrView::concat(ctx->arena_frame, post, "*"_v);
 		}
-		if(!post && ctx->settings.is_mark_verb_type) {
+		if (!post && ctx->settings.is_mark_verb_type) {
 			post = "ᵛ"_v;
 		}
 		break;

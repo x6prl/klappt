@@ -4,12 +4,12 @@
 #include <SDL3/SDL_pixels.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "app/sizes.h"
+#include "app/themes.h"
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/stats.h"
 #include "render_helpers.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
 
 namespace {
 

@@ -4,13 +4,14 @@
 
 #include "app/app_context.h"
 #include "app/app_status.h"
+#include "app/themes.h"
+#include "app/sizes.h"
+#include "app/textcache.h"
 #include "app/words_init.h"
 #include "base/arena.h"
 #include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
-#include "ui/sizes.h"
-#include "ui/textcache.h"
 
 void screen_trainer_go(AppContext *ctx);
 void screen_trainer_draw(AppContext *ctx);
@@ -46,7 +47,7 @@ void screen_onboarding_go(AppContext *ctx);
 void screen_onboarding_draw(AppContext *ctx);
 
 void screen_font_rendering_perf_go(AppContext *ctx);
-void screen_font_rendering_perf_draw(AppContext *ctx) ;
+void screen_font_rendering_perf_draw(AppContext *ctx);
 
 #if NEURO
 void screen_tts_asr_go(AppContext *ctx);

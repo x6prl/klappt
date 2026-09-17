@@ -1,3 +1,5 @@
+#include "screen_helpers.h"
+
 #include "app/app_context.h"
 #include "base/arr.h"
 #include "base/str_view.h"
@@ -5,13 +7,7 @@
 #include "ui/components/button.h"
 #include "ui/components/switch_button.h"
 
-#include "ui/sizes.h"
-#include "ui/textcache.h"
-#include "ui/themes.h"
 #include "ui/trs.h"
-
-#include "screen_helpers.h"
-#include <cstdint>
 
 void screen_settings_push(AppContext *ctx) { ctx->push(Screen::Settings); }
 
@@ -101,7 +97,8 @@ void screen_settings_draw(AppContext *ctx) {
 	                                                            // to list?
 		 }) {
 
-		draw_section_header(CLAY_ID("SecApp"), tr()->screen_settings_sec_appearance);
+		draw_section_header(CLAY_ID("SecApp"),
+		                    tr()->screen_settings_sec_appearance);
 
 		CLAY(CLAY_ID("ThemeRow"),
 		     {
@@ -157,8 +154,8 @@ void screen_settings_draw(AppContext *ctx) {
 					   .layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                                 CLAY_SIZING_FIT(0)}},
 				 }) {
-				draw_text(tr()->screen_settings_text_size, theme()->onSurface, title_font_size,
-				          trans_font);
+				draw_text(tr()->screen_settings_text_size, theme()->onSurface,
+				          title_font_size, trans_font);
 			}
 
 			CLAY(CLAY_ID("FontStepperGroup"),
@@ -232,8 +229,8 @@ void screen_settings_draw(AppContext *ctx) {
 					   .layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                                 CLAY_SIZING_FIT(0)}},
 				 }) {
-				draw_text(tr()->screen_settings_density, theme()->onSurface, title_font_size,
-				          trans_font);
+				draw_text(tr()->screen_settings_density, theme()->onSurface,
+				          title_font_size, trans_font);
 			}
 
 			CLAY(CLAY_ID("DensityOptions"),
@@ -253,9 +250,12 @@ void screen_settings_draw(AppContext *ctx) {
 
 				auto current_density = ctx->settings.density;
 				Arr<Pair<DensityMode, StrView>, 3> d_options{{
-					  {DensityMode::Compact, tr()->screen_settings_density_compact},
-					  {DensityMode::Normal, tr()->screen_settings_density_normal},
-					  {DensityMode::Comfortable, tr()->screen_settings_density_spacious},
+					  {DensityMode::Compact,
+				       tr()->screen_settings_density_compact},
+					  {DensityMode::Normal,
+				       tr()->screen_settings_density_normal},
+					  {DensityMode::Comfortable,
+				       tr()->screen_settings_density_spacious},
 				}};
 
 				int counter = 0;
@@ -314,8 +314,8 @@ void screen_settings_draw(AppContext *ctx) {
 			                                  CLAY_SIZING_FIT(0)},
 							 },
 				 }) {
-				draw_text(tr()->screen_settings_default_screen, theme()->onSurface,
-				          title_font_size, trans_font);
+				draw_text(tr()->screen_settings_default_screen,
+				          theme()->onSurface, title_font_size, trans_font);
 			}
 
 			CLAY(CLAY_ID("ScreenOptions"),
@@ -332,8 +332,10 @@ void screen_settings_draw(AppContext *ctx) {
 				auto current_default =
 					  static_cast<Screen>(ctx->settings.default_screen);
 				Arr<Pair<Screen, StrView>, 2> options{
-					  {{Screen::Dictionary, tr()->screen_settings_screen_wortschatz},
-				       {Screen::Trainer, tr()->screen_settings_screen_trainer}}};
+					  {{Screen::Dictionary,
+				        tr()->screen_settings_screen_wortschatz},
+				       {Screen::Trainer,
+				        tr()->screen_settings_screen_trainer}}};
 
 				int counter = 0;
 				for (auto &[screen, label] : options) {
@@ -368,7 +370,8 @@ void screen_settings_draw(AppContext *ctx) {
 			}
 		}
 
-		draw_section_header(CLAY_ID("SecTrainer"), tr()->screen_settings_sec_trainer);
+		draw_section_header(CLAY_ID("SecTrainer"),
+		                    tr()->screen_settings_sec_trainer);
 
 		CLAY(CLAY_ID("RoundSizeRow"),
 		     {
@@ -440,12 +443,14 @@ void screen_settings_draw(AppContext *ctx) {
 
 		draw_setting_divider();
 
-		draw_switch_row(
-			  CLAY_ID("SuggestionsRow"), CLAY_ID("SuggestionsSwitch"),
-			  tr()->screen_settings_suggestions, ctx->settings.is_using_suggestions,
-			  [&](bool v) { ctx->settings.is_using_suggestions = v; });
+		draw_switch_row(CLAY_ID("SuggestionsRow"), CLAY_ID("SuggestionsSwitch"),
+		                tr()->screen_settings_suggestions,
+		                ctx->settings.is_using_suggestions, [&](bool v) {
+							ctx->settings.is_using_suggestions = v;
+						});
 
-		draw_section_header(CLAY_ID("SecWordCard"), tr()->screen_settings_sec_dictionary);
+		draw_section_header(CLAY_ID("SecWordCard"),
+		                    tr()->screen_settings_sec_dictionary);
 		draw_switch_row(CLAY_ID("MarkSeinRow"), CLAY_ID("MarkSeinSwitch"),
 		                tr()->screen_settings_mark_aux_sein,
 		                ctx->settings.is_mark_verb_aux_sein, [&](bool v) {
@@ -463,7 +468,8 @@ void screen_settings_draw(AppContext *ctx) {
 		draw_setting_divider();
 
 		draw_switch_row(CLAY_ID("MarkVerbTypeRow"),
-		                CLAY_ID("MarkVerbTypeSwitch"), tr()->screen_settings_mark_verb_type,
+		                CLAY_ID("MarkVerbTypeSwitch"),
+		                tr()->screen_settings_mark_verb_type,
 		                ctx->settings.is_mark_verb_type,
 		                [&](bool v) { ctx->settings.is_mark_verb_type = v; });
 
@@ -474,19 +480,20 @@ void screen_settings_draw(AppContext *ctx) {
 		                ctx->settings.is_mark_adj_type,
 		                [&](bool v) { ctx->settings.is_mark_adj_type = v; });
 
-		draw_section_header(CLAY_ID("SecWordView"), tr()->screen_settings_sec_word_details);
+		draw_section_header(CLAY_ID("SecWordView"),
+		                    tr()->screen_settings_sec_word_details);
 
 		draw_switch_row(CLAY_ID("ShowIPARow"), CLAY_ID("ShowIPASwitch"),
-		                tr()->screen_settings_show_ipa, ctx->settings.is_show_ipa,
+		                tr()->screen_settings_show_ipa,
+		                ctx->settings.is_show_ipa,
 		                [&](bool v) { ctx->settings.is_show_ipa = v; });
 
 		draw_setting_divider();
 
-		draw_switch_row(
-			  CLAY_ID("ShowOriginRow"), CLAY_ID("ShowOriginSwitch"),
-			  tr()->screen_settings_show_origin,
-			  ctx->settings.is_show_origin,
-			  [&](bool v) { ctx->settings.is_show_origin = v; });
+		draw_switch_row(CLAY_ID("ShowOriginRow"), CLAY_ID("ShowOriginSwitch"),
+		                tr()->screen_settings_show_origin,
+		                ctx->settings.is_show_origin,
+		                [&](bool v) { ctx->settings.is_show_origin = v; });
 
 		draw_setting_divider();
 
@@ -519,15 +526,13 @@ void screen_settings_draw(AppContext *ctx) {
 			auto sub_color = theme()->onSurface;
 			sub_color.a = static_cast<uint8_t>(sub_color.a * 0.5f);
 			const uint16_t note_font_size = sizes()->font.label_sm;
-			draw_text(
-				  tr()->screen_settings_about_wiktionary,
-				  sub_color, note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
-				  CLAY_TEXT_ALIGN_CENTER);
+			draw_text(tr()->screen_settings_about_wiktionary, sub_color,
+			          note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+			          CLAY_TEXT_ALIGN_CENTER);
 
-			draw_text(
-				  tr()->screen_settings_about_wiktextract,
-				  sub_color, note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
-				  CLAY_TEXT_ALIGN_CENTER);
+			draw_text(tr()->screen_settings_about_wiktextract, sub_color,
+			          note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
+			          CLAY_TEXT_ALIGN_CENTER);
 		}
 	}
 }

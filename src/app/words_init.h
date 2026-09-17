@@ -36,15 +36,28 @@ inline void save_words_dat(Arena &scratch, const Settings &settings,
 
 inline bool sync_learning_words_to_store(Arena &scratch, WordStore &store,
                                          Words &words, bool &changed) {
-	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
-		auto &word = words[ref];
-		auto previous_id = word.word_id;
-		if (!store.find_and_fill_word_id(scratch, word)) {
-			return false;
-		}
-		changed = changed || word.word_id != previous_id;
-	}
-	return true;
+    for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
+        auto &word = words[ref];
+
+        // Guard against any empty or Nil words
+        if (word.word_id.value == 0 || word.type == WordType::Nil) {
+            words.remove_by_ref(ref);
+            changed = true;
+            continue;
+        }
+
+        auto previous_id = word.word_id;
+        if (!store.find_and_fill_word_id(scratch, word)) {
+            SDL_Log("Word ID %" PRSize " not found in store, removing from list",
+                    word.word_id.value);
+            words.remove_by_ref(ref);
+            changed = true;
+            continue; // Continue syncing remaining words
+        }
+
+        changed = changed || (word.word_id != previous_id);
+    }
+    return true;
 }
 
 inline bool sync_learning_words_to_states(Engine::States &states,

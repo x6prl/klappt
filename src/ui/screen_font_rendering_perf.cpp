@@ -6,9 +6,6 @@
 #include "screen_helpers.h"
 
 #include "ui/components/button.h"
-#include "ui/sizes.h"
-#include "ui/textcache.h"
-#include "ui/themes.h"
 
 namespace {
 

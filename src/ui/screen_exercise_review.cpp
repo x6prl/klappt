@@ -1,3 +1,5 @@
+#include "screen_helpers.h"
+
 #include "app/app_context.h"
 #include "app/words_init.h"
 #include "app/worker.h"
@@ -7,12 +9,8 @@
 #include "platform/neuro.h"
 
 #include "ui/components/button.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
-#include "ui/trs.h"
 
-#include "screen_helpers.h"
-#include <SDL3/SDL_log.h>
+#include "ui/trs.h"
 
 void screen_exercise_review_push(AppContext *ctx) {
 	ctx->push(Screen::ExerciseReview);
@@ -249,8 +247,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 						 },
 				   .backgroundColor = theme()->surface,
 			 }) {
-			draw_text(tr()->screen_exercise_review_all_answers_correct, theme()->onSurface,
-			          sizes()->font.title_lg);
+			draw_text(tr()->screen_exercise_review_all_answers_correct,
+			          theme()->onSurface, sizes()->font.title_lg);
 		}
 		return;
 	}
@@ -406,8 +404,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				}
 
 			} else {
-				draw_text(tr()->screen_exercise_review_expected_answer, label_color,
-				          sizes()->font.label_md);
+				draw_text(tr()->screen_exercise_review_expected_answer,
+				          label_color, sizes()->font.label_md);
 				CLAY(CLAY_ID("ExpectedBox"),
 				     {
 						   .layout =
@@ -485,8 +483,8 @@ void screen_exercise_review_draw(AppContext *ctx) {
 				// if (next_btn.activated()) {
 				// 	ctx->exercises.next_result();
 				// }
-				draw_text(tr()->screen_exercise_review_click_to_next, theme()->outline,
-				          sizes()->font.body_md);
+				draw_text(tr()->screen_exercise_review_click_to_next,
+				          theme()->outline, sizes()->font.body_md);
 			}
 			if (Clay_Hovered() &&
 			    (ctx->tslt.is_tap() || ctx->tslt.is_longtap())) {

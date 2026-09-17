@@ -4,8 +4,6 @@
 #include "domain/exercises.h"
 
 #include "ui/components/button.h"
-#include "ui/sizes.h"
-#include "ui/themes.h"
 #include "ui/trs.h"
 
 #include "screen_helpers.h"

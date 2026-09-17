@@ -3,11 +3,11 @@
 #include <SDL3/SDL_log.h>
 #include <clay/clay.h>
 
-#include "../themes.h"
 #include "app/app_context.h"
+#include "app/sizes.h"
+#include "app/themes.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "ui/sizes.h"
 
 namespace Icons {
 constexpr auto EDIT = ""_v;

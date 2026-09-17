@@ -1,7 +1,7 @@
 #include "themes.h"
 namespace {
-static Theme::Type current_theme{Theme::Light};
-constexpr static Theme app_themes[Theme::Themes_COUNT] =
+Theme::Type current_theme{Theme::Light};
+constexpr Theme app_themes[Theme::Themes_COUNT] =
 	  { // ------------------------------------
         // LIGHT THEME
         // ------------------------------------

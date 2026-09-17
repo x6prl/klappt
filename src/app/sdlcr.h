@@ -6,7 +6,7 @@
 
 #include "base/profiler.h"
 
-#include "ui/textcache.h"
+#include "textcache.h"
 
 typedef struct {
 	SDL_Renderer *renderer;

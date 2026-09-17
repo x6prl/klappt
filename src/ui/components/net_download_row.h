@@ -6,12 +6,11 @@
 #include "app/net_context.h"
 #include "base/str_view.h"
 #include "platform/net_worker.h"
+
 #include "ui/components/button.h"
 #include "ui/components/download_data.h"
+
 #include "ui/screen_helpers.h"
-#include "ui/sizes.h"
-#include "ui/textcache.h"
-#include "ui/themes.h"
 
 inline void download_track(AppContext *ctx, Size req_pool_index,
                            StrView title) {
