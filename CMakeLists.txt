@@ -1,30 +1,24 @@
 cmake_minimum_required(VERSION 3.16)
 
-# set the output directory for built objects.
-# This makes sure that the dynamic library goes into the build directory automatically.
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 
-# prevent installing to system directories.
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE INTERNAL "")
 
-# Declare the project
-project(klappt)
+project(klappt LANGUAGES C CXX)
 
-# Use mold if present
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+
 find_program(MOLD_PROGRAM mold)
-if (MOLD_PROGRAM)
-    set(CMAKE_LINKER_TYPE MOLD)
-    message(STATUS "mold found: ${MOLD_PROGRAM}")
-else ()
-    message(STATUS "mold not found")
-endif ()
+if(MOLD_PROGRAM AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID))
+    message(STATUS "Using mold linker: ${MOLD_PROGRAM}")
+    add_link_options("-fuse-ld=mold")
+else()
+    message(STATUS "mold not found or not supported on this platform; using default linker")
+endif()
 
 include(CTest)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Og")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fwrapv -fsanitize=address,undefined,thread ")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Og -fno-omit-frame-pointer")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
 if ((APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin") OR EMSCRIPTEN)
     set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")    # Disable shared builds on platforms where it does not make sense to use them
@@ -33,17 +27,18 @@ else()
     set(SDL_SHARED ON)
 endif()
 
-# Hotreload is only supported for Linux and Android builds.
 option(ENABLE_HOTRELOAD "Enable Debug hotreload where supported" ON)
 option(ENABLE_NEURO "Enable Sherpa onnx for TTS and ASR" ON)
 if (EMSCRIPTEN)  # TODO: make it work
     set(ENABLE_NEURO OFF)
 endif()
 option(ENABLE_TRACY "Enable Tracy profiling instrumentation" OFF)
+
 set(HOTRELOAD_SUPPORTED_PLATFORM OFF)
 if ((CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID) AND NOT EMSCRIPTEN)
     set(HOTRELOAD_SUPPORTED_PLATFORM ON)
 endif()
+
 set(USE_HOTRELOAD OFF)
 if (ENABLE_HOTRELOAD AND HOTRELOAD_SUPPORTED_PLATFORM)
     set(USE_HOTRELOAD ON)
@@ -53,9 +48,50 @@ if(ENABLE_TRACY AND EMSCRIPTEN)
     message(FATAL_ERROR "ENABLE_TRACY is not supported for Emscripten builds")
 endif()
 
+add_compile_options(
+    $<$<CONFIG:Debug>:-Og>
+    $<$<CONFIG:Debug>:-g>
+
+    $<$<CONFIG:Release>:-O2>
+    $<$<CONFIG:Release>:-ffunction-sections>
+    $<$<CONFIG:Release>:-fdata-sections>
+
+    $<$<BOOL:${ENABLE_TRACY}>:-fno-omit-frame-pointer>
+)
+
+# ==============================================================================
+# Link-Time Optimization (LTO / IPO) Check
+# ==============================================================================
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output)
+if(ipo_supported)
+    message(STATUS "LTO / IPO is supported: Will enable for Release builds")
+else()
+    message(STATUS "LTO / IPO is NOT supported: ${ipo_output}")
+endif()
+
+if(APPLE)
+    add_link_options("$<$<CONFIG:Release>:-Wl,-dead_strip>")
+elseif(NOT MSVC)
+    add_link_options("$<$<CONFIG:Release>:-Wl,--gc-sections>")
+endif()
+
+option(ENABLE_SANITIZERS "Enable ASan and UBSan" OFF)
+
+if(ENABLE_SANITIZERS AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID))
+    set(SAN_FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer -fwrapv)
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE ${SAN_FLAGS})
+    target_link_options(${EXECUTABLE_NAME} PRIVATE ${SAN_FLAGS})
+
+    if(USE_HOTRELOAD)
+        target_compile_options(app_hotreload PRIVATE ${SAN_FLAGS})
+        target_link_options(app_hotreload PRIVATE ${SAN_FLAGS})
+    endif()
+endif()
+
 if(MSVC)
     if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
-        add_definitions(/MP)				# parallelize each target, unless Ninja is the generator
+        add_definitions(/MP) # parallelize each target, unless Ninja is the generator
     endif()
 endif()
 
@@ -291,9 +327,9 @@ if(NOT EMSCRIPTEN)
 
     set(CURL_ENABLE_SSL ON CACHE BOOL "" FORCE)
     set(_OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+
     if (ANDROID)
         set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-        # set(EXECUTABLE_NAME ${PROJECT_NAME})
         set(CURL_USE_MBEDTLS OFF CACHE BOOL "" FORCE)
         set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
         set(CURL_USE_SECTRANSP OFF CACHE BOOL "" FORCE)
@@ -301,48 +337,33 @@ if(NOT EMSCRIPTEN)
         set(CURL_USE_WOLFSSL OFF CACHE BOOL "" FORCE)
         set(CURL_USE_GNUTLS OFF CACHE BOOL "" FORCE)
 
-        # set(MBEDTLS_INCLUDE_DIR ${mbedtls_SOURCE_DIR}/include CACHE STRING "" FORCE)
-        # set(MBEDTLS_LIBRARY mbedtls CACHE STRING "" FORCE)
-        # set(MBEDX509_LIBRARY mbedx509 CACHE STRING "" FORCE)
-        # set(MBEDCRYPTO_LIBRARY mbedcrypto CACHE STRING "" FORCE)
-        #
-        # set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
         add_subdirectory(src/vendor/boringssl)
 
         set(BORINGSSL_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/src/vendor/boringssl")
         set(BORINGSSL_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/boringssl")
 
+        # Define OpenSSL imported targets from BoringSSL build products
         add_library(OpenSSL::SSL STATIC IMPORTED GLOBAL)
         set_target_properties(OpenSSL::SSL PROPERTIES
             IMPORTED_LOCATION "${BORINGSSL_BIN_DIR}/libssl.a"
-            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/boringssl/include"
+            INTERFACE_INCLUDE_DIRECTORIES "${BORINGSSL_SRC_DIR}/include"
         )
-        #
+
         add_library(OpenSSL::Crypto STATIC IMPORTED GLOBAL)
         set_target_properties(OpenSSL::Crypto PROPERTIES
             IMPORTED_LOCATION "${BORINGSSL_BIN_DIR}/libcrypto.a"
-            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/boringssl/include"
+            INTERFACE_INCLUDE_DIRECTORIES "${BORINGSSL_SRC_DIR}/include"
         )
 
-        if(NOT TARGET OpenSSL::SSL)
-            add_library(OpenSSL::SSL ALIAS ssl)
-        endif()
-        if(NOT TARGET OpenSSL::Crypto)
-            add_library(OpenSSL::Crypto ALIAS crypto)
-        endif()
-        # 3. Set cache variables so libcurl's internal checks know OpenSSL is "found"
-        # set(OPENSSL_FOUND ON CACHE BOOL "" FORCE)
-        # set(OpenSSL_FOUND ON CACHE BOOL "" FORCE)
-        set(OPENSSL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/boringssl/include" CACHE PATH "" FORCE)
-
+        # Tell libcurl's FindOpenSSL that BoringSSL fulfills OpenSSL
         set(OPENSSL_FOUND ON CACHE BOOL "" FORCE)
         set(OPENSSL_INCLUDE_DIR "${BORINGSSL_SRC_DIR}/include" CACHE PATH "" FORCE)
         set(OPENSSL_SSL_LIBRARY "${BORINGSSL_BIN_DIR}/libssl.a" CACHE FILEPATH "" FORCE)
         set(OPENSSL_CRYPTO_LIBRARY "${BORINGSSL_BIN_DIR}/libcrypto.a" CACHE FILEPATH "" FORCE)
         set(OPENSSL_ROOT_DIR "${BORINGSSL_BIN_DIR}" CACHE PATH "" FORCE)
-
         set(OPENSSL_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
-    elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+
+    elseif(UNIX AND NOT APPLE)
         set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
         set(CURL_USE_SRP OFF CACHE BOOL "" FORCE)
         find_package(OpenSSL REQUIRED)
@@ -350,30 +371,27 @@ if(NOT EMSCRIPTEN)
             message(FATAL_ERROR "System OpenSSL not found for Linux build. Install libssl-dev or equivalent.")
         endif()
 
-    elseif(APPLE AND NOT EMSCRIPTEN)
+    elseif(APPLE)
         set(CURL_ENABLE_SSL ON CACHE BOOL "" FORCE)
         find_package(OpenSSL QUIET)
         if(NOT OPENSSL_FOUND)
             message(WARNING "No system OpenSSL found for macOS build. Will try using built-in or default SSL.")
         endif()
-
-    elseif(EMSCRIPTEN)
-        set(CURL_USE_OPENSSL OFF CACHE BOOL "" FORCE)
     endif()
-    message(STATUS "OPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}")
-    message(STATUS "OPENSSL_INCLUDE_DIR=${OPENSSL_INCLUDE_DIR}")
-    message(STATUS "OPENSSL_SSL_LIBRARY=${OPENSSL_SSL_LIBRARY}")
-    message(STATUS "OPENSSL_CRYPTO_LIBRARY=${OPENSSL_CRYPTO_LIBRARY}")
 
     add_subdirectory(src/vendor/curl)
-    # set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
     set(BUILD_SHARED_LIBS ${_OLD_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
-    #######
-    ####### CURL ###########
 endif()
 
-# Set the name of the executable
+# Set the name of the executable / main library
 set(EXECUTABLE_NAME ${PROJECT_NAME})
+
+# ==============================================================================
+# Global C++ Standard (Moved up so all targets inherit it)
+# ==============================================================================
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Create an executable or a shared library based on the platform and add our sources to it
 if (ANDROID)
@@ -382,6 +400,12 @@ if (ANDROID)
     add_library(${EXECUTABLE_NAME} SHARED)
 else()
     add_executable(${EXECUTABLE_NAME})
+endif()
+
+if(ipo_supported)
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+        INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+    )
 endif()
 
 # Hot-reloadable sources
@@ -422,13 +446,12 @@ set(APP_DOMAIN_FILES
     src/domain/word_store.cpp
     src/domain/tokenizer.cpp
 )
+
 target_include_directories(${EXECUTABLE_NAME} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 target_include_directories(${EXECUTABLE_NAME} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
-)
-target_include_directories(${EXECUTABLE_NAME} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/xxHash"
 )
 
@@ -439,7 +462,6 @@ if (ENABLE_NEURO)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE sherpa-onnx-core sherpa-onnx-c-api)
 endif()
 
-#
 add_library(miniz STATIC
     src/vendor/miniz/miniz.c
 )
@@ -454,7 +476,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_options(${EXECUTABLE_NAME} PRIVATE
         -Wall
         -Wextra
-        # -Wfloat-equal
         -Wno-missing-field-initializers
         -ffast-math
     )
@@ -477,40 +498,63 @@ if(USE_HOTRELOAD)
         ${APP_HOTRELOAD_FILES}
         ${APP_UI_IMPL_FILES}
     )
+
+    if(ipo_supported)
+        set_target_properties(app_hotreload PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+        )
+    endif()
+
+    # Export symbols from app_hotreload so dlsym() can find ui_* functions
+    set_target_properties(app_hotreload PROPERTIES
+        CXX_VISIBILITY_PRESET default
+        VISIBILITY_INLINES_HIDDEN OFF
+    )
+
+    # Export symbols from the main executable so app_hotreload can call core functions
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+        CXX_VISIBILITY_PRESET default
+        VISIBILITY_INLINES_HIDDEN OFF
+        ENABLE_EXPORTS TRUE
+    )
+
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_compile_options(${EXECUTABLE_NAME} PRIVATE
+        target_compile_options(app_hotreload PRIVATE
             -Wall
             -Wextra
             -Wno-missing-field-initializers
-            -Og
-    )
+            $<$<CONFIG:Debug>:-Og>
+        )
     endif()
+
     set_source_files_properties(src/base/hash.cpp PROPERTIES
         COMPILE_OPTIONS "-O2"
     )
-    target_compile_features(app_hotreload PUBLIC cxx_std_23)
+
     target_compile_definitions(app_hotreload PRIVATE
         $<$<CONFIG:Debug>:HOTRELOAD=1>
         $<$<BOOL:${ENABLE_NEURO}>:NEURO=1>
     )
+
     target_include_directories(app_hotreload PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-    target_include_directories(app_hotreload SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor")
+    target_include_directories(app_hotreload SYSTEM PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/curl/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/xxHash"
+        SDL/include
+        SDL_ttf/include
+    )
     if (ENABLE_NEURO)
         target_include_directories(app_hotreload SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/sherpa-onnx")
     endif()
-    target_include_directories(app_hotreload SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/curl/include")
-    target_include_directories(app_hotreload SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/xxHash")
-    target_include_directories(app_hotreload SYSTEM PRIVATE SDL/include)
-    # target_include_directories(app_hotreload PRIVATE SDL_mixer/include)
-    # target_include_directories(app_hotreload PRIVATE SDL_image/include)
-    target_include_directories(app_hotreload SYSTEM PRIVATE SDL_ttf/include)
 
-    # it builds automatically btw
-    if (!ANDROID)
+    # Ensure app_hotreload is always built when the main application builds (on both Linux & Android)
+    # add_dependencies(${EXECUTABLE_NAME} app_hotreload)
+    if(NOT ANDROID)
         add_dependencies(${EXECUTABLE_NAME} app_hotreload)
     endif()
 
-    # Use static UI path outside Debug builds even on hotreload-capable platforms.
+    # Use static UI path outside Debug builds even on hotreload-capable platforms
     target_sources(${EXECUTABLE_NAME}
     PRIVATE
         ${APP_CORE_FILES}
@@ -521,7 +565,7 @@ if(USE_HOTRELOAD)
         $<$<NOT:$<CONFIG:Debug>>:${APP_HOTRELOAD_FILES}>
     )
 else()
-    # No hotreload support on this platform: always compile UI directly in main target.
+    # No hotreload support on this platform: always compile UI directly in main target
     target_sources(${EXECUTABLE_NAME}
     PRIVATE
         ${APP_CORE_FILES}
@@ -533,27 +577,16 @@ else()
     )
 endif()
 
-# Add your sources to the target
+# Add your entry source to the target
 target_sources(${EXECUTABLE_NAME}
 PRIVATE
     src/app/main.cpp
     src/platform/apple/iosLaunchScreen.storyboard
 )
 
-# What is iosLaunchScreen.storyboard? This file describes what Apple's mobile platforms
-# should show the user while the application is starting up. If you don't include one,
-# then you get placed in a compatibility mode that does not allow HighDPI.
-# This file is referenced inside Info.plist.in, where it is marked as the launch screen file.
-# It is also ignored on non-Apple platforms.
-
-# To get an app icon on Apple platforms, add it to your executable.
-# Afterward, the image file in Info.plist.in.
 if(APPLE)
     target_sources("${EXECUTABLE_NAME}" PRIVATE "src/assets/logo.png")
 endif()
-
-# Set C++ version
-set (CMAKE_CXX_STANDARD 23)
 
 if(EMSCRIPTEN)
     option(EMSCRIPTEN_ALLOW_MEMORY_GROWTH "Allow the WebAssembly heap to grow at runtime" ON)
@@ -566,9 +599,7 @@ if(EMSCRIPTEN)
 
     set(CMAKE_EXECUTABLE_SUFFIX ".html" CACHE INTERNAL "")
 
-    target_compile_options(${EXECUTABLE_NAME} PRIVATE
-        "-pthread"
-    )
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE "-pthread")
     target_link_options(${EXECUTABLE_NAME} PRIVATE
         "-pthread"
         "-sPTHREAD_POOL_SIZE=4"
@@ -576,14 +607,11 @@ if(EMSCRIPTEN)
         "-sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString"
         "-lidbfs.js"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web/web_persist.js"
-        # on Web targets, we need CMake to generate a HTML webpage.
         "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web/web_shell.html"
     )
 
     if(EMSCRIPTEN_USE_WASMFS)
-        target_link_options(${EXECUTABLE_NAME} PRIVATE
-            "-sWASMFS=1"
-        )
+        target_link_options(${EXECUTABLE_NAME} PRIVATE "-sWASMFS=1")
     endif()
 
     if(EMSCRIPTEN_ALLOW_MEMORY_GROWTH)
@@ -617,7 +645,8 @@ endif()
 # we use EXCLUDE_FROM_ALL so that its install targets and configs don't
 # pollute upwards into our configuration.
 if(ENABLE_TRACY)
-    target_link_options(${EXECUTABLE_NAME} PRIVATE -rdynamic)
+    # target_link_options(${EXECUTABLE_NAME} PRIVATE -rdynamic)
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES ENABLE_EXPORTS TRUE)
     set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiling" FORCE)
     if (ANDROID)
         # Disables callstack collection (for my Android with SELinux)
@@ -700,10 +729,17 @@ if (USE_HOTRELOAD)
     endif()
 endif()
 
-# Link sherpa dependencies and SDL3 with explicit ordering
-# Libraries that depend on others should come BEFORE their dependencies
+# Group circular dependencies correctly for ELF linkers
+set(LINK_GROUP_START "")
+set(LINK_GROUP_END "")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID)
+    set(LINK_GROUP_START "-Wl,--start-group")
+    set(LINK_GROUP_END "-Wl,--end-group")
+endif()
+
 if (ENABLE_NEURO)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE
+        ${LINK_GROUP_START}
         sherpa-onnx-core
         $<TARGET_NAME_IF_EXISTS:kaldi-native-fbank-core>
         $<TARGET_NAME_IF_EXISTS:kaldi-decoder-core>
@@ -716,21 +752,20 @@ if (ENABLE_NEURO)
         $<TARGET_NAME_IF_EXISTS:sherpa-onnx-fstfar>
         $<TARGET_NAME_IF_EXISTS:sherpa-onnx-fst>
         SDL3::SDL3
+        ${LINK_GROUP_END}
     )
 else()
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         SDL3::SDL3
     )
 endif()
-# End the linker group
-target_link_options(${EXECUTABLE_NAME} PRIVATE "LINKER:--end-group")
 
 if(ANDROID)
     target_link_libraries(${EXECUTABLE_NAME} PUBLIC
       log
       android
-      ssl
-      crypto
+      OpenSSL::SSL
+      OpenSSL::Crypto
     )
 endif()
 
@@ -741,7 +776,7 @@ endif()
 
 if(NOT EMSCRIPTEN)
     target_link_libraries(${EXECUTABLE_NAME} PUBLIC lmdb)
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE CURL::libcurl )
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE CURL::libcurl)
 endif()
 
 if(ENABLE_TRACY)
@@ -755,9 +790,6 @@ if(USE_HOTRELOAD)
         SDL3_ttf::SDL3_ttf
         simdjson
 
-        # sherpa-onnx-c-api
-        # sherpa-onnx-core
-        # CURL::libcurl
         $<TARGET_NAME_IF_EXISTS:espeak-ng>
         $<TARGET_NAME_IF_EXISTS:ucd>
         $<TARGET_NAME_IF_EXISTS:ucd-tools>
@@ -797,24 +829,16 @@ if (APPLE)
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Bold.ttf")
     add_resource("${CMAKE_CURRENT_LIST_DIR}/src/assets/cacert.pem")
-    # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/ar.txt")
-    # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/en.txt")
-    # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/ru.txt")
-    # add_resource("${CMAKE_CURRENT_LIST_DIR}/word_data/tr.txt")
 
 elseif(EMSCRIPTEN)
     # on the web, we pack files into the webassembly virtual filesystem
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Inter-Regular.ttf@/\""
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/ReadexPro-Regular.ttf@/\""
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Font-Awesome-7-Free-Solid-900.otf@/\""
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf@/\""
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Bold.ttf@/\""
-        "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/cacert.pem@/\""
-        # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/ar.txt@/word_data/\""
-        # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/en.txt@/word_data/\""
-        # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/ru.txt@/word_data/\""
-        # "--preload-file \"${CMAKE_CURRENT_LIST_DIR}/word_data/tr.txt@/word_data/\""
+    target_link_options(${EXECUTABLE_NAME} PRIVATE
+        "SHELL:--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Inter-Regular.ttf@/\""
+        "SHELL:--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/ReadexPro-Regular.ttf@/\""
+        "SHELL:--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/Font-Awesome-7-Free-Solid-900.otf@/\""
+        "SHELL:--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Regular.ttf@/\""
+        "SHELL:--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/fonts/JetBrainsMono-Bold.ttf@/\""
+        "SHELL:--preload-file \"${CMAKE_CURRENT_LIST_DIR}/src/assets/cacert.pem@/\""
     )
 
 else()
@@ -825,7 +849,7 @@ else()
         file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")
         set(DEST_ROOT "${MOBILE_ASSETS_DIR}")
     else()
-        set(DEST_ROOT "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+        set(DEST_ROOT "${CMAKE_BINARY_DIR}/$<CONFIG>")
     endif()
 
     macro(copy_helper input_relpath output_filename)
@@ -845,11 +869,6 @@ else()
     copy_helper("fonts/JetBrainsMono-Regular.ttf" "JetBrainsMono-Regular.ttf")
     copy_helper("fonts/JetBrainsMono-Bold.ttf" "JetBrainsMono-Bold.ttf")
     copy_helper("cacert.pem" "cacert.pem")
-    # copy_helper("word_data/ar.txt")
-    # copy_helper("word_data/en.txt")
-    # copy_helper("word_data/ru.txt")
-    # copy_helper("word_data/tr.txt")
-
 endif()
 
 # set some extra configs for each platform
@@ -889,11 +908,11 @@ if(NOT ANDROID)
     )
     target_link_libraries(codec_tests PRIVATE SDL3::SDL3)
     add_test(NAME codec_tests COMMAND codec_tests)
+
     add_executable(str_view_tests
         tests/str_view_test.cpp
         src/base/str_view.cpp
     )
-    target_compile_features(str_view_tests PUBLIC cxx_std_23)
     target_include_directories(str_view_tests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
@@ -918,13 +937,8 @@ if(NOT ANDROID)
         src/domain/tokenizer.cpp
         src/base/str_view.cpp
     )
-    target_compile_features(tokenizer_tests PUBLIC cxx_std_23)
-    target_include_directories(tokenizer_tests PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    )
-    target_include_directories(tokenizer_tests SYSTEM PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
-    )
+    target_include_directories(tokenizer_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_include_directories(tokenizer_tests SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor")
     target_link_libraries(tokenizer_tests PRIVATE SDL3::SDL3)
     add_test(NAME tokenizer_tests COMMAND tokenizer_tests)
 
@@ -934,32 +948,22 @@ if(NOT ANDROID)
         src/domain/grammar.cpp
         src/base/str_view.cpp
     )
-    target_compile_features(grammar_tests PUBLIC cxx_std_23)
-    target_include_directories(grammar_tests PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    )
-    target_include_directories(grammar_tests SYSTEM PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor"
-    )
+    target_include_directories(grammar_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_include_directories(grammar_tests SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor")
     target_link_libraries(grammar_tests PRIVATE SDL3::SDL3)
     add_test(NAME grammar_tests COMMAND grammar_tests)
 endif()
 
-# on Visual Studio, set our app as the default project
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${EXECUTABLE_NAME}")
 
-# On macOS Platforms, ensure that the bundle is valid for distribution by calling fixup_bundle.
-# note that fixup_bundle does not work on iOS, so you will want to use static libraries
-# or manually copy dylibs and set rpaths
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    # tell Install about the target, otherwise fixup won't know about the transitive dependencies
     install(TARGETS ${EXECUTABLE_NAME}
-     BUNDLE DESTINATION ./install COMPONENT Runtime
+        BUNDLE DESTINATION ./install COMPONENT Runtime
         RUNTIME DESTINATION ./install/bin COMPONENT Runtime
     )
 
-    set(DEP_DIR "${CMAKE_BINARY_DIR}")  # where to look for dependencies when fixing up
-    INSTALL(CODE
+    set(DEP_DIR "${CMAKE_BINARY_DIR}")
+    install(CODE
         "include(BundleUtilities)
         fixup_bundle(\"$<TARGET_BUNDLE_DIR:${EXECUTABLE_NAME}>\" \"\" \"${DEP_DIR}\")
         "
@@ -969,6 +973,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 endif()
 
 if (NOT (ANDROID OR EMSCRIPTEN OR APPLE))
+    find_package(SQLite3 REQUIRED)
+
     add_executable(xdbuilder
         xdbuilder/xdbuilder.cpp
         src/base/hash.cpp
@@ -984,8 +990,8 @@ if (NOT (ANDROID OR EMSCRIPTEN OR APPLE))
     target_include_directories(xdbuilder PRIVATE "src/vendor")
     target_include_directories(xdbuilder PRIVATE xxHash)
     target_link_libraries(xdbuilder PRIVATE
-        xapian
-        sqlite3
+        xapian::xapian
+        SQLite::SQLite3
         SDL3::SDL3
     )
 endif()
