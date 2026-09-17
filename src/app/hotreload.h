@@ -1,7 +1,6 @@
 #pragma once
 
 #include "SDL3/SDL_log.h"
-#include "app/app_context.h"
 #include "base/pair.h"
 #include "ui/entry.h"
 
