@@ -70,7 +70,8 @@ void screen_settings_draw(AppContext *ctx) {
 			                                 CLAY_SIZING_FIT(0)}},
 				 }) {
 				draw_text(label, theme()->onSurface, title_font_size,
-				          trans_font);
+				          trans_font, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_LEFT);
 			}
 
 			if (switch_button(ctx, switch_id, value)) {
@@ -155,7 +156,8 @@ void screen_settings_draw(AppContext *ctx) {
 			                                 CLAY_SIZING_FIT(0)}},
 				 }) {
 				draw_text(tr()->screen_settings_text_size, theme()->onSurface,
-				          title_font_size, trans_font);
+				          title_font_size, trans_font, CLAY_TEXT_WRAP_WORDS,
+				          CLAY_TEXT_ALIGN_LEFT);
 			}
 
 			CLAY(CLAY_ID("FontStepperGroup"),
@@ -315,7 +317,8 @@ void screen_settings_draw(AppContext *ctx) {
 							 },
 				 }) {
 				draw_text(tr()->screen_settings_default_screen,
-				          theme()->onSurface, title_font_size, trans_font);
+				          theme()->onSurface, title_font_size, trans_font,
+				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 			}
 
 			CLAY(CLAY_ID("ScreenOptions"),
