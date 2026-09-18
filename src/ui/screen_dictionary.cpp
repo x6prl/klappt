@@ -87,7 +87,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 			}
 		}
 		// NOTE: at least 2 chars to start searching
-		if (ctx->dictionary_search.size >= 2) {
+		if (ctx->dictionary_search.view().utf8_length() >= 2) {
 			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
 			const auto query = ctx->dictionary_search.view();
 			const auto total_words = ctx->word_store.matching_word_count(query);
