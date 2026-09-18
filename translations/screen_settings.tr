@@ -70,6 +70,10 @@ ru: Помечать вспомогательный глагол «sein» зна
 en: Mark irregular verbs with !
 ru: Помечать неправильные глаголы знаком !
 
+@mark_verb_separable_prefix
+en: Separate separable prefixes with |
+ru: Отделять отделямое знаком |
+
 @mark_verb_type
 en: Mark verbs with ᵛ
 ru: Помечать глаголы знаком ᵛ

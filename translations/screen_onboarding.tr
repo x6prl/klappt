@@ -55,12 +55,20 @@ en: Word card style
 ru: Вид карточки слова
 
 @opt_mark_irr
-en: Mark irregular verbs !
-ru: Пометка неправильных глаголов !
+en: Mark irregular verbs
+ru: Пометка неправильных глаголов
 
 @opt_mark_irr_desc
 en: Shows ! next to verbs with irregular forms
 ru: Показывает ! рядом с неправильными глаголами
+
+@opt_mark_sep_pref
+en: Separate prefixes
+ru: Отделять приставки
+
+@opt_mark_sep_pref_desc
+en: Shows | after the separable verb prefix
+ru: Вставляет | после отделяемых приставок глаголов
 
 @opt_mark_sein
 en: Mark 'sein' verbs
@@ -71,7 +79,7 @@ en: Shows * for verbs using 'sein' as auxiliary
 ru: Показывает * для глаголов, образующих перфект с 'sein'
 
 @opt_mark_verb_tag
-en: Verb marker tag
+en: Verb marker
 ru: Значок глагола
 
 @opt_mark_verb_tag_desc
@@ -79,7 +87,7 @@ en: Shows ᵛ tag next to verbs if no other verb marker is present
 ru: Показывает значок ᵛ рядом с глаголами, если нет других меток
 
 @opt_mark_adj_tag
-en: Adjective marker tag
+en: Adjective marker
 ru: Значок прилагательного
 
 @opt_mark_adj_tag_desc

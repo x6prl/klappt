@@ -30,7 +30,15 @@ void word_main(Clay_ElementId id, AppContext *ctx, const Word &w,
 		post = w.n.plural_suffix;
 		break;
 	case WordType::Verb:
-		main = w.v.infinitive;
+		if (ctx->settings.is_mark_verb_separable_prefix &&
+		    w.v.separable_prefix_size) {
+			auto i = w.v.infinitive;
+			main = StrBuilder::concat(
+				  ctx->arena_frame, i.slice(0, w.v.separable_prefix_size),
+				  "|"_v, i.slice(w.v.separable_prefix_size));
+		} else {
+			main = w.v.infinitive;
+		}
 		if (ctx->settings.is_mark_verb_irregular &&
 		    grammar::is_irrregular(w.v)) {
 			post = "!"_v;

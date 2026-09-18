@@ -24,6 +24,7 @@ struct Settings {
 	// displaying
 	bool is_mark_verb_aux_sein{true};
 	bool is_mark_verb_irregular{true};
+	bool is_mark_verb_separable_prefix{true};
 	bool is_mark_verb_type{false};
 	bool is_mark_adj_type{false};
 	bool is_show_ipa{false};

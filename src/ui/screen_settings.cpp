@@ -470,6 +470,14 @@ void screen_settings_draw(AppContext *ctx) {
 
 		draw_setting_divider();
 
+		draw_switch_row(
+			  CLAY_ID("MarkSepPrefRow"), CLAY_ID("MarkSepPrefSwitch"),
+			  tr()->screen_settings_mark_verb_separable_prefix,
+			  ctx->settings.is_mark_verb_separable_prefix,
+			  [&](bool v) { ctx->settings.is_mark_verb_separable_prefix = v; });
+
+		draw_setting_divider();
+
 		draw_switch_row(CLAY_ID("MarkVerbTypeRow"),
 		                CLAY_ID("MarkVerbTypeSwitch"),
 		                tr()->screen_settings_mark_verb_type,

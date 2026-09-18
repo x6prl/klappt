@@ -105,7 +105,10 @@ static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 static bool run_download_and_unpack_tr_asset(AppContext *ctx) {
 	return check_and_run_download_and_unpack(
 		  ctx, tr()->screen_onboarding_asset_main_dict,
-		  AssetsDL::Type::XAPIAN_TR, [](AppContext *_) { return true; });
+		  AssetsDL::Type::XAPIAN_TR, [](AppContext *ctx) {
+			  (void)ctx;
+			  return true;
+		  });
 }
 
 #if NEURO
@@ -147,6 +150,7 @@ static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
 
 static void draw_segmented_progress_bar(AppContext *ctx, int current_step,
                                         int total_steps) {
+	(void)ctx;
 	CLAY(CLAY_ID("OnboardingProgressBar"),
 	     {
 			   .layout =
@@ -416,19 +420,25 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 			draw_preview_card(CLAY_ID("PrevBuch"), "das "_v, "Buch"_v,
 			                  " \"-er"_v);
 
-			StrView fahren_post{};
+			StrView um_fahren{};
+			if (ctx->settings.is_mark_verb_separable_prefix) {
+				um_fahren = "um|fahren"_v;
+			} else {
+				um_fahren = "umfahren"_v;
+			}
+			StrView um_fahren_post{};
 			if (ctx->settings.is_mark_verb_irregular &&
 			    ctx->settings.is_mark_verb_aux_sein) {
-				fahren_post = "!*"_v;
+				um_fahren_post = "!*"_v;
 			} else if (ctx->settings.is_mark_verb_irregular) {
-				fahren_post = "!"_v;
+				um_fahren_post = "!"_v;
 			} else if (ctx->settings.is_mark_verb_aux_sein) {
-				fahren_post = "*"_v;
+				um_fahren_post = "*"_v;
 			} else if (ctx->settings.is_mark_verb_type) {
-				fahren_post = "ᵛ"_v;
+				um_fahren_post = "ᵛ"_v;
 			}
-			draw_preview_card(CLAY_ID("PrevFahren"), {}, "fahren"_v,
-			                  fahren_post);
+			draw_preview_card(CLAY_ID("PrevUmFahren"), {}, um_fahren,
+			                  um_fahren_post);
 
 			StrView gross_post =
 				  ctx->settings.is_mark_adj_type ? "ᵃ"_v : StrView{};
@@ -449,6 +459,15 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 		                tr()->screen_onboarding_opt_mark_irr_desc,
 		                ctx->settings.is_mark_verb_irregular, [ctx](bool val) {
 							ctx->settings.is_mark_verb_irregular = val;
+							ctx->settings.save(ctx->arena_frame);
+						});
+
+		draw_option_row(ctx, CLAY_ID("OptMarkSepPref"),
+		                tr()->screen_onboarding_opt_mark_sep_pref,
+		                tr()->screen_onboarding_opt_mark_sep_pref_desc,
+		                ctx->settings.is_mark_verb_separable_prefix,
+		                [ctx](bool val) {
+							ctx->settings.is_mark_verb_separable_prefix = val;
 							ctx->settings.save(ctx->arena_frame);
 						});
 
