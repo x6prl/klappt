@@ -3,12 +3,12 @@ en:  to review
 ru:  на повторение
 
 @action_review_all
-en: Review all
-ru: Повторить все
+en: View all
+ru: Смотреть все
 
 @action_review_errors
-en: Review errors
-ru: Повторить ошибки
+en: View errors
+ru: Смотреть ошибки
 
 @action_next_round
 en: Next round
