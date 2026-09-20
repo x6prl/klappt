@@ -491,6 +491,16 @@ void screen_settings_draw(AppContext *ctx) {
 		                ctx->settings.is_mark_adj_type,
 		                [&](bool v) { ctx->settings.is_mark_adj_type = v; });
 
+		draw_switch_row(
+			  CLAY_ID("ShowDictSearchOnlyTransRow"),
+			  CLAY_ID("ShowDictSearchOnlyTransSwitch"),
+			  tr()->screen_settings_show_dict_search_only_translations,
+			  ctx->settings.is_show_dictionary_search_only_translations_button,
+			  [&](bool v) {
+				  ctx->settings
+						.is_show_dictionary_search_only_translations_button = v;
+			  });
+
 		draw_section_header(CLAY_ID("SecWordView"),
 		                    tr()->screen_settings_sec_word_details);
 

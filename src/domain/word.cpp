@@ -49,7 +49,8 @@ StrView gender_to_article_nominative_strview(Gender g) {
 	return " "_v;
 }
 
-DynArr<StrView> word_translations_split(Arena &a, StrView translations_raw) {
+DynArr<StrView> word_translations_split_senses(Arena &a,
+                                               StrView translations_raw) {
 	DynArr<StrView> ret{};
 	for (; translations_raw;) {
 		auto tr_item = translations_raw.mut_split_by(';').trim();
@@ -58,17 +59,37 @@ DynArr<StrView> word_translations_split(Arena &a, StrView translations_raw) {
 	return ret;
 }
 
-DynArr<StrView> word_translations_discrete(Arena &a, StrView translations_raw) {
+DynArr<StrView> word_translations_split_all(Arena &a,
+                                            StrView translations_raw) {
 	DynArr<StrView> ret{};
-	for (; translations_raw;) {
-		auto tr_item = translations_raw.mut_split_by(';').trim();
-		for (; tr_item;) {
-			auto tr = tr_item.mut_split_by(',').trim();
-			if (!tr || ret.is_contains(tr)) {
-				continue;
+	if (!translations_raw)
+		return ret;
+
+	const char *start = translations_raw.data;
+	const char *end = translations_raw.data + translations_raw.size;
+	const char *cursor = start;
+	int paren_depth = 0;
+
+	for (; cursor < end; ++cursor) {
+		char c = *cursor;
+		if (c == '(')
+			paren_depth++;
+		else if (c == ')' && paren_depth > 0)
+			paren_depth--;
+		else if ((c == ';' || c == ',') && paren_depth == 0) {
+			StrView item{start, static_cast<Size>(cursor - start)};
+			item.mut_trim();
+			if (item && !ret.is_contains(item)) {
+				ret.push(a, item);
 			}
-			ret.push(a, tr);
-			// SDL_Log(">>>>>>>>>>>>= " StrView_Fmt, StrView_Arg(tr));
+			start = cursor + 1;
+		}
+	}
+	if (start < end) {
+		StrView item{start, static_cast<Size>(end - start)};
+		item.mut_trim();
+		if (item && !ret.is_contains(item)) {
+			ret.push(a, item);
 		}
 	}
 	return ret;

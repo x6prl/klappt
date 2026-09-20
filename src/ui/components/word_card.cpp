@@ -120,7 +120,7 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 					 },
 			   .clip = {.horizontal = true},
 		 }) {
-		auto trs = StrBuilder{word_translations_discrete(a, translations_plain)}
+		auto trs = StrBuilder{word_translations_split_all(a, translations_plain)}
 		                 .join(a, ", "_v);
 		CLAY_TEXT(trs.to_clay_string(), CLAY_TEXT_CONFIG({
 											  .textColor = color,

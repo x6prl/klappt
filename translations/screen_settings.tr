@@ -56,7 +56,7 @@ ru: ОБУЧЕНИЕ И ТРЕНАЖЁР
 
 @suggestions
 en: Suggest words
-ru: Предлогать слова
+ru: Предлагать слова
 
 @sec_dictionary
 en: DICTIONARY
@@ -81,6 +81,10 @@ ru: Помечать глаголы знаком ᵛ
 @mark_adj_type
 en: Mark adjectives with ᵃ
 ru: Помечать прилагательные знаком ᵃ
+
+@show_dict_search_only_translations
+en: Show "Search only in translations" (en) button in Dictionary
+ru: Показывать кнопку "Поиск только среди переводов" (ru) в словаре
 
 @sec_word_details
 en: WORD DETAILS

@@ -237,6 +237,13 @@ static void step_draw_language(AppContext *ctx) {
 				if (btn.activated()) {
 					set_language(lang);
 					ctx->settings.tr_language = lang;
+					{ // NOTE: english users need this button, but russians —
+						// mostly not
+						bool is_eng = lang == lang_en;
+						ctx->settings
+							  .is_show_dictionary_search_only_translations_button =
+							  is_eng;
+					}
 					ctx->settings.save(ctx->arena_frame);
 					onboarding_advance(ctx, 1);
 				}

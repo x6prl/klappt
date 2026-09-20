@@ -221,7 +221,7 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 
 		ctx.word_store.for_each_matching_word_range(
 			  ctx.arena_frame, spec.key, 0, ctx.word_store.word_count(),
-			  [&](Size, const Word &w) {
+			  SearchMode::All, [&](Size, const Word &w) {
 				  if (learning_list_seed_matches(w, spec)) {
 					  matched_word = word_clone(ctx.arena, w);
 					  found = true;

@@ -63,8 +63,8 @@ struct Word {
 	StrView json_payload{};
 };
 
-DynArr<StrView> word_translations_split(Arena &a, StrView translations_raw);
-DynArr<StrView> word_translations_discrete(Arena &a, StrView translations_raw);
+DynArr<StrView> word_translations_split_senses(Arena &a, StrView translations_raw);
+DynArr<StrView> word_translations_split_all(Arena &a, StrView translations_raw);
 
 // Lexeme identity is the learner-relevant German side only.
 // The active store is scoped to a single target language, so translations

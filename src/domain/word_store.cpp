@@ -12,6 +12,7 @@
 #include "base/hash.h"
 #include "base/profiler.h"
 #include "base/shuffle.h"
+#include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/grammar.h"
 #include "domain/word.h"
@@ -35,6 +36,8 @@ constexpr char LEMMA_PREFIX[] = "XL";
 constexpr char FORM_PREFIX[] = "XF";
 constexpr char TRANSLATION_PREFIX[] = "XT";
 
+constexpr StrView EXACT_TERM_PREFIX = "XTE:"_v;
+
 constexpr char DIRTY_TERM[] = "SDIRTY";
 constexpr char NEW_TERM[] = "SNEW";
 
@@ -48,6 +51,42 @@ constexpr uint64_t LOCAL_WORD_ID_FLAG = 1ULL << 63;
 inline bool is_local_temp_id(WordId id) {
 	return (id.value & LOCAL_WORD_ID_FLAG) != 0;
 }
+
+struct WordSortKeyMaker : public Xapian::KeyMaker {
+	SearchMode mode{SearchMode::All};
+
+	explicit WordSortKeyMaker(SearchMode m) : mode(m) {}
+
+	std::string operator()(const Xapian::Document &doc) const override {
+		std::string lemma_val = doc.get_value(LEMMA_KEY_VALUE_SLOT);
+		std::string pop_val = doc.get_value(POPULARITY_VALUE_SLOT);
+
+		uint8_t len =
+			  lemma_val.empty() ? 0 : static_cast<uint8_t>(lemma_val[0]);
+		uint8_t pop = pop_val.empty() ? 0 : static_cast<uint8_t>(pop_val[0]);
+
+		std::string key;
+		key.reserve(2 + lemma_val.size());
+
+		if (mode == SearchMode::TranslationsOnly) {
+			// When searching translations: POPULARITY dominates!
+			// Byte 0: Inverted popularity (highest popularity first: laufen >
+			// rennen > pesen) Byte 1: Length (shortest as secondary
+			// tie-breaker)
+			key.push_back(static_cast<char>(255 - pop));
+			key.push_back(static_cast<char>(len));
+		} else /* SearchMode::All */ {
+			// When searching German words: Shortest length first
+			key.push_back(static_cast<char>(len));
+			key.push_back(static_cast<char>(255 - pop));
+		}
+
+		if (lemma_val.size() > 1) {
+			key.append(lemma_val.data() + 1, lemma_val.size() - 1);
+		}
+		return key;
+	}
+};
 
 // NOTE: yet unused
 [[maybe_unused]]
@@ -103,22 +142,20 @@ std::string_view content_hash_term(Arena &a, uint64_t hash) {
 // 	return true;
 // }
 
-std::string_view make_lemma_sort_key(Arena &scratch, StrView lemma) {
+std::string_view make_lemma_sort_key(Arena &a, StrView lemma) {
 	if (!lemma) {
-		char *buf = scratch.pushN<char>(1);
+		char *buf = a.pushN<char>(1);
 		buf[0] = 0;
 		return {buf, 1};
 	}
 
-	// Lowercase via Arena
-	StrView lower = lemma.utf8_to_lowercase_german(scratch);
+	StrView lower = lemma.utf8_to_lowercase_german(a);
+	auto lemma_length = lower.utf8_length();
 
-	// Length byte: lemma.size < 256 ? lemma.size : 255
 	uint8_t len_byte =
-		  static_cast<uint8_t>(lower.size < 256 ? lower.size : 255);
+		  static_cast<uint8_t>(lemma_length < 256 ? lemma_length : 255);
 
-	// Allocate 1 byte for length + payload size
-	char *buf = scratch.pushN<char>(1 + lower.size);
+	char *buf = a.pushN<char>(1 + lower.size);
 	buf[0] = static_cast<char>(len_byte);
 	std::memcpy(buf + 1, lower.data, static_cast<size_t>(lower.size));
 
@@ -251,18 +288,47 @@ void index_field(Xapian::TermGenerator &generator, StrView text, int weight,
 	if (!text)
 		return;
 	std::string_view sv{text.data, static_cast<size_t>(text.size)};
-	generator.index_text_without_positions(sv, weight);
 	if (!prefix.empty()) {
-		generator.index_text_without_positions(sv, weight, prefix);
+		generator.index_text(sv, weight, prefix);
+	} else {
+		generator.index_text(sv, weight);
 	}
 }
 
+StrView strip_parentheses(StrView s) {
+	// TODO: do we have cases starting with '('?..
+	s.mut_trim();
+	// NOTE: if it contains '(', take only what's before it
+	auto split = s.split_by('(');
+	StrView head = split.first.trim();
+	return head ? head : s;
+}
+
 void index_translation_fields(Arena &scratch, Xapian::TermGenerator &generator,
-                              StrView translations_raw) {
-	auto translations = word_translations_split(scratch, translations_raw);
-	for (const auto &discrete_translation : translations) {
-		index_field(generator, discrete_translation, WEIGHT_HIGH,
-		            TRANSLATION_PREFIX);
+                              Xapian::Document &doc, StrView translations_raw) {
+	auto translations = word_translations_split_all(scratch, translations_raw);
+
+	for (const auto &discrete : translations) {
+		// regular full-text indexing with positions
+		index_field(generator, discrete, WEIGHT_HIGH, TRANSLATION_PREFIX);
+
+		// exact translation indexing
+		// TODO: put to plain translations only translation headword? think
+		// about it;
+		//
+		// NOTE: "to run (to move on foot...)" -> "to run"
+		StrView clean = strip_parentheses(discrete);
+		StrView lower_clean = clean.utf8_to_lowercase(scratch);
+		lower_clean.mut_trim();
+
+		if (lower_clean && lower_clean.size <= 116) {
+			// Add boolean term: "XTE:" + "to run"
+			StrView exact_term =
+				  StrView::concat(scratch, EXACT_TERM_PREFIX, lower_clean);
+			std::string_view sv{exact_term.data,
+			                    static_cast<size_t>(exact_term.size)};
+			doc.add_boolean_term(sv);
+		}
 	}
 }
 
@@ -315,7 +381,7 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 		index_field(generator, word.p.text, WEIGHT_LOW, LEMMA_PREFIX);
 		break;
 	}
-	index_translation_fields(scratch, generator, word.translations_raw);
+	index_translation_fields(scratch, generator, doc, word.translations_raw);
 }
 
 void configure_query_parser(Xapian::QueryParser &parser,
@@ -343,8 +409,10 @@ bool build_document(Arena &scratch, const Word &word, Xapian::Document &doc,
 	doc.add_boolean_term(word_id_term(scratch, word.word_id));
 	doc.add_boolean_term(content_hash_term(scratch, word_hash(scratch, word)));
 
-	char pop_byte = static_cast<char>(word.popularity);
-	doc.add_value(POPULARITY_VALUE_SLOT, std::string_view{&pop_byte, 1});
+	uint8_t pop_byte = word.popularity;
+	doc.add_value(
+		  POPULARITY_VALUE_SLOT,
+		  std::string_view{reinterpret_cast<const char *>(&pop_byte), 1});
 
 	StrView lemma = word_primary_lemma(word);
 	doc.add_value(LEMMA_KEY_VALUE_SLOT, make_lemma_sort_key(scratch, lemma));
@@ -549,7 +617,9 @@ Size WordStore::word_count() const {
 	}
 }
 
-Size WordStore::matching_word_count(StrView query) const {
+Size WordStore::matching_word_count(Arena &scratch, StrView query,
+                                    SearchMode mode) const {
+	auto g = scratch.guard();
 	KLAPPT_PROFILE_SCOPE_N("WordStore::matching_word_count");
 	query.mut_trim();
 	if (!query) {
@@ -558,7 +628,8 @@ Size WordStore::matching_word_count(StrView query) const {
 
 	try {
 		Xapian::MSet mset;
-		if (!search_mset(query, 0, 0, mset)) {
+
+		if (!search_mset(scratch, query, 0, 0, mset, mode)) {
 			return 0;
 		}
 		return static_cast<Size>(mset.get_matches_estimated());
@@ -570,35 +641,120 @@ Size WordStore::matching_word_count(StrView query) const {
 	}
 }
 
-bool WordStore::search_mset(StrView query, Size start, Size count,
-                            Xapian::MSet &mset) const {
+bool WordStore::search_mset(Arena &scratch, StrView query, Size start,
+                            Size count, Xapian::MSet &mset,
+                            SearchMode mode) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::search_mset");
 	query.mut_trim();
 	if (!query || !db) {
 		return false;
 	}
 
-	if (start < 0)
+	if (start < 0) {
 		start = 0;
-	if (count < 0)
+	}
+	if (count < 0) {
 		count = 0;
+	}
 
 	try {
+		auto guard = scratch.guard();
+
+		auto to_sv = [](StrView s) -> std::string_view {
+			return {s.data, static_cast<size_t>(s.size)};
+		};
+
+		auto put_in_quotes = [&](StrView str) {
+			return StrBuilder::concat(scratch, "\""_v, str, "\""_v);
+		};
+
 		Xapian::QueryParser parser;
 		configure_query_parser(parser, *db);
-		const auto parsed = parser.parse_query(
-			  std::string_view{query.data, static_cast<size_t>(query.size)},
-			  Xapian::QueryParser::FLAG_BOOLEAN |
-					Xapian::QueryParser::FLAG_LOVEHATE |
-					Xapian::QueryParser::FLAG_PARTIAL);
+
+		constexpr unsigned parser_flags = Xapian::QueryParser::FLAG_BOOLEAN |
+		                                  Xapian::QueryParser::FLAG_LOVEHATE |
+		                                  Xapian::QueryParser::FLAG_PARTIAL;
+
+		StrView lower_q = query.utf8_to_lowercase(scratch);
+		std::string_view raw_q = to_sv(lower_q);
+
+		Xapian::Query subqueries[6];
+		size_t sub_count = 0;
+
+		if (mode == SearchMode::All) {
+			// 1. German Lemma & Form
+			Xapian::Query q_lemma =
+				  parser.parse_query(raw_q, parser_flags, LEMMA_PREFIX);
+			Xapian::Query q_form =
+				  parser.parse_query(raw_q, parser_flags, FORM_PREFIX);
+
+			subqueries[sub_count++] = 10000.0 * q_lemma;
+			subqueries[sub_count++] = 1000.0 * q_form;
+		}
+
+		// 2. Exact Translation Match ("to run")
+		if (lower_q.size <= 116) {
+			StrView exact_term =
+				  StrView::concat(scratch, EXACT_TERM_PREFIX, lower_q);
+			subqueries[sub_count++] = 500.0 * Xapian::Query(to_sv(exact_term));
+		}
+
+		// 3. Translation Phrase Match
+		Xapian::Query q_tr_phrase;
+		if (lower_q.is_contains(' ')) {
+			// Find the length of the last word by scanning backwards
+			Size last_word_len = 0;
+			for (Size i = lower_q.size; i > 0; --i) {
+				if (lower_q[i - 1] == ' ') {
+					break;
+				}
+				++last_word_len;
+			}
+
+			// Only wrap in quotes if the trailing word is at least 2
+			// characters.
+			if (last_word_len >= 2) {
+				StrView quoted = put_in_quotes(lower_q);
+				constexpr unsigned phrase_flags =
+					  Xapian::QueryParser::FLAG_PHRASE |
+					  Xapian::QueryParser::FLAG_BOOLEAN;
+				q_tr_phrase = parser.parse_query(to_sv(quoted), phrase_flags,
+				                                 TRANSLATION_PREFIX);
+			} else {
+				// If typing an incomplete word (e.g. "to be or n"), boost the
+				// completed prefix
+				StrView prefix_phrase =
+					  lower_q.slice(0, lower_q.size - last_word_len).trim();
+				if (prefix_phrase.is_contains(' ')) {
+					StrView quoted = put_in_quotes(prefix_phrase);
+					constexpr unsigned phrase_flags =
+						  Xapian::QueryParser::FLAG_PHRASE |
+						  Xapian::QueryParser::FLAG_BOOLEAN;
+					q_tr_phrase = parser.parse_query(
+						  to_sv(quoted), phrase_flags, TRANSLATION_PREFIX);
+				}
+			}
+		}
+
+		if (!q_tr_phrase.empty()) {
+			subqueries[sub_count++] = 100.0 * q_tr_phrase;
+		}
+
+		// 4. Translation General Match
+		Xapian::Query q_tr =
+			  parser.parse_query(raw_q, parser_flags, TRANSLATION_PREFIX);
+		subqueries[sub_count++] = 10.0 * q_tr;
+
+		Xapian::Query final_query(Xapian::Query::OP_MAX, subqueries,
+		                          subqueries + sub_count);
+
 		Xapian::Enquire enquire(*db);
-		enquire.set_query(parsed);
+		enquire.set_query(final_query);
+		enquire.set_weighting_scheme(Xapian::CoordWeight());
 
-		// sort by popularyty (descending = true)
-		enquire.set_sort_by_value_then_relevance(POPULARITY_VALUE_SLOT, true);
-
-		// sort shortest-to-longest (ascending = false)
-		enquire.set_sort_by_value(LEMMA_KEY_VALUE_SLOT, false);
+		// KeyMaker adapts based on mode
+		WordSortKeyMaker key_maker(mode);
+		enquire.set_sort_by_relevance_then_key(&key_maker, false);
 
 		constexpr auto CHECK_AT_LEAST = 30;
 		mset = enquire.get_mset(static_cast<Xapian::doccount>(start),

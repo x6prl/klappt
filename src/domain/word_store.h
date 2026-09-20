@@ -10,6 +10,11 @@
 #include "ui/translations/langs.h"
 #include "words_codec.h"
 
+enum class SearchMode : uint8_t {
+	All = 0,
+	TranslationsOnly = 1,
+};
+
 inline bool word_matches_query(Arena &a, const Word &word, StrView query);
 inline char ascii_to_lower(char ch);
 inline bool str_contains_ci(StrView haystack, StrView needle);
@@ -29,7 +34,8 @@ struct WordStore {
 	bool is_open() const { return db != nullptr; }
 
 	Size word_count() const;
-	Size matching_word_count(StrView query) const;
+	Size matching_word_count(Arena &scratch, StrView query,
+	                         SearchMode mode) const;
 
 	/*
 	 * Ensure the word exists in Xapian. If it already exists, word_id is filled
@@ -112,7 +118,8 @@ struct WordStore {
 
 	template <typename F>
 	bool for_each_matching_word_range(Arena &scratch, StrView query, Size start,
-	                                  Size count, F &&visitor) const {
+	                                  Size count, SearchMode mode,
+	                                  F &&visitor) const {
 		KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_matching_word_range");
 		query.mut_trim();
 		if (!db || !query || count <= 0) {
@@ -125,7 +132,7 @@ struct WordStore {
 		try {
 			auto guard = scratch.guard();
 			Xapian::MSet mset;
-			if (!search_mset(query, start, count, mset)) {
+			if (!search_mset(scratch, query, start, count, mset, mode)) {
 				return false;
 			}
 
@@ -205,8 +212,8 @@ struct WordStore {
 	                                uint64_t *rng_state) const;
 
   private:
-	bool search_mset(StrView query, Size start, Size count,
-	                 Xapian::MSet &mset) const;
+	bool search_mset(Arena &scratch, StrView query, Size start, Size count,
+	                 Xapian::MSet &mset, SearchMode mode) const;
 };
 
 inline bool word_matches_query(Arena &a, const Word &word, StrView query) {

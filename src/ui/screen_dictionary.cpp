@@ -9,6 +9,7 @@
 #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 
+#include "ui/translations/langs.h"
 #include "ui/trs.h"
 
 void screen_dictionary_go(AppContext *ctx) {
@@ -21,13 +22,17 @@ void screen_dictionary_draw(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE();
 	auto floating_button_clear_id = CLAY_ID("FloatingButtonClear");
 	{ // floating buttons
-		auto floating_button_clear_id = CLAY_ID("FloatingButtonClear");
 
 		// 38dp compact circle
 		const float btn_size = 38.0f * sizes()->scale;
 
 		CLAY(floating_button_clear_id,
-		     {.floating = {
+		     {.layout =
+		            {
+						  .childGap = sizes()->space.sm,
+						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					},
+		      .floating = {
 					.offset = {-static_cast<float>(sizes()->space.sm), 0.0f},
 					.zIndex = 10,
 					.attachPoints = {.element = CLAY_ATTACH_POINT_RIGHT_CENTER,
@@ -53,6 +58,24 @@ void screen_dictionary_draw(AppContext *ctx) {
 			btn_style.background_pressed = theme()->primary;
 			btn_style.text = theme()->primary;
 			btn_style.text_pressed = theme()->onPrimary;
+
+			if (ctx->settings
+			          .is_show_dictionary_search_only_translations_button) {
+				MobileButtonStyle mode_style = btn_style;
+				mode_style.font_id = FontID::MAIN;
+				if (ctx->is_dictionary_search_translations_only) {
+					mode_style.background = theme()->primary;
+					mode_style.text = theme()->onPrimary;
+				}
+				auto mode_btn = mobile_button(
+					  ctx, CLAY_ID("FLOATING_MODE"),
+					  lang_code(ctx->settings.tr_language), mode_style);
+				if (mode_btn.activated()) {
+					ctx->is_dictionary_search_translations_only =
+						  !ctx->is_dictionary_search_translations_only;
+					ctx->push_one_frame();
+				}
+			}
 
 			auto b = mobile_button(ctx, CLAY_ID("FLOATING_RESET"),
 			                       Icons::ROTATE, btn_style);
@@ -90,7 +113,12 @@ void screen_dictionary_draw(AppContext *ctx) {
 		if (ctx->dictionary_search.view().utf8_length() >= 2) {
 			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
 			const auto query = ctx->dictionary_search.view();
-			const auto total_words = ctx->word_store.matching_word_count(query);
+			const auto mode = ctx->is_dictionary_search_translations_only
+			                        ? SearchMode::TranslationsOnly
+			                        : SearchMode::All;
+
+			const auto total_words = ctx->word_store.matching_word_count(
+				  ctx->arena_frame, query, mode);
 			CLAY(CLAY_ID("WordsListSlot"),
 			     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 			                            CLAY_SIZING_GROW(0)}}}) {
@@ -102,7 +130,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 					  [&](AppContext *ctx, list::ItemsRange window) {
 						  ctx->word_store.for_each_matching_word_range(
 								ctx->arena_frame, query, window.first,
-								window.last_exclusive - window.first,
+								window.last_exclusive - window.first, mode,
 								[&](Size index, Word &w) {
 									CLAY(CLAY_IDI("WordRow", index),
 						                 {.layout = {

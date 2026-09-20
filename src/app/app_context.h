@@ -114,6 +114,7 @@ struct AppContext {
 	// SDL_AudioDeviceID audioDevice{};
 	// MIX_Track *track{};
 	MobileTextInputState mobile_text_input{};
+	bool is_dictionary_search_translations_only{false};
 	MobileTextInputBuffer dictionary_search{}; // TODO: make them slim
 	MobileTextInputBuffer learning_search{};
 	MobileTextInputBuffer tts_input{};

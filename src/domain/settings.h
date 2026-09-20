@@ -30,6 +30,7 @@ struct Settings {
 	bool is_show_ipa{false};
 	bool is_show_origin{false};
 	bool is_show_noun_plural_as_suffix{false};
+	bool is_show_dictionary_search_only_translations_button{false};
 	// modules
 	bool is_module_tts{true};
 	bool is_module_asr{false};
