@@ -879,34 +879,55 @@ Size WordStore::get_smart_suggestions(Arena &scratch, Arena &out_arena,
                                       Size count, DynArr<Word> &out,
                                       uint64_t *rng_state) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::get_smart_suggestions");
-	if (!db || count <= 0)
+	if (!db || count <= 0) {
 		return 0;
+	}
 
 	auto try_pick_from_term = [&](const char *term, Size need) -> Size {
-		if (!db->term_exists(term))
+		if (need <= 0 || !db->term_exists(term)) {
 			return 0;
+		}
+
 		const auto freq = db->get_termfreq(term);
-		if (freq == 0)
+		if (freq == 0) {
 			return 0;
+		}
+
+		auto term_guard = scratch.guard();
+
+		auto *docids = scratch.pushN<Xapian::docid>(freq);
+		Size doc_count = 0;
+		for (auto it = db->postlist_begin(term);
+		     it != db->postlist_end(term) &&
+		     static_cast<Xapian::doccount>(doc_count) < freq;
+		     ++it) {
+			docids[doc_count++] = *it;
+		}
+
+		if (doc_count == 0) {
+			return 0;
+		}
 
 		Size local_picked = 0;
 		Size attempts = 0;
-		const Size max_attempts = need * 5 + 10;
+		const Size max_attempts = need * 10 + 20;
 
-		for (; local_picked < need && attempts < max_attempts;) {
+		while (local_picked < need && doc_count > 0 &&
+		       attempts < max_attempts) {
 			++attempts;
-			auto guard = scratch.guard();
 
-			auto offset =
-				  static_cast<Xapian::doccount>(random_num(0, freq, rng_state));
-			auto it = db->postlist_begin(term);
-			it.skip_to(offset);
-			if (it == db->postlist_end(term))
-				continue;
+			const auto pick_idx = static_cast<Size>(
+				  random_num(0, static_cast<int64_t>(doc_count), rng_state));
+			const auto docid = docids[pick_idx];
 
+			docids[pick_idx] = docids[doc_count - 1];
+			--doc_count;
+
+			auto doc_guard = scratch.guard();
 			try {
-				const auto doc = db->get_document(*it);
+				const auto doc = db->get_document(docid);
 				const auto data = doc.get_data();
+
 				Word word{};
 				if (!WordsCodec::word_decode(scratch, data.data(),
 				                             static_cast<Size>(data.size()),
@@ -914,7 +935,8 @@ Size WordStore::get_smart_suggestions(Arena &scratch, Arena &out_arena,
 					continue;
 				}
 
-				if (word.type == WordType::Phrase || word.in_learning_list ||
+				if (word.type == WordType::Phrase ||
+				    word.type == WordType::Nil || word.in_learning_list ||
 				    word.was_learned) {
 					continue;
 				}
@@ -926,12 +948,14 @@ Size WordStore::get_smart_suggestions(Arena &scratch, Arena &out_arena,
 						break;
 					}
 				}
-				if (is_duplicate)
+				if (is_duplicate) {
 					continue;
+				}
 
 				out.push(out_arena, word_clone(out_arena, word));
 				++local_picked;
 			} catch (...) {
+				continue;
 			}
 		}
 		return local_picked;
