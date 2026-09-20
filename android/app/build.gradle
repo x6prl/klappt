@@ -6,6 +6,14 @@ if (buildAsApplication) {
     apply plugin: 'com.android.library'
 }
 
+def appVersion = file("../../VERSION").text.trim()
+
+def versionParts = appVersion.tokenize('.')
+def appVersionCode =
+        versionParts[0].toInteger() * 1_000_000 +
+        versionParts[1].toInteger() * 1_000 +
+        versionParts[2].toInteger()
+
 android {
     // Target API requirement for Google Play (API 35+)
     compileSdk 36
@@ -18,8 +26,8 @@ android {
         applicationId "org.viktorfilinkov.klappt"
         minSdk 21
         targetSdk 36
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersion
 
         externalNativeBuild {
             cmake {

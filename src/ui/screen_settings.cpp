@@ -537,6 +537,14 @@ void screen_settings_draw(AppContext *ctx) {
 			auto sub_color = theme()->onSurface;
 			sub_color.a = static_cast<uint8_t>(sub_color.a * 0.5f);
 			const uint16_t note_font_size = sizes()->font.label_sm;
+
+			auto app_version_str = StrView::lit(KLAPPT_VERSION);
+
+			draw_text(StrView::concat(ctx->arena_frame, "klappt version "_v,
+			                          app_version_str),
+			          sub_color, note_font_size, FontID::MAIN,
+			          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
+
 			draw_text(tr()->screen_settings_about_wiktionary, sub_color,
 			          note_font_size, FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 			          CLAY_TEXT_ALIGN_CENTER);

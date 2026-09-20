@@ -5,7 +5,9 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE INTERNAL "")
 
-project(klappt LANGUAGES C CXX)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" KLAPPT_VERSION)
+string(STRIP "${KLAPPT_VERSION}" KLAPPT_VERSION)
+project(klappt VERSION ${KLAPPT_VERSION} LANGUAGES C CXX)
 
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
@@ -402,6 +404,10 @@ else()
     add_executable(${EXECUTABLE_NAME})
 endif()
 
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
+    KLAPPT_VERSION=\"${KLAPPT_VERSION}\"
+)
+
 if(ipo_supported)
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES
         INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
@@ -497,6 +503,10 @@ if(USE_HOTRELOAD)
     add_library(app_hotreload SHARED
         ${APP_HOTRELOAD_FILES}
         ${APP_UI_IMPL_FILES}
+    )
+
+    target_compile_definitions(app_hotreload PRIVATE
+        KLAPPT_VERSION=\"${KLAPPT_VERSION}\"
     )
 
     if(ipo_supported)
