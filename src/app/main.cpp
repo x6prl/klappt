@@ -204,6 +204,9 @@ SDL_Renderer *create_renderer(SDL_Window *window) {
 	if (renderer) {
 		SDL_Log("opengles2 renderer created");
 		return renderer;
+	} else {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Failed to create opengles2 renderer");
 	}
 #endif
 

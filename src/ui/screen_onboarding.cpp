@@ -235,6 +235,7 @@ static void step_draw_language(AppContext *ctx) {
 					  mobile_button(ctx, CLAY_IDI("LangSelectBtn", i),
 				                    get_language_display_name(lang), btn_style);
 				if (btn.activated()) {
+					set_language(lang);
 					ctx->settings.tr_language = lang;
 					ctx->settings.save(ctx->arena_frame);
 					onboarding_advance(ctx, 1);
