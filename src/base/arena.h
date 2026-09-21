@@ -2,7 +2,6 @@
 
 #include <sys/mman.h>
 
-#include <cassert>
 #include <cinttypes>
 #include <cstdlib>
 

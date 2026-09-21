@@ -13,7 +13,6 @@
 #include "app/tslt.h"
 #include "app/worker.h"
 #include "base/arena.h"
-#include "base/dyn_arr.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 #include "domain/engine.h"
@@ -22,6 +21,7 @@
 #include "domain/word_store.h"
 #include "domain/words.h"
 #include "platform/audio.h"
+
 #include "ui/components/download_data.h"
 #include "ui/components/text_input_state.h"
 #include "ui/components/word_edit_state.h"

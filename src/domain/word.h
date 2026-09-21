@@ -5,7 +5,6 @@
 #include "base/str_view.h"
 
 #include "domain/word_id.h"
-#include <cstdint>
 
 enum class WordType : int8_t { Nil = 0, Noun, Verb, Adj, Phrase };
 enum class Gender : int8_t { unknown = -1, none = 0, m, f, n };

@@ -1,6 +1,5 @@
 #include "exercises.h"
 
-#include "SDL3/SDL_log.h"
 #include "app/app_context.h"
 #include "base/arena.h"
 #include "base/dyn_arr.h"
@@ -10,14 +9,11 @@
 #include "base/shuffle.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
+#include "domain/grammar.h"
+
 #include "engine.h"
 #include "tokenizer.h"
 #include "words.h"
-
-#include <algorithm>
-#include <cstdint>
-#include <ctime>
-#include <simdjson/simdjson.h>
 
 namespace Engine {
 

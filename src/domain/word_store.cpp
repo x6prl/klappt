@@ -9,6 +9,7 @@
 #include <xapian.h>
 
 #include "base/arena.h"
+#include "base/dyn_arr.h"
 #include "base/hash.h"
 #include "base/profiler.h"
 #include "base/shuffle.h"

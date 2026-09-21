@@ -1,15 +1,30 @@
 #pragma once
 
-#include "arena.h"
-#include <algorithm>
-#include <cstring>
 #include <type_traits>
-#include <utility>
+
+#include "arena.h"
 
 template <class T> struct DynArr {
 	static_assert(std::is_trivially_copyable_v<T>);
 	static_assert(std::is_trivially_move_constructible_v<T>);
 	static_assert(std::is_trivially_destructible_v<T>);
+
+	template <typename _Tp>
+	[[__nodiscard__, __gnu__::__always_inline__]]
+	constexpr static _Tp &&
+	forward(typename std::remove_reference<_Tp>::type &&__t) noexcept {
+		static_assert(!std::is_lvalue_reference<_Tp>::value,
+		              "std::forward must not be used to convert an rvalue to "
+		              "an lvalue");
+		return static_cast<_Tp &&>(__t);
+	}
+
+	template <typename _Tp>
+	[[__nodiscard__, __gnu__::__always_inline__]]
+	constexpr static _Tp &&
+	forward(typename std::remove_reference<_Tp>::type &__t) noexcept {
+		return static_cast<_Tp &&>(__t);
+	}
 
 	static constexpr Size INITIAL_SIZE = 5; // mostly we need 5 elements
 
@@ -83,13 +98,14 @@ template <class T> struct DynArr {
 	template <class... Args> static DynArr<T> with(Arena &a, Args... args) {
 		constexpr auto total_args = sizeof...(args);
 		DynArr ret{a.pushN<T>(total_args), 0, total_args};
-		(ret.push(a, std::forward<Args>(args)), ...);
+		(ret.push(a, forward<Args>(args)), ...);
 		return ret;
 	}
 	template <size_t reserve_at_least, class... Args>
 	static DynArr<T> with(Arena &a, Args... args) {
 		constexpr auto total_args = sizeof...(args);
-		constexpr auto reserve = std::max(reserve_at_least, total_args);
+		constexpr auto reserve =
+			  reserve_at_least > total_args ? reserve_at_least : total_args;
 		DynArr ret{a.pushN<T>(reserve), 0, reserve};
 		(ret.push(a, args), ...);
 		return ret;

@@ -2,8 +2,12 @@
 
 #include <SDL3/SDL_log.h>
 #include <SDL3_ttf/SDL_ttf.h>
+#include <SDL3/SDL_surface.h>
 
-#include "SDL3/SDL_surface.h"
+#include <cassert>
+
+#include <initializer_list>
+
 #include "base/profiler.h"
 
 namespace {

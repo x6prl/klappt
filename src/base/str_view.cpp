@@ -1,5 +1,6 @@
 #include "str_view.h"
 
+#include <cassert>
 #include <cctype>
 #include <charconv>
 #include <cstdint>

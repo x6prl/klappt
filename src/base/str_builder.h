@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstring>
-
 #include "dyn_arr.h"
 #include "str_view.h"
 
@@ -49,7 +47,7 @@ struct StrBuilder {
 
 	void append(Arena &a, StrBuilder str) {
 		total_lenght += str.total_lenght;
-		data.append(a, std::move(str.data));
+		data.append(a, static_cast<DynArr<StrView> &&>(str.data));
 	}
 
 	StrView join(Arena &a) {

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "SDL3/SDL_log.h"
 #include "base/dyn_arr.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
+
 #include "engine.h"
 #include "words.h"
 
