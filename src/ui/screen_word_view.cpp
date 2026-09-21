@@ -250,16 +250,19 @@ static void draw_noun_title(AppContext *ctx, const Noun &n) {
 }
 
 static void draw_adj_title(AppContext *ctx, const Word &w) {
+	(void)ctx;
 	draw_text(w.a.lemma, theme()->onSurface, sizes()->font.title_lg,
 	          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 }
 
 static void draw_verb_title(AppContext *ctx, const Word &w) {
+	(void)ctx;
 	draw_text(w.v.infinitive, theme()->onSurface, sizes()->font.title_lg,
 	          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
 }
 
 static void draw_phrase_title(AppContext *ctx, const Word &w) {
+	(void)ctx;
 	const bool is_long_phrase = w.p.text.utf8_length() > 50;
 	const Clay_TextAlignment text_align =
 		  is_long_phrase ? CLAY_TEXT_ALIGN_LEFT : CLAY_TEXT_ALIGN_CENTER;
@@ -1240,7 +1243,6 @@ void screen_word_view_draw(AppContext *ctx) {
 		           //    .width = {0, 0, udpi(1.f), 0},
 		           // },
 			 }) {
-			auto word_ref = state.word_ref;
 			auto add_or_remove_btn = mobile_icon_button<false>(
 				  ctx, CLAY_ID("RemoveButton"),
 				  state.word_copy.in_learning_list ? Icons::REMOVE

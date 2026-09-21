@@ -163,50 +163,37 @@ std::string_view make_lemma_sort_key(Arena &a, StrView lemma) {
 	return {buf, static_cast<size_t>(1 + lower.size)};
 }
 
-bool is_list_contains_item(StrView list, StrView item, char delimiter) {
-	item.mut_trim();
-	if (!item) {
-		return true;
-	}
-	for (; list;) {
-		auto part = list.mut_split_by(delimiter).trim();
-		if (part == item) {
-			return true;
-		}
-	}
-	return false;
-}
-
-StrView merge_unique_items(Arena &a, StrView base, StrView extra,
-                           char delimiter) {
-	StrView merged = base;
-	bool is_changed = false;
-	for (; extra;) {
-		auto item = extra.mut_split_by(delimiter).trim();
-		if (!item || is_list_contains_item(base, item, delimiter) ||
-		    is_list_contains_item(merged, item, delimiter)) {
-			continue;
-		}
-		if (merged) {
-			if (delimiter == ';') {
-				if (merged.last() != ';') {
-					merged = StrView::concat(a, merged, ";"_v);
-				}
-				auto spaced = StrView::concat(a, merged, " "_v);
-				merged = StrView::concat(a, spaced, item);
-			} else {
-				merged = StrView::concat_with(a, merged, item, delimiter);
-			}
-		} else {
-			merged = item.copy(a);
-		}
-		is_changed = true;
-	}
-	if (is_changed && delimiter == ';' && merged.last() != ';') {
-		merged = StrView::concat(a, merged, ";"_v);
-	}
-	return is_changed ? merged : base;
-}
+// NOTE: unused, but..............
+// StrView merge_unique_items(Arena &a, StrView base, StrView extra,
+//                            char delimiter) {
+// 	StrView merged = base;
+// 	bool is_changed = false;
+// 	for (; extra;) {
+// 		auto item = extra.mut_split_by(delimiter).trim();
+// 		if (!item || is_list_contains_item(base, item, delimiter) ||
+// 		    is_list_contains_item(merged, item, delimiter)) {
+// 			continue;
+// 		}
+// 		if (merged) {
+// 			if (delimiter == ';') {
+// 				if (merged.last() != ';') {
+// 					merged = StrView::concat(a, merged, ";"_v);
+// 				}
+// 				auto spaced = StrView::concat(a, merged, " "_v);
+// 				merged = StrView::concat(a, spaced, item);
+// 			} else {
+// 				merged = StrView::concat_with(a, merged, item, delimiter);
+// 			}
+// 		} else {
+// 			merged = item.copy(a);
+// 		}
+// 		is_changed = true;
+// 	}
+// 	if (is_changed && delimiter == ';' && merged.last() != ';') {
+// 		merged = StrView::concat(a, merged, ";"_v);
+// 	}
+// 	return is_changed ? merged : base;
+// }
 
 uint64_t word_hash(Arena &scratch, const Word &word) {
 	auto guard = scratch.guard();

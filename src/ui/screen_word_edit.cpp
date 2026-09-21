@@ -235,6 +235,7 @@ static MobileButtonStyle enum_button_style(bool selected) {
 }
 
 static void draw_row_label(AppContext *ctx, Clay_ElementId id, StrView label) {
+	(void)ctx;
 	CLAY(id,
 	     {.layout = {.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)}}}) {
 		// CHANGED: replaced udpi(16) with sizes()->font.body_md (16sp)
