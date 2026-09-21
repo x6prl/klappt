@@ -54,6 +54,9 @@ struct WordStore {
 		                          static_cast<int8_t>(lang),
 		                          static_cast<int8_t>(app_lang));
 	}
+	DynArr<Word> get_random_words_by_type(Arena &scratch, Arena &out_arena,
+	                                      WordType type, Size count,
+	                                      uint64_t *rng_state) const;
 
 	// NOTE: used for db gen
 	void save_direct(Arena &scratch, const Word &word,

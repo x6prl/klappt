@@ -298,10 +298,10 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		word_class_name = verb_word_class_to_badge(word_payload.word_class);
 		forms.push(ctx->arena_frame,
 		           {"er/sie/es:"_v,
-		            grammar::verb_third_person_full(ctx->arena_frame, w.v)});
+		            grammar::verb_third_person(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Präteritum:"_v,
-		            grammar::verb_praeteritum_full(ctx->arena_frame, w.v)});
+		            grammar::verb_praeteritum(ctx->arena_frame, w.v)});
 		forms.push(ctx->arena_frame,
 		           {"Perfekt:"_v,
 		            grammar::verb_perfect_full(ctx->arena_frame, w.v)});

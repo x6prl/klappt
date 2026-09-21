@@ -317,9 +317,9 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "gemacht"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "hat gemacht"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v),
 		                  "machte"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
 		                  "macht"_v);
 	}
 	{
@@ -621,9 +621,9 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "gedruckt"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "hat gedruckt"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v),
 		                  "druckte"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
 		                  "druckt"_v);
 	}
 
@@ -639,8 +639,8 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "gegangen"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "ist gegangen"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum_full(scratch, v), "ging"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v), "ging"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
 		                  "geht"_v);
 	}
 
@@ -658,9 +658,9 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "aufgestanden"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "ist aufgestanden"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v),
 		                  "stand auf"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person_full(scratch, v),
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
 		                  "steht auf"_v);
 	}
 }

@@ -112,12 +112,12 @@ StrView word_tts_full(Arena &a, const Word &word) {
 
 			// 3rd person
 			builder.push(a, ".\n er"_v);
-			builder.push(a, grammar::verb_third_person_full(a, word.v));
+			builder.push(a, grammar::verb_third_person(a, word.v));
 		}
 
 		// past form
 		builder.push(a, ".\n"_v);
-		builder.push(a, grammar::verb_praeteritum_full(a, word.v));
+		builder.push(a, grammar::verb_praeteritum(a, word.v));
 
 		// perfect
 		builder.push(a, ".\n"_v);

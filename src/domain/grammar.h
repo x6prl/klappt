@@ -49,8 +49,8 @@ StrView verb_past_participle(Arena &scratch, const Verb &v);
 [[nodiscard]]
 StrView verb_perfect_full(Arena &scratch, const Verb &v);
 [[nodiscard]]
-StrView verb_praeteritum_full(Arena &scratch, const Verb &v);
+StrView verb_praeteritum(Arena &scratch, const Verb &v);
 [[nodiscard]]
-StrView verb_third_person_full(Arena &scratch, const Verb &v);
+StrView verb_third_person(Arena &scratch, const Verb &v);
 
 } // namespace grammar

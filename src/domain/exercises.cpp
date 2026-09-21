@@ -366,9 +366,10 @@ void append_common_stage_entire(Arena &a, Arena &scratch,
 
 	// 3. take distractors
 	Size distractor_count = std::min<Size>(candidates.size, OPTIONS_MAX - 1);
-	DynArr<StrView> opts = DynArr<StrView>::with<OPTIONS_MAX>(a, correct_str);
+	DynArr<StrView> opts =
+		  DynArr<StrView>::with<OPTIONS_MAX>(a, correct_str.copy(a));
 	for (Size i = 0; i < distractor_count; ++i) {
-		opts.push(a, candidates[i]);
+		opts.push(a, candidates[i].copy(a));
 	}
 
 	// 4. shuffle options
@@ -493,8 +494,8 @@ StrView answered_response_from_exercise(Arena &tmpa, Arena &a,
 		}
 		if (!stage_started && i - 1 == last_stage_index_with_content) {
 			// SDL_Log("i %" PRSize ", cur sta %" PRSize ", total sta %" PRSize
-			        // " ",
-			        // i, e.current_stage, e.stages.size);
+			// " ",
+			// i, e.current_stage, e.stages.size);
 			parts.push(tmpa, " "_v);
 			parts.push(tmpa, e.stages[i].before_answer);
 		}
@@ -625,6 +626,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 	// NOTE: we may need a big arena
 	auto &scratch = ctx->arena;
 	auto g = scratch.guard();
+	auto g_frame = ctx->arena_frame.guard();
 
 	DynArr<StrView> noun_lemma_list;
 	DynArr<StrView> verb_infinitive_list;
@@ -651,9 +653,20 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 
 	auto push_if_not_empty = [&a = scratch](DynArr<StrView> *list,
 	                                        StrView str) {
-		if (str) {
+		str = str.trim();
+		if (str && !list->is_contains(str)) {
 			list->push(a, str);
 		}
+	};
+
+	auto push_verb_distractors = [&](DynArr<StrView> &inf_list,
+	                                 DynArr<StrView> &third_list,
+	                                 DynArr<StrView> &praet_list,
+	                                 DynArr<StrView> &pp_list, const Verb &v) {
+		push_if_not_empty(&inf_list, v.infinitive);
+		push_if_not_empty(&third_list, grammar::verb_third_person(scratch, v));
+		push_if_not_empty(&praet_list, grammar::verb_praeteritum(scratch, v));
+		push_if_not_empty(&pp_list, grammar::verb_past_participle(scratch, v));
 	};
 
 	auto &words = *ctx->words;
@@ -669,25 +682,17 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		if (due_id.is_contains(word.word_id)) {
 			due_ref.push(scratch, i);
 		}
-		auto text = word.p.text; // hä...  TODO: be more elegant
+		auto text = word.p.text;
 		switch (word.type) {
 		case WordType::Noun:
-			// noun_word_ref_list.push(ctx->tmparena, i);
 			push_if_not_empty(&noun_lemma_list, word.n.lemma);
 			break;
 		case WordType::Verb:
-			// verb_word_ref_list.push(ctx->tmparena, i);
-			push_if_not_empty(&verb_infinitive_list, word.v.infinitive);
-			push_if_not_empty(&verb_third_person_list, word.v.third_person);
-			push_if_not_empty(&verb_praeteritum_list, word.v.praeteritum);
-			// we need to split aux and pII
-			{
-				auto pp = word.v.auxv_and_past_participle.split().second;
-				push_if_not_empty(&verb_past_participle_list, pp);
-			}
+			push_verb_distractors(verb_infinitive_list, verb_third_person_list,
+			                      verb_praeteritum_list,
+			                      verb_past_participle_list, word.v);
 			break;
 		case WordType::Adj:
-			// adjective_word_ref_list.push(ctx->tmparena, i);
 			push_if_not_empty(&adjective_lemma_list, word.a.lemma);
 			push_if_not_empty(&adjective_cmp_list, word.a.comparative);
 			push_if_not_empty(&adjective_sup_list, word.a.superlative);
@@ -713,9 +718,51 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 		  scratch, phrase_words_list, adjective_lemma_list);
 
 	// SDL_Log("due in words list %" PRSize "", due_ref.size);
-	// TODO: check the sizes of the lists
-	if (noun_lemma_list.size < 5) {
-		// TODO: add more nouns from words store if too little of them present
+	constexpr Size MIN_DISTRACTORS = 12;
+	if (ctx->word_store.is_open()) {
+		// 1. Nouns
+		if (noun_lemma_list.size < MIN_DISTRACTORS) {
+			DynArr<Word> fallback_nouns =
+				  ctx->word_store.get_random_words_by_type(
+						ctx->arena_frame, scratch, WordType::Noun,
+						MIN_DISTRACTORS - noun_lemma_list.size + 4, &rng_state);
+			for (Size i = 0; i < fallback_nouns.size; ++i) {
+				push_if_not_empty(&noun_lemma_list, fallback_nouns[i].n.lemma);
+			}
+		}
+
+		// 2. Verbs (covers Infinitive, Third Person, Präteritum, Partizip II)
+		if (verb_infinitive_list.size < MIN_DISTRACTORS ||
+		    verb_third_person_list.size < MIN_DISTRACTORS ||
+		    verb_praeteritum_list.size < MIN_DISTRACTORS ||
+		    verb_past_participle_list.size < MIN_DISTRACTORS) {
+			DynArr<Word> fallback_verbs =
+				  ctx->word_store.get_random_words_by_type(
+						ctx->arena_frame, scratch, WordType::Verb, 15,
+						&rng_state);
+			for (Size i = 0; i < fallback_verbs.size; ++i) {
+				push_verb_distractors(
+					  verb_infinitive_list, verb_third_person_list,
+					  verb_praeteritum_list, verb_past_participle_list,
+					  fallback_verbs[i].v);
+			}
+		}
+
+		// 3. Adjectives (Lemma, Comparative, Superlative)
+		if (adjective_lemma_list.size < MIN_DISTRACTORS ||
+		    adjective_cmp_list.size < MIN_DISTRACTORS ||
+		    adjective_sup_list.size < MIN_DISTRACTORS) {
+			DynArr<Word> fallback_adjs =
+				  ctx->word_store.get_random_words_by_type(
+						ctx->arena_frame, scratch, WordType::Adj, 15,
+						&rng_state);
+			for (Size i = 0; i < fallback_adjs.size; ++i) {
+				const auto &fa = fallback_adjs[i];
+				push_if_not_empty(&adjective_lemma_list, fa.a.lemma);
+				push_if_not_empty(&adjective_cmp_list, fa.a.comparative);
+				push_if_not_empty(&adjective_sup_list, fa.a.superlative);
+			}
+		}
 	}
 
 	const auto total_exercises = std::min(n, due_ref.size);

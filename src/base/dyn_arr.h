@@ -77,6 +77,15 @@ template <class T> struct DynArr {
 		}
 		return false;
 	}
+	template <class F>
+		requires requires(F f, const T &x) { f(x); }
+	bool is_contains(F f) const {
+		for (const auto &x : *this) {
+			if (f(x))
+				return true;
+		}
+		return false;
+	}
 	// bool is_contains_by_ref(const T &val) const {
 	// 	for (const auto &x : *this) {
 	// 		if (x == val)

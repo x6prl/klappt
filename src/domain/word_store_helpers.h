@@ -12,7 +12,7 @@ namespace WordStoreHelper {
 template <typename F>
 bool for_each_dirty_word(Arena &scratch, const WordStore &ws, F &&visitor) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_dirty_word");
-	if (!ws.db)
+	if (!ws.is_open())
 		return false;
 
 	const char *dirty_terms[] = {"SDIRTY", "SNEW"};
@@ -56,7 +56,7 @@ bool for_each_matching_word_range(Arena &scratch, const WordStore &ws,
                                   SearchMode mode, F &&visitor) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_matching_word_range");
 	query.mut_trim();
-	if (!ws.db || !query || count <= 0) {
+	if (!ws.is_open() || !query || count <= 0) {
 		return false;
 	}
 	if (start < 0) {
@@ -102,7 +102,7 @@ bool for_each_matching_word_range(Arena &scratch, const WordStore &ws,
 template <typename F>
 bool for_each_word(Arena &scratch, const WordStore &ws, F &&visitor) {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_word");
-	if (!ws.db)
+	if (!ws.is_open())
 		return false;
 
 	try {

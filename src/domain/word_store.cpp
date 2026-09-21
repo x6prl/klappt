@@ -361,7 +361,7 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 		doc.add_boolean_term("XYverb");
 		index_field(generator, word.v.infinitive, WEIGHT_HIGHEST, LEMMA_PREFIX);
 		if (word.v.third_person) {
-			auto third_p = grammar::verb_third_person_full(scratch, word.v);
+			auto third_p = grammar::verb_third_person(scratch, word.v);
 			index_field(generator, third_p, WEIGHT_NORM, FORM_PREFIX);
 		}
 		index_field(generator, word.v.praeteritum, WEIGHT_NORM, FORM_PREFIX);
@@ -759,8 +759,8 @@ bool WordStore::search_mset(Arena &scratch, StrView query, Size start,
 
 		constexpr auto CHECK_AT_LEAST = 30;
 		*mset = enquire.get_mset(static_cast<Xapian::doccount>(start),
-		                        static_cast<Xapian::doccount>(count),
-		                        CHECK_AT_LEAST);
+		                         static_cast<Xapian::doccount>(count),
+		                         CHECK_AT_LEAST);
 		return true;
 	} catch (const Xapian::Error &e) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Xapian search failed: %s",
@@ -848,6 +848,115 @@ bool WordStore::get_by_id_for_lang(Arena &scratch, WordId word_id, Word &word,
 		             e.get_description().c_str());
 		return false;
 	}
+}
+
+DynArr<Word> WordStore::get_random_words_by_type(Arena &scratch, Arena &a,
+                                                 WordType type, Size count,
+                                                 uint64_t *rng_state) const {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::get_random_words_by_type");
+	if (!db || count <= 0) {
+		return {};
+	}
+
+	const char *term = nullptr;
+	switch (type) {
+	case WordType::Noun:
+		term = "XYnoun";
+		break;
+	case WordType::Verb:
+		term = "XYverb";
+		break;
+	case WordType::Adj:
+		term = "XYadj";
+		break;
+	case WordType::Phrase:
+		term = "XYphrase";
+		break;
+	default:
+		return {};
+	}
+
+	if (!db->term_exists(term)) {
+		return {};
+	}
+
+	const auto freq = db->get_termfreq(term);
+	if (freq == 0) {
+		return {};
+	}
+
+	auto g = scratch.guard();
+
+	auto *docids = scratch.pushN<Xapian::docid>(freq);
+	Size doc_count = 0;
+
+	for (auto it = db->postlist_begin(term);
+	     it != db->postlist_end(term) &&
+	     static_cast<Xapian::doccount>(doc_count) < freq;
+	     ++it) {
+		docids[doc_count++] = *it;
+	}
+
+	if (doc_count == 0) {
+		return {};
+	}
+
+	Size picked = 0;
+	const Size max_attempts = count * 15 + 30;
+	Size attempts = 0;
+
+	DynArr<Word> ret{};
+
+	while (picked < count && doc_count > 0 && attempts < max_attempts) {
+		++attempts;
+		const auto pick_idx = static_cast<Size>(
+			  random_num(0, static_cast<int64_t>(doc_count), rng_state));
+		const auto docid = docids[pick_idx];
+		docids[pick_idx] = docids[doc_count - 1];
+		--doc_count;
+
+		auto g = scratch.guard();
+		try {
+			// prioritize top popularity on early attempts
+			if (attempts < count * 8) {
+				std::string pop_val =
+					  db->get_document(docid).get_value(POPULARITY_VALUE_SLOT);
+				uint8_t pop =
+					  pop_val.empty() ? 0 : static_cast<uint8_t>(pop_val[0]);
+				if (pop < 30) {
+					continue;
+				}
+			}
+
+			const auto doc = db->get_document(docid);
+			const auto data = doc.get_data();
+
+			Word word{};
+			if (!WordsCodec::word_decode(scratch, data.data(),
+			                             static_cast<Size>(data.size()),
+			                             word)) {
+				continue;
+			}
+
+			if (word.type != type) {
+				continue;
+			}
+
+			auto is_same_word_id = [wid = word.word_id](const Word &w) {
+				return w.word_id == wid;
+			};
+			if (ret.is_contains(is_same_word_id)) {
+				continue;
+			}
+
+			ret.push(a, word_clone(a, word));
+			++picked;
+		} catch (...) {
+			// continue
+		}
+	}
+
+	return ret;
 }
 
 void WordStore::save_direct(Arena &scratch, const Word &word, bool mark_dirty) {

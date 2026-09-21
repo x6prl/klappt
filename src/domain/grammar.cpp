@@ -416,7 +416,7 @@ StrView verb_perfect_full(Arena &scratch, const Verb &v) {
 	return builder.join(scratch, ' ');
 }
 
-StrView verb_praeteritum_full(Arena &scratch, const Verb &v) {
+StrView verb_praeteritum(Arena &scratch, const Verb &v) {
 	if (v.praeteritum && v.praeteritum != "-"_v) {
 		if (verb_is_separable_prefix(v)) {
 			return StrView::concat_with(scratch, v.praeteritum,
@@ -427,7 +427,7 @@ StrView verb_praeteritum_full(Arena &scratch, const Verb &v) {
 	return verb_form_with_ending(scratch, v, "te"_v);
 }
 
-StrView verb_third_person_full(Arena &scratch, const Verb &v) {
+StrView verb_third_person(Arena &scratch, const Verb &v) {
 	if (v.third_person) {
 		if (verb_is_separable_prefix(v)) {
 			return StrView::concat_with(scratch, v.third_person,
