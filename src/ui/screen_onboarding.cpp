@@ -793,7 +793,7 @@ static void finish_onboarding_and_start(AppContext *ctx) {
 		ctx->app_status.push_error(tr()->screen_onboarding_err_seed_words);
 	}
 
-	screen_trainer_go(ctx);
+	screen_default_go(ctx);
 }
 
 struct OnboardingStepDescriptor {

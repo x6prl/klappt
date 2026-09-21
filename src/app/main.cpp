@@ -41,6 +41,8 @@
 
 #if HOTRELOAD
 #include "app/hotreload.h"
+#else
+#include "ui/screen_helpers.h"
 #endif
 
 #if NEURO
@@ -411,9 +413,14 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	SDL_AddTimer(UI_UPDATE_EVENT_TIME_MS, WakeUpTimer, nullptr);
 
 	if (ctx->settings.onboarding_stage < 0) {
-		if (!init_runtime_data(*ctx))
+		if (!init_runtime_data(*ctx)) {
 			return SDL_APP_FAILURE;
+		}
+#if HOTRELOAD
 		ctx->go(static_cast<Screen>(ctx->settings.default_screen));
+#else
+		screen_default_go(ctx);
+#endif
 	}
 	m.lap().printus("runtime data initialized");
 

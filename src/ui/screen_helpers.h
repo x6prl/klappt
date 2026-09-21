@@ -13,6 +13,8 @@
 #include "domain/exercises.h"
 #include "domain/words.h"
 
+void screen_default_go(AppContext *ctx);
+
 void screen_trainer_go(AppContext *ctx);
 void screen_trainer_draw(AppContext *ctx);
 
@@ -53,6 +55,16 @@ void screen_font_rendering_perf_draw(AppContext *ctx);
 void screen_tts_asr_go(AppContext *ctx);
 void screen_tts_asr_draw(AppContext *ctx);
 #endif // NEURO
+
+inline void screen_default_go(AppContext *ctx) {
+	switch (static_cast<Screen>(ctx->settings.default_screen)) {
+	case Screen::Dictionary:
+		screen_dictionary_go(ctx);
+		break;
+	default:
+		screen_trainer_go(ctx);
+	}
+}
 
 inline void
 draw_text(StrView text, Clay_Color color, uint16_t font_size = 0,
