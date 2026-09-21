@@ -9,6 +9,7 @@
 #include "base/str_view.h"
 #include "domain/word.h"
 #include "domain/word_store.h"
+#include "domain/word_store_helpers.h"
 #include "domain/words_codec.h"
 #include "platform/files.h"
 #include "platform/neuro.h"
@@ -219,9 +220,10 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 		Word matched_word{};
 		bool found = false;
 
-		ctx.word_store.for_each_matching_word_range(
-			  ctx.arena_frame, spec.key, 0, ctx.word_store.word_count(),
-			  SearchMode::All, [&](Size, const Word &w) {
+		WordStoreHelper::for_each_matching_word_range(
+			  ctx.arena_frame, ctx.word_store, spec.key, 0,
+			  ctx.word_store.word_count(), SearchMode::All,
+			  [&](Size, const Word &w) {
 				  if (learning_list_seed_matches(w, spec)) {
 					  matched_word = word_clone(ctx.arena, w);
 					  found = true;

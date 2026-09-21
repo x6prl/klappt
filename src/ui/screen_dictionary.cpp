@@ -1,3 +1,4 @@
+#include "domain/word_store_helpers.h"
 #include "screen_helpers.h"
 
 #include "app/app_context.h"
@@ -128,8 +129,9 @@ void screen_dictionary_draw(AppContext *ctx) {
 				list::vertical_uniform_w(
 					  ctx, CLAY_ID("WordsList"), total_words, row_slot_height,
 					  [&](AppContext *ctx, list::ItemsRange window) {
-						  ctx->word_store.for_each_matching_word_range(
-								ctx->arena_frame, query, window.first,
+						  WordStoreHelper::for_each_matching_word_range(
+								ctx->arena_frame, ctx->word_store, query,
+								window.first,
 								window.last_exclusive - window.first, mode,
 								[&](Size index, Word &w) {
 									CLAY(CLAY_IDI("WordRow", index),

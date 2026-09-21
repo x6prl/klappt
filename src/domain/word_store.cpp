@@ -629,7 +629,7 @@ Size WordStore::matching_word_count(Arena &scratch, StrView query,
 	try {
 		Xapian::MSet mset;
 
-		if (!search_mset(scratch, query, 0, 0, mset, mode)) {
+		if (!search_mset(scratch, query, 0, 0, &mset, mode)) {
 			return 0;
 		}
 		return static_cast<Size>(mset.get_matches_estimated());
@@ -642,7 +642,7 @@ Size WordStore::matching_word_count(Arena &scratch, StrView query,
 }
 
 bool WordStore::search_mset(Arena &scratch, StrView query, Size start,
-                            Size count, Xapian::MSet &mset,
+                            Size count, Xapian::MSet *mset,
                             SearchMode mode) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::search_mset");
 	query.mut_trim();
@@ -757,7 +757,7 @@ bool WordStore::search_mset(Arena &scratch, StrView query, Size start,
 		enquire.set_sort_by_relevance_then_key(&key_maker, false);
 
 		constexpr auto CHECK_AT_LEAST = 30;
-		mset = enquire.get_mset(static_cast<Xapian::doccount>(start),
+		*mset = enquire.get_mset(static_cast<Xapian::doccount>(start),
 		                        static_cast<Xapian::doccount>(count),
 		                        CHECK_AT_LEAST);
 		return true;

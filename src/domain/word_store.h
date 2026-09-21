@@ -1,14 +1,9 @@
 #pragma once
 
-#include <SDL3/SDL_log.h>
-#include <xapian.h>
-
 #include "base/arena.h"
-#include "base/profiler.h"
 #include "base/str_view.h"
 #include "domain/word.h"
 #include "ui/translations/langs.h"
-#include "words_codec.h"
 
 enum class SearchMode : uint8_t {
 	All = 0,
@@ -19,6 +14,12 @@ inline bool word_matches_query(Arena &a, const Word &word, StrView query);
 inline char ascii_to_lower(char ch);
 inline bool str_contains_ci(StrView haystack, StrView needle);
 inline bool match_translation_query_cs(StrView translations_raw, StrView query);
+
+namespace Xapian {
+struct WritableDatabase;
+struct Database;
+struct MSet;
+}; // namespace Xapian
 
 struct WordStore {
 	Xapian::WritableDatabase *db{nullptr};
@@ -74,134 +75,8 @@ struct WordStore {
 	// NOTE: not used yet: changing local id to the server's one
 	bool rekey_word(Arena &scratch, WordId old_id, WordId new_id);
 
-	// NOTE: not used yet: travers localy changed words
-	template <typename F>
-	bool for_each_dirty_word(Arena &scratch, F &&visitor) const {
-		KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_dirty_word");
-		if (!db)
-			return false;
-
-		const char *dirty_terms[] = {"SDIRTY", "SNEW"};
-		for (const char *term : dirty_terms) {
-			try {
-				for (auto it = db->postlist_begin(term);
-				     it != db->postlist_end(term); ++it) {
-					auto guard = scratch.guard();
-					const auto doc = db->get_document(*it);
-					const auto data = doc.get_data();
-
-					Word word{};
-					if (!WordsCodec::word_decode(scratch, data.data(),
-					                             static_cast<Size>(data.size()),
-					                             word)) {
-						continue;
-					}
-
-					const bool is_new = (term[1] == 'N'); // 'SNEW'
-					if (!visitor(word, is_new)) {
-						return false;
-					}
-				}
-			} catch (const Xapian::Error &e) {
-				SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-				             "Iterating dirty words failed: %s",
-				             e.get_description().c_str());
-				return false;
-			}
-		}
-		return true;
-	}
-
-	// =========================================================================
-	// Search and pagination
-	// =========================================================================
-
-	template <typename F>
-	bool for_each_matching_word_range(Arena &scratch, StrView query, Size start,
-	                                  Size count, SearchMode mode,
-	                                  F &&visitor) const {
-		KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_matching_word_range");
-		query.mut_trim();
-		if (!db || !query || count <= 0) {
-			return false;
-		}
-		if (start < 0) {
-			start = 0;
-		}
-
-		try {
-			auto guard = scratch.guard();
-			Xapian::MSet mset;
-			if (!search_mset(scratch, query, start, count, mset, mode)) {
-				return false;
-			}
-
-			mset.fetch();
-			auto item_guard = scratch.guard();
-			for (auto it = mset.begin(); it != mset.end(); ++it) {
-				Word word{};
-				const auto doc = it.get_document();
-				const auto data = doc.get_data();
-
-				if (!WordsCodec::word_decode(scratch, data.data(),
-				                             static_cast<Size>(data.size()),
-				                             word)) {
-					SDL_LogError(
-						  SDL_LOG_CATEGORY_ERROR,
-						  "Decoding Xapian matched word document failed");
-					continue;
-				}
-
-				if (!visitor(static_cast<Size>(it.get_rank()), word)) {
-					break;
-				}
-			}
-			return true;
-		} catch (const Xapian::Error &e) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Iterating matching Xapian words failed: %s",
-			             e.get_description().c_str());
-			return false;
-		}
-	}
-
-	// full db traverse
-	template <typename F>
-	bool for_each_word(Arena &scratch, F &&visitor) const {
-		KLAPPT_PROFILE_SCOPE_N("WordStore::for_each_word");
-		if (!db)
-			return false;
-
-		try {
-			for (auto it = db->allterms_begin("Q"); it != db->allterms_end("Q");
-			     ++it) {
-				auto guard = scratch.guard();
-				auto postings = db->postlist_begin(*it);
-				if (postings == db->postlist_end(*it)) {
-					continue;
-				}
-
-				Word word{};
-				const auto doc = db->get_document(*postings);
-				const auto data = doc.get_data();
-				if (!WordsCodec::word_decode(scratch, data.data(),
-				                             static_cast<Size>(data.size()),
-				                             word)) {
-					continue;
-				}
-
-				if (!visitor(word)) {
-					break;
-				}
-			}
-			return true;
-		} catch (const Xapian::Error &e) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Iterating all Xapian words failed: %s",
-			             e.get_description().c_str());
-			return false;
-		}
-	}
+	bool search_mset(Arena &scratch, StrView query, Size start, Size count,
+	                 Xapian::MSet *mset, SearchMode mode) const;
 
 	Size get_smart_suggestions(Arena &scratch, Arena &out_arena, Size count,
 	                           DynArr<Word> &out, uint64_t *rng_state) const;
@@ -210,10 +85,6 @@ struct WordStore {
 	Size get_random_unlearned_words(Arena &scratch, Arena &out_arena,
 	                                Size count, DynArr<Word> &out,
 	                                uint64_t *rng_state) const;
-
-  private:
-	bool search_mset(Arena &scratch, StrView query, Size start, Size count,
-	                 Xapian::MSet &mset, SearchMode mode) const;
 };
 
 inline bool word_matches_query(Arena &a, const Word &word, StrView query) {
