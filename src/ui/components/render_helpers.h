@@ -30,7 +30,7 @@ inline SDL_FColor blend_over(const SDL_FColor &fg, const SDL_FColor &bg) {
 }
 
 // Internal helper to calculate the perimeter points of the rectangle
-static void generate_rounded_rect_perimeter(const SDL_FRect *rect,
+inline void generate_rounded_rect_perimeter(const SDL_FRect *rect,
                                             float radius, int corner_mask,
                                             int segments,
                                             SDL_FPoint *out_points,

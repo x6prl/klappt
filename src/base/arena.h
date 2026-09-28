@@ -7,7 +7,6 @@
 
 #include <SDL3/SDL_log.h>
 #include <type_traits>
-#include <unistd.h>
 
 // NOTE: should be SIGNED
 using Size = int64_t;
@@ -17,8 +16,8 @@ struct Arena {
 	using Offset = Size;
 	unsigned char *data{};
 	Offset offset{0};
-	Offset size_objects{0};
-	const Size allocated_size{0};
+	Offset objects_size{0};
+	const Size capacity{0};
 	const bool is_mmaped{true};
 
 	struct [[nodiscard]] TempGuard {
@@ -27,16 +26,16 @@ struct Arena {
 		const Offset objects;
 
 		TempGuard(Arena *_a)
-			  : a{_a}, pos{a->offset}, objects{_a->size_objects} {}
+			  : a{_a}, pos{a->offset}, objects{_a->objects_size} {}
 		TempGuard(const TempGuard &) = delete;
 		TempGuard &operator=(const TempGuard &) = delete;
 		~TempGuard() {
 			a->offset = pos;
-			a->size_objects = objects;
+			a->objects_size = objects;
 		}
 	};
 
-	Arena(Size arena_size = Size{1} << 19) : allocated_size{arena_size} {
+	Arena(Size arena_size = Size{1} << 19) : capacity{arena_size} {
 		// NOTE: page-aligned (4-16KiB)
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
@@ -48,22 +47,21 @@ struct Arena {
 		}
 		SDL_Log("Created arena of size %" PRSize " KiB", arena_size / 1024);
 	}
-	Arena(Arena &from, Size arena_size = Size{1} << 19)
-		  : data{static_cast<unsigned char *>(
-				  from.push(arena_size, sysconf(_SC_PAGESIZE)))},
-			allocated_size{arena_size}, is_mmaped{false} {}
+	explicit Arena(Arena &from, Size arena_size = Size{1} << 19)
+		  : data{static_cast<unsigned char *>(from.push(arena_size, 64))},
+			capacity{arena_size}, is_mmaped{false} {}
 	~Arena() {
 		if (is_mmaped) {
 			if (data && MAP_FAILED != data) {
-				munmap(data, allocated_size);
+				munmap(data, capacity);
 				SDL_Log("Destroyed arena of size %" PRSize
 				        " KiB, used: %" PRSize " KiB",
-				        allocated_size / 1024, size_objects / 1024);
+				        capacity / 1024, objects_size / 1024);
 			}
 		} else {
 			SDL_Log("Destroyed sub-arena of size %" PRSize
 			        " KiB, used: %" PRSize " KiB",
-			        allocated_size / 1024, size_objects / 1024);
+			        capacity / 1024, objects_size / 1024);
 		}
 	}
 	Arena(Arena const &) = delete;
@@ -72,7 +70,7 @@ struct Arena {
 	// NOTE: ^2 alignment only! and not more than mempage size
 	[[nodiscard]]
 	void *push(Size size, Size align = 32) {
-		size_objects += size;
+		objects_size += size;
 		// alignment
 		{
 			offset += align - 1;
@@ -80,18 +78,20 @@ struct Arena {
 		}
 		auto ret = data + offset;
 		offset += size;
-		if (offset > allocated_size) {
+		if (offset > capacity) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "Arena: cannot allocate memory"
 			             " (request=%" PRSize " aligned_used=%" PRSize
 			             " capacity=%" PRSize ")\n",
-			             size, offset, allocated_size);
+			             size, offset, capacity);
 			exit(-5);
 		}
 		return static_cast<void *>(ret);
 	}
 
-	template <class T> T *pushN(Size count) {
+	template <class T>
+	[[nodiscard]]
+	T *pushN(Size count) {
 		static_assert(std::is_trivially_copyable_v<T>,
 		              "Arena::pushN only supports trivially copyable types!");
 		return static_cast<T *>(
@@ -100,13 +100,13 @@ struct Arena {
 
 	void clear() {
 		offset = 0;
-		size_objects = 0;
+		objects_size = 0;
 	}
 
 	void print_stats() const {
 		const auto used = offset;
-		const auto free = allocated_size - used;
-		const auto alignment_overhead = used - size_objects;
+		const auto free = capacity - used;
+		const auto alignment_overhead = used - objects_size;
 
 		SDL_Log("Arena stats: "
 		        "capacity=%" PRSize " KiB, "
@@ -114,8 +114,8 @@ struct Arena {
 		        "free=%" PRSize " KiB, "
 		        "objects=%" PRSize " KiB, "
 		        "alignment_overhead=%" PRSize " B",
-		        allocated_size / 1024, used / 1024, free / 1024,
-		        size_objects / 1024, alignment_overhead);
+		        capacity / 1024, used / 1024, free / 1024, objects_size / 1024,
+		        alignment_overhead);
 	}
 
 	[[nodiscard]]

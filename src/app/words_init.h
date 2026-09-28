@@ -360,7 +360,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 			} else {
 				SDL_Log("main arena usage after decode: %" PRSize " / %" PRSize
 				        " bytes",
-				        ctx.arena.offset, ctx.arena.allocated_size);
+				        ctx.arena.offset, ctx.arena.capacity);
 			}
 		} else {
 			SDL_Log(StrView_Fmt
@@ -395,7 +395,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 
 	SDL_Log("main arena usage after startup load: %" PRSize " / %" PRSize
 	        " bytes",
-	        ctx.arena.offset, ctx.arena.allocated_size);
+	        ctx.arena.offset, ctx.arena.capacity);
 	SDL_Log("==================");
 	return true;
 }
