@@ -103,17 +103,19 @@ static StrView noun_word_class_to_badge(StrView cls) {
 	if (cls == "noun"_v) {
 		return "Substantiv"_v;
 	}
-	if (cls == "name"_v || cls == "proper_noun"_v) {
+	if (cls == "name"_v) {
 		return "Eigenname"_v;
 	}
 	return cls;
 }
+
 static StrView verb_word_class_to_badge(StrView cls) {
 	if (cls == "verb"_v) {
 		return "Verb"_v;
 	}
 	return cls;
 }
+
 static StrView adj_word_class_to_badge(StrView cls) {
 	if (cls == "adj"_v) {
 		return "Adjektiv"_v;
@@ -121,11 +123,15 @@ static StrView adj_word_class_to_badge(StrView cls) {
 	if (cls == "adv"_v) {
 		return "Adverb"_v;
 	}
-	if (cls == "adv,adj"_v || cls == "adj,adv"_v) {
+	if (cls == "adv,adj"_v) {
 		return "Adjektiv / Adverb"_v;
+	}
+	if (cls == "num,adj"_v) {
+		return "Numerale / Adjektiv"_v;
 	}
 	return cls;
 }
+
 static StrView phrase_word_class_to_badge(StrView cls) {
 	if (cls == "pron"_v) {
 		return "Pronomen"_v;
@@ -133,63 +139,47 @@ static StrView phrase_word_class_to_badge(StrView cls) {
 	if (cls == "prep"_v) {
 		return "Präposition"_v;
 	}
-	if (cls == "postp"_v) {
-		return "Postposition"_v;
-	}
 	if (cls == "conj"_v) {
 		return "Konjunktion"_v;
 	}
-	if (cls == "det"_v || cls == "art"_v) {
+	if (cls == "det"_v) {
 		return "Artikel"_v;
 	}
 	if (cls == "num"_v) {
-		return "Numerale"_v; // or "Zahlwort"_v
+		return "Numerale"_v;
 	}
 	if (cls == "particle"_v) {
 		return "Partikel"_v;
 	}
-	if (cls == "intj"_v || cls == "interjection"_v) {
+	if (cls == "intj"_v) {
 		return "Interjektion"_v;
 	}
+
 	if (cls == "phrase"_v) {
-		return "Redewendung"_v; // or "Ausdruck"_v
-	}
-	if (cls == "id"_v || cls == "idiom"_v) {
 		return "Redewendung"_v;
 	}
-	if (cls == "contraction"_v) {
-		return "Kurzform"_v; // or "Kontraktion"_v (perfect for 's, is', etc.)
-	}
-	if (cls == "abbrev"_v || cls == "abbreviation"_v) {
+	if (cls == "abbrev"_v) {
 		return "Abkürzung"_v;
 	}
-	if (cls == "name"_v) {
-		return "Eigenname"_v;
-	}
-	if (cls == "affix"_v) {
-		return "Affix"_v;
-	}
+
 	if (cls == "prefix"_v) {
 		return "Präfix"_v;
 	}
 	if (cls == "suffix"_v) {
 		return "Suffix"_v;
 	}
+	if (cls == "affix"_v) {
+		return "Affix"_v;
+	}
+
 	if (cls == "symbol"_v) {
 		return "Symbol"_v;
 	}
-	if (cls == "punct"_v || cls == "punctuation"_v) {
-		return "Satzzeichen"_v;
+
+	if (cls == "name"_v) {
+		return "Eigenname"_v;
 	}
-	if (cls == "verb"_v) {
-		return "Verb"_v;
-	}
-	if (cls == "adj"_v) {
-		return "Adjektiv"_v;
-	}
-	if (cls == "adv"_v) {
-		return "Adverb"_v;
-	}
+
 	return cls;
 }
 
