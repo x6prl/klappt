@@ -389,35 +389,13 @@ void append_common_stage_entire(Arena &a, Arena &scratch,
 }
 
 void append_stages_aux_and_past_participle(
-	  Arena &a, Arena &scratch, StrView aux_and_past_participle,
+	  Arena &a, Arena &scratch, const Verb &verb,
 	  const DynArr<StrView> past_participle_list, StrView source_aux,
 	  StrView source_pp, ExerciseState *exercise, Mode mode) {
 	constexpr Size points_reward_for_aux_stage = 1;
-	static Arr<StrView, 2> aux_list = {"hat"_v, "ist"_v};
-	StrView aux{};
-	StrView past_participle{};
-
-	aux_and_past_participle = aux_and_past_participle.trim();
-	if (aux_and_past_participle.is_contains(' ')) {
-		auto split = aux_and_past_participle.split();
-		aux = split.first.trim();
-		past_participle = split.second.trim();
-		if (!aux_list.is_contains(aux)) {
-			SDL_LogError(
-				  SDL_LOG_CATEGORY_ERROR,
-				  "unknown verb aux: |" StrView_Fmt "| in |" StrView_Fmt "|",
-				  StrView_Arg(aux), StrView_Arg(aux_and_past_participle));
-			aux = aux_list[0];
-		}
-	} else {
-		if (aux_list.is_contains(aux_and_past_participle)) {
-			aux = aux_and_past_participle;
-		} else {
-			past_participle = aux_and_past_participle;
-		}
-	}
-	if (aux) {
-		Size correct_option_index = (aux == "ist"_v) ? 1 : 0;
+	{ // aux stage
+		static Arr<StrView, 2> aux_list = {"hat"_v, "ist"_v};
+		Size correct_option_index = grammar::is_aux_sein(verb) ? 1 : 0;
 		ExerciseState::SubStage substage = {
 			  .is_keypad = false,
 			  .correct_option_index = correct_option_index,
@@ -432,7 +410,9 @@ void append_stages_aux_and_past_participle(
 		                DynArr<ExerciseState::SubStage>::with(a, substage)});
 		exercise->points_max += points_reward_for_aux_stage;
 	}
-	if (past_participle) {
+
+	if (grammar::is_irrregular(verb)) {
+		auto past_participle = grammar::verb_past_participle(scratch, verb);
 		switch (mode) {
 		case Engine::Mode::Entire:
 			append_common_stage_entire(
@@ -838,22 +818,21 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 				                    verb_infinitive_list, source_clean,
 				                    FormType::Infinitive);
 				if (word.v.third_person) {
-					append_common_stage(word.v.third_person,
-					                    Tokenizer::Kind::Verb,
-					                    verb_third_person_list, source_clean,
-					                    FormType::ThirdPerson);
+					append_common_stage(
+						  grammar::verb_third_person(scratch, word.v),
+						  Tokenizer::Kind::Verb, verb_third_person_list,
+						  source_clean, FormType::ThirdPerson);
 				}
 				if (word.v.praeteritum) {
-					append_common_stage(word.v.praeteritum,
-					                    Tokenizer::Kind::Verb,
-					                    verb_praeteritum_list, source_clean,
-					                    FormType::Praeteritum);
+					append_common_stage(
+						  grammar::verb_praeteritum(scratch, word.v),
+						  Tokenizer::Kind::Verb, verb_praeteritum_list,
+						  source_clean, FormType::Praeteritum);
 				}
 				if (word.v.auxv_and_past_participle) {
 					append_stages_aux_and_past_participle(
-						  a, scratch, word.v.auxv_and_past_participle,
-						  verb_past_participle_list, source_clean, source_clean,
-						  &exercise, state.mode);
+						  a, scratch, word.v, verb_past_participle_list,
+						  source_clean, source_clean, &exercise, state.mode);
 				}
 			}
 		} else if (word.type == WordType::Adj) {
