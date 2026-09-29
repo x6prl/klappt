@@ -91,12 +91,8 @@ void screen_trainer_draw(AppContext *ctx) {
 				          FontID::MAIN, CLAY_TEXT_WRAP_WORDS,
 				          CLAY_TEXT_ALIGN_CENTER);
 
-				StrBuilder count_str{};
-				count_str.push(
-					  ctx->arena_frame,
-					  StrView::from_number(ctx->arena_frame, due_count));
-				draw_text(count_str.join(ctx->arena_frame), theme()->primary,
-				          sizes()->font.display, FontID::MAIN,
+				draw_text(StrView::from_number(ctx->arena_frame, due_count),
+				          theme()->primary, sizes()->font.display, FontID::MAIN,
 				          CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_CENTER);
 
 				draw_text(tr()->screen_trainer_words_ready_for_review,
@@ -143,14 +139,12 @@ void screen_trainer_draw(AppContext *ctx) {
 						   .backgroundColor = theme()->surfaceContainerHigh,
 						   .cornerRadius = sizes()->radius.sm,
 					 }) {
-					StrBuilder t_str{};
-					t_str.push(ctx->arena_frame,
-					           tr()->screen_trainer_in_learning);
-					t_str.push(ctx->arena_frame,
-					           StrView::from_number(ctx->arena_frame,
-					                                total_learning));
-					draw_text(t_str.join(ctx->arena_frame),
-					          theme()->onSurfaceContainerHigh,
+					auto t_str = StrBuilder::concat(
+						  ctx->arena_frame, tr()->screen_trainer_in_learning,
+						  " "_v,
+						  StrView::from_number(ctx->arena_frame,
+					                           total_learning));
+					draw_text(t_str, theme()->onSurfaceContainerHigh,
 					          sizes()->font.label_md);
 				}
 			} else {
