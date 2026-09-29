@@ -6,6 +6,7 @@
 #include "domain/word_payload.h"
 #include "domain/words.h"
 
+static constexpr Size WV_STATES_MAX = 24;
 struct WordViewState{
 	WordId word_id{};
 	WordRef word_ref{};

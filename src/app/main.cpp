@@ -301,7 +301,6 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		  .text = text_cache,
 		  .current = 0,
 		  .stack = {Screen::Onboarding},
-		  .word_view_state = new WordViewState{},
 		  .word_edit_state = new WordEditState{},
 		  .fonts_ready_sem = SDL_CreateSemaphore(0),
 	};

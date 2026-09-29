@@ -66,6 +66,45 @@ inline void screen_default_go(AppContext *ctx) {
 	}
 }
 
+inline void on_back_button_pressed(AppContext *ctx) {
+	ctx->push_one_frame();
+	switch (ctx->screen()) {
+	case Screen::Exercice: {
+		if (ctx->exercises.handler_back_pressed_ex(ctx)) {
+			// NOTE: it wasn't the last substage of the current
+			// exercise
+			return;
+		} else {
+			// NOTE: it was, but we ignore it
+			// TODO: think more
+			return;
+		}
+	} break;
+	case Screen::ExerciceResultSummary: {
+		return; // skip ctx->pop()!
+	} break;
+	case Screen::ExerciseReview: {
+		if (ctx->exercises.handler_back_pressed_rv()) {
+			// skip ctx->pop()!
+			return;
+		}
+	} break;
+	case Screen::WordView: {
+		auto &view_states = ctx->word_view_states;
+		view_states.pop();
+		if (!view_states.is_empty()) {
+			// skip ctx->pop()!
+			return;
+		}
+	} break;
+	default:
+		break;
+	}
+	if (!ctx->pop()) {
+		// TODO: ask user whether should exit
+	}
+};
+
 inline void
 draw_text(StrView text, Clay_Color color, uint16_t font_size = 0,
           uint16_t font_id = FontID::MAIN,

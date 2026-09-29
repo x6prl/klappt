@@ -14,6 +14,7 @@
 #include "domain/word.h"
 #include "ui/components/button.h"
 #include "ui/translations/langs.h"
+#include "ui/trs.h"
 
 namespace {
 
@@ -120,8 +121,9 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 					 },
 			   .clip = {.horizontal = true},
 		 }) {
-		auto trs = StrBuilder{word_translations_split_all(a, translations_plain)}
-		                 .join(a, ", "_v);
+		auto trs =
+			  StrBuilder{word_translations_split_all(a, translations_plain)}
+					.join(a, ", "_v);
 		CLAY_TEXT(trs.to_clay_string(), CLAY_TEXT_CONFIG({
 											  .textColor = color,
 											  .fontId = font_id,
@@ -292,38 +294,34 @@ TapSwipeLongTap::State word_card_learning_list(AppContext *ctx,
 			auto color_wait = theme()->secondary;
 			color_wait.a = 255.f;
 			// TODO: cache it
-			char str_buf[16];
 			auto min = due_mark / 60;
 			auto hours = due_mark / (60 * 60);
 			auto days = due_mark / (60 * 60 * 24);
 			auto weeks = due_mark / (60 * 60 * 24 * 7);
 			auto to_draw = min;
-			char time_ch = 'm';
+			StrView time_ch = tr()->ui_minute_1c;
 			if (!weeks) {
 				if (!days) {
 					if (hours) {
 						to_draw = hours;
-						time_ch = 'h';
+						time_ch = tr()->ui_hour_1c;
 					} else {
 						if (!min) {
 							to_draw = due_mark;
-							time_ch = 's';
+							time_ch = tr()->ui_second_1c;
 						}
 					}
 				} else {
 					to_draw = days;
-					time_ch = 'd';
+					time_ch = tr()->ui_day_1c;
 				}
 			} else {
 				to_draw = weeks;
-				time_ch = 'w';
+				time_ch = tr()->ui_week_1c;
 			}
-			auto res = std::to_chars(str_buf, str_buf + sizeof(str_buf) - 1,
-			                         to_draw);
-			*res.ptr = time_ch;
-			already_should_icon =
-				  StrView::from_chars(ctx->arena_frame, str_buf,
-			                          static_cast<Size>(res.ptr - str_buf + 1));
+			already_should_icon = StrView::concat(
+				  ctx->arena_frame,
+				  StrView::from_number(ctx->arena_frame, to_draw), time_ch);
 
 			// SDL_Log("due_mark %d %d %d", due_mark, min, hours);
 			// SDL_Log("already " StrView_Fmt, StrView_Arg(already));

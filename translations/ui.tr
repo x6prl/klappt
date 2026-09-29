@@ -13,3 +13,18 @@ en: edit
 ru: редактировать
 tr: düzenle
 ar: تعديل
+@week_1c
+en: w
+ru: н
+@day_1c
+en: d
+ru: д
+@hour_1c
+en: h
+ru: ч
+@minute_1c
+en: m
+ru: м
+@second_1c
+en: s
+ru: с

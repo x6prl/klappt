@@ -47,7 +47,7 @@ inline void sync_learning_words_to_store(Arena &scratch, const WordStore &store,
 			continue;
 		}
 
-		if (!store.find_word(scratch, word)) {
+		if (!store.ensure_word(scratch, word)) {
 			SDL_Log("Word ID %" PRSize
 			        " not found in store, removing from list",
 			        word.word_id.value);

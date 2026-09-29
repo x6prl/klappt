@@ -119,7 +119,7 @@ struct AppContext {
 	MobileTextInputBuffer learning_search{};
 	MobileTextInputBuffer tts_input{};
 	StrView asr_result{};
-	WordViewState *word_view_state{};
+	DynArr<WordViewState> word_view_states{};
 	WordEditState *word_edit_state{};
 	Settings settings{};
 
@@ -159,6 +159,7 @@ struct AppContext {
 	void on_screen_change(Screen from, Screen to) {
 		(void)from;
 		(void)to;
+		// SDL_Log("on_screen_change %d -> %d", (int)from, (int)to);
 
 		// { // text_input_reset
 		// 	if (window) {
@@ -194,7 +195,10 @@ struct AppContext {
 			// }
 			record_stop_then_do_nothing(this);
 			record_deinit(this);
-		}
+		} break;
+		case Screen::WordView: {
+			word_view_states.reset_size_reserved();
+		} break;
 		default:
 			break;
 		}
@@ -206,6 +210,7 @@ struct AppContext {
 	bool push(Screen s) {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::push");
 		KLAPPT_PROFILE_NAME_F("AppContext::push -> %s", screen_name(s));
+		const auto was = screen();
 		if (current + 1 >= STACK_SIZE) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Screen stack overflow");
 			return false;
@@ -213,6 +218,7 @@ struct AppContext {
 		++current;
 		stack[current] = s;
 		push_one_frame();
+		on_screen_change(was, screen());
 		return true;
 	}
 	/*
@@ -241,8 +247,10 @@ struct AppContext {
 		}
 		KLAPPT_PROFILE_NAME_F("AppContext::pop -> %s",
 		                      screen_name(stack[current - 1]));
+		const auto was = screen();
 		arena_screen_list[current].clear();
 		--current;
+		on_screen_change(was, screen());
 		push_one_frame();
 		return true;
 	}

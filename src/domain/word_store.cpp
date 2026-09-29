@@ -755,7 +755,7 @@ bool WordStore::search_mset(Arena &scratch, StrView query, Size start,
 }
 
 // TODO: add another arena param
-bool WordStore::find_word(Arena &scratch, Word &word) const {
+bool WordStore::ensure_word(Arena &scratch, Word &word) const {
 	KLAPPT_PROFILE_SCOPE_N("WordStore::ensure_word");
 	if (word.type == WordType::Nil || !db)
 		return false;
@@ -773,6 +773,114 @@ bool WordStore::find_word(Arena &scratch, Word &word) const {
 		}
 		return false;
 	}
+	return false;
+}
+
+bool WordStore::find_word(Arena &scratch, StrView word_str, bool is_phrase,
+                          WordId &word_id) const {
+	KLAPPT_PROFILE_SCOPE_N("WordStore::find_word");
+	auto g = scratch.guard();
+	word_str.mut_trim();
+	if (!word_str || !db) {
+		return false;
+	}
+
+	StrView lower = word_str.utf8_to_lowercase_german(scratch);
+
+	Xapian::QueryParser parser{};
+	parser.set_database(*db);
+	parser.set_default_op(Xapian::Query::OP_AND);
+
+	constexpr unsigned parser_flags =
+		  Xapian::QueryParser::FLAG_PHRASE | Xapian::QueryParser::FLAG_BOOLEAN;
+
+	Xapian::Query q_text;
+	if (is_phrase || lower.is_contains(' ')) {
+		auto quoted = StrBuilder::concat(scratch, "\""_v, lower, "\""_v);
+		q_text = parser.parse_query(
+			  {quoted.data, static_cast<size_t>(quoted.size)}, parser_flags,
+			  LEMMA_PREFIX);
+	} else {
+		q_text =
+			  parser.parse_query({lower.data, static_cast<size_t>(lower.size)},
+		                         parser_flags, LEMMA_PREFIX);
+	}
+
+	Xapian::Query phrase_filter("XYphrase");
+	Xapian::Query final_query =
+		  is_phrase
+				? Xapian::Query(Xapian::Query::OP_FILTER, q_text, phrase_filter)
+				: Xapian::Query(Xapian::Query::OP_AND_NOT, q_text,
+	                            phrase_filter);
+
+	try {
+		Xapian::Enquire enquire(*db);
+		enquire.set_query(final_query);
+
+		enquire.set_sort_by_value(POPULARITY_VALUE_SLOT, true);
+
+		auto mset = enquire.get_mset(0, 10);
+
+		WordId best_id{};
+		int best_score = -1;
+
+		for (auto it = mset.begin(); it != mset.end(); ++it) {
+			const auto doc = it.get_document();
+
+			std::string lemma_val = doc.get_value(LEMMA_KEY_VALUE_SLOT);
+			if (lemma_val.size() > 1) {
+				StrView stored_lower{lemma_val.data() + 1,
+				                     static_cast<Size>(lemma_val.size() - 1)};
+				if (stored_lower != lower) {
+					continue;
+				}
+			}
+
+			Word word{};
+			const auto data = doc.get_data();
+			if (!WordsCodec::word_decode(scratch, data.data(),
+			                             static_cast<Size>(data.size()),
+			                             word)) {
+				continue;
+			}
+
+			const bool matches_type = is_phrase
+			                                ? (word.type == WordType::Phrase)
+			                                : (word.type != WordType::Phrase);
+			if (!matches_type) {
+				continue;
+			}
+
+			StrView raw_lemma = word_primary_lemma(word);
+			StrView cand_lower = raw_lemma.utf8_to_lowercase_german(scratch);
+			if (cand_lower != lower) {
+				continue;
+			}
+
+			int score = static_cast<int>(word.popularity);
+
+			if (raw_lemma == word_str) {
+				score += 10000;
+			}
+
+			if (score > best_score) {
+				best_score = score;
+				best_id = word.word_id;
+			}
+		}
+
+		if (best_score >= 0) {
+			word_id = best_id;
+			return true;
+		}
+
+	} catch (const Xapian::Error &e) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "WordStore::find_word failed: %s",
+		             e.get_description().c_str());
+		return false;
+	}
+
+	SDL_Log("Not found " StrView_Fmt, StrView_Arg(word_str));
 	return false;
 }
 

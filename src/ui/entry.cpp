@@ -367,36 +367,6 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 		}
 	}
 
-	auto on_back_button_pressed = [](AppContext *ctx) -> void {
-		switch (ctx->screen()) {
-		case Screen::Exercice: {
-			if (ctx->exercises.handler_back_pressed_ex(ctx)) {
-				// NOTE: it wasn't the last substage of the current
-				// exercise
-				return;
-			} else {
-				// NOTE: it was, but we ignore it
-				// TODO: think more
-				return;
-			}
-		} break;
-		case Screen::ExerciceResultSummary: {
-			return; // skip ctx->pop()!
-		} break;
-		case Screen::ExerciseReview: {
-			if (ctx->exercises.handler_back_pressed_rv()) {
-				// skip ctx->pop()!
-				return;
-			}
-		} break;
-		default:
-			break;
-		}
-		if (!ctx->pop()) {
-			// TODO: ask user whether should exit
-		}
-	};
-
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.dispatch");
 		switch (event->type) {

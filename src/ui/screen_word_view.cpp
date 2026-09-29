@@ -1,3 +1,4 @@
+#include "domain/word_id.h"
 #include "screen_helpers.h"
 
 #include <simdjson/simdjson.h>
@@ -17,8 +18,70 @@
 
 #include "ui/trs.h"
 
-
 namespace {
+
+[[nodiscard]]
+bool push_and_fill_state(AppContext *ctx, WordId word_id) {
+	ctx->push_one_frame();
+	auto &state_stack = ctx->word_view_states;
+	if (state_stack.size >= WV_STATES_MAX) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Word view stack limit reached");
+		return false;
+	}
+	state_stack.push(ctx->arena_screen(), {
+												.word_id = word_id,
+												.has_learning_state = false,
+										  });
+	auto &state = state_stack.last();
+	bool is_word_copied = false;
+
+	{
+		KLAPPT_PROFILE_SCOPE_N("copy Word words");
+		// NOTE: try to get it from the learning list
+		for (auto word_ref = ctx->words->begin(); word_ref < ctx->words->end();
+		     word_ref.advance(ctx->words)) {
+			// NOTE: we are not copying strings
+			auto &word = (*ctx->words)[word_ref];
+			if (word.word_id == word_id) {
+				state.word_copy = word;
+				is_word_copied = true;
+				break;
+			}
+		}
+	}
+	// NOTE: if the word not in the learning list -> get it from the store
+	if (!is_word_copied) {
+		KLAPPT_PROFILE_SCOPE_N("copy Word store");
+		// get it from xapian
+		ctx->word_store.get_by_id(ctx->arena_screen(), word_id,
+		                          state.word_copy);
+		is_word_copied = true;
+	}
+	{
+		KLAPPT_PROFILE_SCOPE_N("copy State");
+		// get it from lmdb
+		auto [is_success, was_found] =
+			  ctx->states.get(word_id, state.learning_state_copy);
+		if (is_success) {
+			state.has_learning_state = was_found;
+		} else {
+			ctx->app_status.push_error("lmdb get() error"_v);
+		}
+	}
+	{
+		KLAPPT_PROFILE_SCOPE_N("parse JSON");
+		simdjson::dom::parser parser{};
+
+		if (!word_json_parse(ctx->arena_frame, ctx->arena_screen(),
+		                     state.word_copy.json_payload, state.word_payload,
+		                     parser)) {
+			ctx->app_status.push_error("word_json_parse() error"_v);
+		} else {
+			// log_word_payload(state.word_payload);
+		}
+	}
+	return true;
+}
 
 [[maybe_unused]]
 static inline StrView word_to_str(Arena &scratch, Arena &a, const Word &w) {
@@ -133,21 +196,26 @@ static StrView phrase_word_class_to_badge(StrView cls) {
 static StrView format_due_delta(Arena &a, Engine::Timestamp now,
                                 Engine::Timestamp due) {
 	const auto delta = static_cast<long long>(due - now);
-	char *buf = a.pushN<char>(64);
 	if (delta <= 0) {
 		const auto overdue = -delta;
-		const auto hours = overdue / (60 * 60);
-		const auto mins = (overdue / 60) % 60;
-		auto len = SDL_snprintf(buf, 64, StrView_Fmt " %lldh %lldm", StrView_Arg(tr()->screen_word_view_due_overdue), hours, mins);
-		return {buf, std::min<Size>(len, 63)};
+		const int hours = overdue / (60 * 60);
+		const int mins = (overdue / 60) % 60;
+		auto ret = StrBuilder::concat(
+			  a, tr()->screen_word_view_due_overdue, " "_v,
+			  StrView::from_number(a, hours), tr()->ui_hour_1c, " "_v,
+			  StrView::from_number(a, mins), tr()->ui_minute_1c);
+		return ret;
 	}
 
-	const auto days = delta / (60 * 60 * 24);
-	const auto hours = (delta / (60 * 60)) % 24;
-	const auto mins = (delta / 60) % 60;
-	auto len =
-		  SDL_snprintf(buf, 64, StrView_Fmt " %lldd %lldh %lldm", StrView_Arg(tr()->screen_word_view_due_in), days, hours, mins);
-	return {buf, std::min<Size>(len, 63)};
+	const int days = delta / (60 * 60 * 24);
+	const int hours = (delta / (60 * 60)) % 24;
+	const int mins = (delta / 60) % 60;
+	auto ret = StrBuilder::concat(
+		  a, tr()->screen_word_view_due_in, " "_v,
+		  StrView::from_number(a, days), tr()->ui_day_1c, " "_v,
+		  StrView::from_number(a, hours), tr()->ui_hour_1c, " "_v,
+		  StrView::from_number(a, mins), tr()->ui_minute_1c);
+	return ret;
 }
 
 static StrView mode_name(Engine::Mode mode) {
@@ -269,6 +337,58 @@ static void draw_phrase_title(AppContext *ctx, const Word &w) {
 
 	draw_text(w.p.text, theme()->onSurface, sizes()->font.title_lg,
 	          FontID::MAIN, CLAY_TEXT_WRAP_WORDS, text_align);
+}
+
+struct KeywordRange {
+	Size start_index;
+	Size count;
+};
+
+static DynArr<KeywordRange> split_keywords_into_rows(
+	  AppContext *ctx, const DynArr<StrView> &words, float max_row_width,
+	  float pill_horizontal_padding, // sizes()->pad.badge_compact.left + right
+	  float item_gap                 // (float)sizes()->space.xs
+) {
+	DynArr<KeywordRange> rows{};
+	if (words.is_empty()) {
+		return rows;
+	}
+
+	const uint16_t font_size = sizes()->font.label_sm;
+	const uint16_t font_id = FontID::MAIN;
+
+	Size current_start = 0;
+	Size current_count = 0;
+	float current_row_width = 0.0f;
+
+	for (Size i = 0; i < words.size; ++i) {
+		int text_w = 0, text_h = 0;
+		ctx->text->measure_string(words[i], font_id, font_size, &text_w,
+		                          &text_h);
+
+		float pill_width = static_cast<float>(text_w) + pill_horizontal_padding;
+		float width_with_gap =
+			  current_count > 0 ? (item_gap + pill_width) : pill_width;
+
+		if (current_count > 0 &&
+		    (current_row_width + width_with_gap > max_row_width)) {
+			// overflow
+			rows.push(ctx->arena_frame,
+			          KeywordRange{current_start, current_count});
+			current_start = i;
+			current_count = 1;
+			current_row_width = pill_width;
+		} else {
+			current_row_width += width_with_gap;
+			++current_count;
+		}
+	}
+
+	if (current_count > 0) {
+		rows.push(ctx->arena_frame, KeywordRange{current_start, current_count});
+	}
+
+	return rows;
 }
 
 static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
@@ -400,7 +520,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 			badge_style_template.backgroundColor = theme()->surfaceContainer;
 			if (w.in_learning_list) {
 				CLAY(CLAY_ID("StatusBadge"), badge_style_template) {
-					draw_text(tr()->screen_word_view_in_learning_list, theme()->onSurfaceContainer,
+					draw_text(tr()->screen_word_view_in_learning_list,
+					          theme()->onSurfaceContainer,
 					          sizes()->font.label_sm);
 				}
 			}
@@ -711,29 +832,91 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 
 		// NOTE: phrase only
 		if (w.type == WordType::Phrase && !word_payload.words.is_empty()) {
-			CLAY(CLAY_ID("PhraseKeywordsRow"),
+			CLAY(CLAY_ID("PhraseKeywordsContainer"),
 			     {
 					   .layout =
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIT(0)},
 								   .childGap = sizes()->space.xs,
-								   .childAlignment = {CLAY_ALIGN_X_LEFT,
-			                                          CLAY_ALIGN_Y_CENTER},
-								   .layoutDirection = CLAY_LEFT_TO_RIGHT,
+								   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 							 },
 				 }) {
-				draw_text(tr()->screen_word_view_phrase_words, theme()->outline, sizes()->font.label_md);
-				for (Size k{0}; k < word_payload.words.size; ++k) {
-					CLAY(CLAY_IDI("KeywordPill", k),
+				draw_text(tr()->screen_word_view_phrase_words, theme()->outline,
+				          sizes()->font.label_sm);
+
+				const float screen_pad_h = static_cast<float>(
+					  sizes()->pad.screen.left + sizes()->pad.screen.right);
+				const float card_pad_h = static_cast<float>(
+					  sizes()->pad.card.left + sizes()->pad.card.right);
+				const float max_content_width =
+					  static_cast<float>(ctx->display_width) - screen_pad_h -
+					  card_pad_h;
+
+				const float pill_pad_h =
+					  static_cast<float>(sizes()->pad.badge_compact.left +
+				                         sizes()->pad.badge_compact.right);
+				const float gap = static_cast<float>(sizes()->space.xs);
+
+				auto rows = split_keywords_into_rows(ctx, word_payload.words,
+				                                     max_content_width,
+				                                     pill_pad_h, gap);
+
+				for (Size row_idx = 0; row_idx < rows.size; ++row_idx) {
+					const auto &row = rows[row_idx];
+
+					CLAY(CLAY_IDI("PhraseKeywordRow", row_idx),
 					     {
-							   .layout = {.padding =
-					                            sizes()->pad.badge_compact},
-							   .backgroundColor = theme()->surfaceContainer,
-							   .cornerRadius = sizes()->radius.xs,
+							   .layout =
+									 {
+										   .sizing = {CLAY_SIZING_GROW(0),
+					                                  CLAY_SIZING_FIT(0)},
+										   .childGap = sizes()->space.xs,
+										   .childAlignment =
+												 {CLAY_ALIGN_X_LEFT,
+					                              CLAY_ALIGN_Y_CENTER},
+										   .layoutDirection =
+												 CLAY_LEFT_TO_RIGHT,
+									 },
 						 }) {
-						draw_text(word_payload.words[k], theme()->primary,
-						          sizes()->font.label_sm);
+						for (Size i = 0; i < row.count; ++i) {
+							Size word_index = row.start_index + i;
+							StrView word_text = word_payload.words[word_index];
+
+							auto pill_id = CLAY_IDI("KeywordPill", word_index);
+
+							bool is_hovered = Clay_PointerOver(pill_id);
+							Clay_Color bg =
+								  is_hovered ? theme()->surfaceContainerHigh
+											 : theme()->surfaceContainer;
+
+							CLAY(pill_id,
+							     {
+									   .layout =
+											 {.padding =
+							                        sizes()->pad.badge_compact},
+									   .backgroundColor = bg,
+									   .cornerRadius = sizes()->radius.xs,
+								 }) {
+								draw_text(word_text, theme()->primary,
+								          sizes()->font.label_sm);
+							}
+
+							if (is_hovered && ctx->tslt.is_tap()) {
+								WordId word_id{};
+								if (ctx->word_store.find_word(ctx->arena_frame,
+								                              word_text, false,
+								                              word_id)) {
+									if (!push_and_fill_state(ctx, word_id)) {
+										ctx->app_status.push_error(
+											  "Word view stack cap reached"_v);
+									}
+								} else {
+									ctx->app_status.push_error(
+										  "The word is not found in dictionary"_v);
+								}
+							}
+						}
 					}
 				}
 			}
@@ -752,8 +935,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					   .backgroundColor = theme()->outline,
 				 }) {}
 
-			draw_text(tr()->screen_word_view_examples, theme()->onSurfaceContainer,
-			          sizes()->font.title_md);
+			draw_text(tr()->screen_word_view_examples,
+			          theme()->onSurfaceContainer, sizes()->font.title_md);
 
 			CLAY(CLAY_ID("ExamplesList"),
 			     {
@@ -769,8 +952,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 				     example_index < word_payload.examples.size;
 				     ++example_index) {
 					const auto &ex = word_payload.examples[example_index];
-
-					CLAY(CLAY_IDI("ExampleCard", example_index),
+					auto card_id = CLAY_IDI("ExampleCard", example_index);
+					CLAY(card_id,
 					     {
 							   .layout =
 									 {
@@ -808,6 +991,21 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								  sizes()->font.body_sm,
 								  translation_font_id(ctx),
 								  CLAY_TEXT_WRAP_WORDS, CLAY_TEXT_ALIGN_LEFT);
+						}
+
+						if (Clay_PointerOver(card_id) && ctx->tslt.is_tap()) {
+							WordId word_id{};
+							if (ctx->word_store.find_word(ctx->arena_frame,
+							                              ex.text, true,
+							                              word_id)) {
+								if (!push_and_fill_state(ctx, word_id)) {
+									ctx->app_status.push_error(
+										  "Word view stack cap reached"_v);
+								}
+							} else {
+								ctx->app_status.push_error(
+									  "The example is not found in dictionary"_v);
+							}
 						}
 					}
 				}
@@ -855,8 +1053,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text(tr()->screen_word_view_syn, theme()->outline,
-							          sizes()->font.label_md);
+							draw_text(tr()->screen_word_view_syn,
+							          theme()->outline, sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("SynTextCol"),
 						     {
@@ -898,8 +1096,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text(tr()->screen_word_view_ant, theme()->outline,
-							          sizes()->font.label_md);
+							draw_text(tr()->screen_word_view_ant,
+							          theme()->outline, sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("AntTextCol"),
 						     {
@@ -941,8 +1139,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                              CLAY_SIZING_FIT(0)},
 										 },
 							 }) {
-							draw_text(tr()->screen_word_view_hyp, theme()->outline,
-							          sizes()->font.label_md);
+							draw_text(tr()->screen_word_view_hyp,
+							          theme()->outline, sizes()->font.label_md);
 						}
 						CLAY(CLAY_ID("HyperTextCol"),
 						     {
@@ -1098,12 +1296,14 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 		if (s.mode < Engine::Mode::Compose) {
 			const auto left =
 				  successful_reviews_to_next_mode(ctx->arena_frame, s);
-			draw_text(StrBuilder::concat(ctx->arena_frame, tr()->screen_word_view_next_level_in,
-			                             left, tr()->screen_word_view_reviews_count),
+			draw_text(StrBuilder::concat(ctx->arena_frame,
+			                             tr()->screen_word_view_next_level_in,
+			                             left,
+			                             tr()->screen_word_view_reviews_count),
 			          theme()->onSurfaceContainer, sizes()->font.label_md);
 		} else {
-			draw_text(tr()->screen_word_view_mastered_max_level, theme()->onSurfaceContainer,
-			          sizes()->font.label_md);
+			draw_text(tr()->screen_word_view_mastered_max_level,
+			          theme()->onSurfaceContainer, sizes()->font.label_md);
 		}
 	}
 }
@@ -1113,64 +1313,25 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 void screen_word_view_push(AppContext *ctx, WordId word_id) {
 	KLAPPT_PROFILE_SCOPE_N("screen_word_view_push");
 
-	SDL_Log(__PRETTY_FUNCTION__);
-	ctx->push(Screen::WordView);
+	if (ctx->word_view_states.is_empty()) {
+		ctx->push(Screen::WordView);
+	} else {
+		ctx->word_view_states.reset_size_reserved();
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "unexpected: word view states stack is not empty");
+	}
 
-	auto &state = *ctx->word_view_state;
-	state.word_id = word_id;
-	state.has_learning_state = false;
-	bool is_word_copied = false;
-
-	{
-		KLAPPT_PROFILE_SCOPE_N("copy Word words");
-		// NOTE: try to get it from the learning list
-		for (auto word_ref = ctx->words->begin(); word_ref < ctx->words->end();
-		     word_ref.advance(ctx->words)) {
-			// NOTE: we are not copying strings
-			auto &word = (*ctx->words)[word_ref];
-			if (word.word_id == word_id) {
-				state.word_copy = word;
-				is_word_copied = true;
-				break;
-			}
-		}
-	}
-	// NOTE: if the word not in the learning list -> get it from the store
-	if (!is_word_copied) {
-		KLAPPT_PROFILE_SCOPE_N("copy Word store");
-		// get it from xapian
-		ctx->word_store.get_by_id(ctx->arena_screen(), word_id,
-		                          state.word_copy);
-		is_word_copied = true;
-	}
-	{
-		KLAPPT_PROFILE_SCOPE_N("copy State");
-		// get it from lmdb
-		auto [is_success, was_found] =
-			  ctx->states.get(word_id, state.learning_state_copy);
-		if (is_success) {
-			state.has_learning_state = was_found;
-		} else {
-			ctx->app_status.push_error("lmdb get() error"_v);
-		}
-	}
-	{
-		KLAPPT_PROFILE_SCOPE_N("parse JSON");
-		simdjson::dom::parser parser{};
-
-		if (!word_json_parse(ctx->arena_frame, ctx->arena_screen(),
-		                     state.word_copy.json_payload, state.word_payload,
-		                     parser)) {
-			ctx->app_status.push_error("word_json_parse() error"_v);
-		} else {
-			// log_word_payload(state.word_payload);
-		}
-	}
+	ctx->word_view_states =
+		  DynArr<WordViewState>::with<WV_STATES_MAX>(ctx->arena_screen());
+	(void)push_and_fill_state(ctx, word_id);
 }
 
 void screen_word_view_draw(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("screen_word_view_draw");
-	auto &state = *ctx->word_view_state;
+	if (ctx->word_view_states.is_empty()) {
+		return;
+	}
+	auto &state = ctx->word_view_states.last();
 
 	CLAY(CLAY_ID("WordViewScreen"),
 	     {
@@ -1213,9 +1374,9 @@ void screen_word_view_draw(AppContext *ctx) {
 				}
 			};
 
-			list::vertical_dynamic_rich(ctx, CLAY_ID("WordCardsList"),
-			                            sizes()->space.md, sizes()->pad.screen,
-			                            count, draw_cards);
+			list::vertical_dynamic_rich(
+				  ctx, CLAY_IDI("WordCardsList", ctx->word_view_states.size),
+				  sizes()->space.md, sizes()->pad.screen, count, draw_cards);
 		}
 
 		CLAY(CLAY_ID("WordViewBottomBar"),
@@ -1254,7 +1415,7 @@ void screen_word_view_draw(AppContext *ctx) {
 			auto back_button = mobile_icon_button<false>(
 				  ctx, CLAY_ID_LOCAL("BackButton"), Icons::BACK);
 			if (back_button.activated()) {
-				ctx->pop();
+				on_back_button_pressed(ctx);
 			}
 
 #if NEURO

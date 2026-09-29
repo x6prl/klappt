@@ -42,7 +42,10 @@ struct WordStore {
 	 * Ensure the word exists in Xapian. If it already exists, word_id is filled
 	 * from the stored copy.
 	 */
-	bool find_word(Arena &scratch, Word &word) const;
+	bool ensure_word(Arena &scratch, Word &word) const;
+
+	bool find_word(Arena &scratch, StrView word, bool is_phrase,
+	               WordId &word_id) const;
 
 	bool get_by_id(Arena &scratch, WordId word_id, Word &word) const;
 	bool get_by_id_for_lang(Arena &scratch, WordId word_id, Word &word,

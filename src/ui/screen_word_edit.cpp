@@ -103,7 +103,7 @@ static void validate(WordEditState &edit) {
 }
 
 static void init_edit_from_view(AppContext *ctx) {
-	auto &view = *ctx->word_view_state;
+	auto &view = ctx->word_view_states.last();
 	auto &edit = *ctx->word_edit_state;
 	const auto &word = view.word_copy;
 
@@ -209,7 +209,7 @@ static void save_edit(AppContext *ctx) {
 	ctx->word_store.save(ctx->arena_frame, word);
 	update_learning_list_copy(ctx, word);
 
-	auto &view = *ctx->word_view_state;
+	auto &view = ctx->word_view_states.last();
 	view.word_copy = word;
 	if (view.has_learning_state) {
 		view.learning_state_copy.mode = edit.mode;
