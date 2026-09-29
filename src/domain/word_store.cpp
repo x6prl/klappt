@@ -351,12 +351,10 @@ void index_word_fields(Arena &scratch, Xapian::Document &doc,
 			auto third_p = grammar::verb_third_person(scratch, word.v);
 			index_field(generator, third_p, WEIGHT_NORM, FORM_PREFIX);
 		}
-		index_field(generator, word.v.praeteritum, WEIGHT_NORM, FORM_PREFIX);
-		if (word.v.auxv_and_past_participle) {
-			index_field(generator,
-			            grammar::verb_past_participle(scratch, word.v),
-			            WEIGHT_NORM, FORM_PREFIX);
-		}
+		index_field(generator, grammar::verb_praeteritum(scratch, word.v),
+		            WEIGHT_NORM, FORM_PREFIX);
+		index_field(generator, grammar::verb_past_participle(scratch, word.v),
+		            WEIGHT_NORM, FORM_PREFIX);
 		break;
 	case WordType::Adj:
 		doc.add_boolean_term("XYadj");
