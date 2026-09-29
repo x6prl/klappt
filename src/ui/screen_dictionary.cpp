@@ -14,6 +14,7 @@
 #include "ui/trs.h"
 
 void screen_dictionary_go(AppContext *ctx) {
+	ctx->dictionary_search.clear();
 	ctx->mobile_text_input.activate_text_input = true;
 	ctx->go(Screen::Dictionary);
 	ctx->push_one_frame();
