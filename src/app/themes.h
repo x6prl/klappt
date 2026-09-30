@@ -33,6 +33,9 @@ struct Theme {
 	// Borders and shadows
 	Clay_Color outline;
 	Clay_Color shadow;
+
+	// Other
+	Clay_Color safePaddingBackground;
 };
 
 const Theme *theme();

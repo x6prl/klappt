@@ -16,22 +16,29 @@ constexpr Theme app_themes[Theme::Themes_COUNT] =
 
 				  .surface = {255, 251, 254, 255}, // Very light pink/white
 				  .onSurface = {28, 27, 31, 255},  // Almost Black
-				  .surfaceContainerLow = {251, 247, 252, 255},  // Low elevated surface
-				  .onSurfaceContainerLow = {28, 27, 31, 255},   // Almost Black
-				  .surfaceContainer = {247, 242, 250, 255},     // Light elevated surface
-				  .onSurfaceContainer = {28, 27, 31, 255},      // Almost Black
-				  .surfaceContainerHigh = {238, 232, 244, 255}, // Higher elevated surface
-				  .onSurfaceContainerHigh = {28, 27, 31, 255},  // Almost Black
+				  .surfaceContainerLow = {251, 247, 252,
+                                          255}, // Low elevated surface
+				  .onSurfaceContainerLow = {28, 27, 31, 255}, // Almost Black
+				  .surfaceContainer = {247, 242, 250,
+                                       255}, // Light elevated surface
+				  .onSurfaceContainer = {28, 27, 31, 255}, // Almost Black
+				  .surfaceContainerHigh = {238, 232, 244,
+                                           255}, // Higher elevated surface
+				  .onSurfaceContainerHigh = {28, 27, 31, 255}, // Almost Black
 
-				  .error = {179, 38, 30, 255},     // Red
-				  .onError = {255, 255, 255, 255}, // White
-				  .rightContainer = {219, 239, 223, 255},   // Soft green
-				  .onRightContainer = {21, 74, 35, 255},    // Deep green
-				  .wrongContainer = {245, 225, 227, 255},   // Soft rose
-				  .onWrongContainer = {104, 55, 61, 255},   // Muted plum
+				  .error = {179, 38, 30, 255},            // Red
+				  .onError = {255, 255, 255, 255},        // White
+				  .rightContainer = {219, 239, 223, 255}, // Soft green
+				  .onRightContainer = {21, 74, 35, 255},  // Deep green
+				  .wrongContainer = {245, 225, 227, 255}, // Soft rose
+				  .onWrongContainer = {104, 55, 61, 255}, // Muted plum
 
 				  .outline = {121, 116, 126, 255}, // Grey
-				  .shadow = {0, 0, 0, 64}          // 25% Black for shadows
+				  .shadow = {0, 0, 0, 64},         // 25% Black for shadows
+
+				  .safePaddingBackground = {31, 30, 35,
+                                            255}, // surfaceContainerLow
+                                                  // from Dark theme
 			},
 
 			// ------------------------------------
@@ -48,22 +55,28 @@ constexpr Theme app_themes[Theme::Themes_COUNT] =
 
 				  .surface = {28, 27, 31, 255},      // Almost Black
 				  .onSurface = {230, 225, 229, 255}, // Light Grey
-				  .surfaceContainerLow = {31, 30, 35, 255},      // Low elevated surface
+				  .surfaceContainerLow = {31, 30, 35,
+                                          255}, // Low elevated surface
 				  .onSurfaceContainerLow = {230, 225, 229, 255}, // Light Grey
-				  .surfaceContainer = {36, 35, 40, 255},     // Slightly elevated surface
+				  .surfaceContainer = {36, 35, 40,
+                                       255}, // Slightly elevated surface
 				  .onSurfaceContainer = {230, 225, 229, 255}, // Light Grey
-				  .surfaceContainerHigh = {46, 45, 51, 255},  // Higher elevated surface
+				  .surfaceContainerHigh = {46, 45, 51,
+                                           255}, // Higher elevated surface
 				  .onSurfaceContainerHigh = {230, 225, 229, 255}, // Light Grey
 
-				  .error = {242, 184, 181, 255}, // Light Red
-				  .onError = {96, 20, 16, 255},  // Dark Red
-				  .rightContainer = {51, 82, 60, 255},     // Muted green
+				  .error = {242, 184, 181, 255},            // Light Red
+				  .onError = {96, 20, 16, 255},             // Dark Red
+				  .rightContainer = {51, 82, 60, 255},      // Muted green
 				  .onRightContainer = {220, 245, 224, 255}, // Pale green
 				  .wrongContainer = {91, 58, 64, 255},      // Soft rose
 				  .onWrongContainer = {248, 223, 227, 255}, // Pale rose
 
 				  .outline = {147, 143, 153, 255}, // Lighter Grey
-				  .shadow = {0, 0, 0, 128}         // 50% Black
+				  .shadow = {0, 0, 0, 128},        // 50% Black
+
+				  .safePaddingBackground = {31, 30, 35,
+                                            255}, // surfaceContainerLow
 			}};
 } // namespace
 

@@ -521,7 +521,7 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 								 },
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
-			   .backgroundColor = theme()->surfaceContainerLow,
+			   .backgroundColor = theme()->safePaddingBackground,
 		 }) {
 		CLAY(CLAY_ID("Content"),
 		     {.layout =
