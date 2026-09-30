@@ -101,6 +101,11 @@ bool parse_line(Arena &a, StrView line, Word &word) {
 		line = line.slice(2);
 		auto present_tense = line.mut_split_by('/').trimr();
 		auto [inf, exception] = present_tense.split_by('-');
+		// NOTE: like 'e-mailen'
+		if (exception.is_ends_with("en"_v)) {
+			inf = present_tense;
+			exception = {};
+		}
 
 		constexpr char SEPARABLE_PREFIX_SEPARATOR = '|';
 		if (inf.is_contains(SEPARABLE_PREFIX_SEPARATOR)) {
