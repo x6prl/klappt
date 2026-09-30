@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include <SDL3/SDL_log.h>
+
 #include <xapian.h>
 
 #include "base/arena.h"
@@ -26,6 +27,7 @@
 namespace {
 
 constexpr char NEXT_LOCAL_WORD_ID_KEY[] = "next_local_word_id";
+constexpr char DB_VERSION_KEY[] = "db_version";
 
 constexpr Xapian::valueno POPULARITY_VALUE_SLOT = 1;
 
@@ -589,6 +591,23 @@ void WordStore::close() {
 	}
 	delete db;
 	db = nullptr;
+}
+
+void WordStore::set_db_version(Arena &scratch, uint64_t version) {
+	auto fp_str = StrView::from_number(scratch, version);
+	db->set_metadata(DB_VERSION_KEY, {fp_str.data, (size_t)fp_str.size});
+}
+uint64_t WordStore::db_version() const {
+	uint64_t ret{};
+	const auto fp_str = db->get_metadata(DB_VERSION_KEY);
+	if (!fp_str.empty()) {
+		try {
+			ret = static_cast<uint32_t>(std::stoul(fp_str));
+		} catch (...) {
+			ret = 0;
+		}
+	}
+	return ret;
 }
 
 Size WordStore::word_count() const {

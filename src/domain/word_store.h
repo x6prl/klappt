@@ -3,6 +3,7 @@
 #include "base/arena.h"
 #include "base/str_view.h"
 #include "domain/word.h"
+
 #include "ui/translations/langs.h"
 
 enum class SearchMode : uint8_t {
@@ -33,6 +34,9 @@ struct WordStore {
 	bool open_sub1(StrView path);
 	void close();
 	bool is_open() const { return db != nullptr; }
+
+	void set_db_version(Arena &scratch, uint64_t version);
+	uint64_t db_version() const;
 
 	Size word_count() const;
 	Size matching_word_count(Arena &scratch, StrView query,

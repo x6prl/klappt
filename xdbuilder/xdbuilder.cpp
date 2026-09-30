@@ -164,7 +164,8 @@ bool parse_line(Arena &a, StrView line, Word &word) {
 	return true;
 }
 
-bool build_language_database(sqlite3 *db, const std::string &lang,
+bool build_language_database(sqlite3 *db, uint64_t db_fingerprint,
+                             const std::string &lang,
                              const std::string &output_dir) {
 	Measure m{lang.c_str()};
 	SDL_Log("========================================");
@@ -209,6 +210,8 @@ bool build_language_database(sqlite3 *db, const std::string &lang,
 	Arena scratch(8 * 1024 * 1024); // 8 MB
 	Size count = 0;
 	const int8_t current_lang_id = lang_code_to_id(lang);
+
+	ws.set_db_version(scratch, db_fingerprint);
 
 	while (sqlite3_step(stmt) == SQLITE_ROW) {
 		auto guard = scratch.guard();
@@ -279,11 +282,14 @@ bool build_language_database(sqlite3 *db, const std::string &lang,
 int main(int argc, char **argv) {
 	std::string sqlite_path = "dictionary_master.db";
 	std::string output_dir = "../klappt-resources";
+	uint64_t db_version = 0;
 
 	if (argc > 1)
 		sqlite_path = argv[1];
 	if (argc > 2)
 		output_dir = argv[2];
+	if (argc > 3)
+		db_version = std::stoul(argv[3]);
 
 	SDL_Log("Opening SQLite Master DB: %s", sqlite_path.c_str());
 	SDL_Log("Output resources directory: %s", output_dir.c_str());
@@ -302,7 +308,7 @@ int main(int argc, char **argv) {
 
 	bool all_ok = true;
 	for (const auto &lang : languages) {
-		if (!build_language_database(db, lang, output_dir)) {
+		if (!build_language_database(db, db_version, lang, output_dir)) {
 			all_ok = false;
 			break;
 		}
