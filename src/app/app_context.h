@@ -40,6 +40,7 @@ enum class Screen {
 	WordEdit,
 	Onboarding,
 	TTS_ASR,
+	UpdateDicts,
 	FontPerf,
 };
 
@@ -69,6 +70,8 @@ inline const char *screen_name(Screen s) {
 		return "Onboarding";
 	case Screen::TTS_ASR:
 		return "TTS/ASR";
+	case Screen::UpdateDicts:
+		return "UpdateDicts";
 	case Screen::FontPerf:
 		return "FontPerf";
 	}
@@ -229,7 +232,7 @@ struct AppContext {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::go");
 		KLAPPT_PROFILE_NAME_F("AppContext::go -> %s", screen_name(s));
 		const auto was = screen();
-		if (s != Screen::Trainer) {
+		if (s != Screen::Trainer && s != Screen::UpdateDicts) {
 			current = 1;
 			stack[0] = Screen::Trainer;
 			stack[1] = s;

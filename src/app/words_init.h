@@ -9,7 +9,6 @@
 #include "base/str_view.h"
 #include "domain/word.h"
 #include "domain/word_store.h"
-#include "domain/word_store_helpers.h"
 #include "domain/words_codec.h"
 #include "platform/files.h"
 #include "platform/neuro.h"
@@ -28,7 +27,7 @@ inline void save_words_dat(Arena &scratch, const Settings &settings,
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "WordsCodec::encode failed");
 		return;
 	}
-	const auto leaf = AssetsDL::words_snapshot_leaf[settings.tr_language];
+	const auto leaf = words_snapshot_leaf[settings.tr_language];
 	if (!file_save_relative(scratch, leaf, encoded.data, encoded.size)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Saving " StrView_Fmt " failed",
 		             StrView_Arg(leaf));
@@ -40,7 +39,6 @@ inline void sync_learning_words_to_store(Arena &scratch, const WordStore &store,
 	for (auto ref = words.begin(); ref < words.end(); ref.advance(&words)) {
 		auto &word = words[ref];
 
-		// Guard against any empty or Nil words
 		if (word.word_id.value == 0 || word.type == WordType::Nil) {
 			words.remove_by_ref(ref);
 			changed = true;
@@ -86,58 +84,6 @@ inline bool sync_learning_words_to_states(Engine::States &states,
 	}
 	return true;
 }
-
-// inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
-//                                     const Words &parsed, Size &added_count) {
-// 	for (Size ref = 1; ref < Words::MAX_WORDS; ++ref) {
-// 		if (!parsed.is_used({ref})) {
-// 			continue;
-// 		}
-// 		auto imported = parsed[ref];
-// 		bool was_new = false;
-// 		if (!store.ensure_word(scratch, imported, &was_new)) {
-// 			return false;
-// 		}
-// 		if (!was_new) {
-// 			continue;
-// 		}
-// 		++added_count;
-// 	}
-// 	return true;
-// }
-
-// inline bool import_new_parsed_words(Arena &scratch, WordStore &store,
-//                                     const DynArr<Word> &parsed,
-//                                     Size &added_count, uint64_t timestamp) {
-// 	for (Size i = 0; i < parsed.size; ++i) {
-// 		const auto &word = parsed[i];
-// 		auto imported = word;
-// 		// SDL_Log("import parsed word #%" PRSize " type=%d lemma=" StrView_Fmt,
-// 		// i,
-// 		//         static_cast<int>(word.type),
-// 		//         StrView_Arg(most_meaningfull_lemma(word)));
-// 		bool was_new = false;
-// 		if (!store.ensure_word(scratch, imported, timestamp, &was_new)) {
-// 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-// 			             "Importing parsed word #%" PRSize
-// 			             " failed (" StrView_Fmt ")",
-// 			             i, StrView_Arg(word_primary_lemma(word)));
-// 			return false;
-// 		}
-// 		// SDL_Log("import parsed word #%" PRSize " done new=%d id=%llu", i,
-// 		//         was_new ? 1 : 0,
-// 		//         static_cast<unsigned long long>(imported.word_id.value));
-// 		if (!was_new) {
-// 			continue;
-// 		}
-// 		++added_count;
-// 		if (added_count % (16 * 1024) == 0) {
-// 			SDL_Log("[%s] added %" PRSize " of %" PRSize "",
-// 			        store.lang.mutable_to_cstr(), added_count, parsed.size);
-// 		}
-// 	}
-// 	return true;
-// }
 
 struct LearningListSeedSpec {
 	WordType type;
@@ -190,108 +136,7 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 
 inline bool seed_default_learning_list(AppContext &ctx) {
 	return true; // TODO: rethink
-	static constexpr LearningListSeedSpec DEFAULT_SEEDS[] = {
-		  {WordType::Verb, "sein"_v},
-		  {WordType::Verb, "kommen"_v},
-		  {WordType::Verb, "sehen"_v},
-		  {WordType::Verb, "geben"_v},
-		  {WordType::Verb, "nehmen"_v},
-		  {WordType::Adj, "alt"_v},
-		  {WordType::Adj, "neu"_v},
-		  {WordType::Adj, "groß"_v},
-		  {WordType::Adj, "klein"_v},
-		  {WordType::Adj, "wichtig"_v},
-		  {WordType::Noun, "Auto"_v},
-		  {WordType::Noun, "Buch"_v},
-		  {WordType::Noun, "Computer"_v},
-		  {WordType::Noun, "Apfel"_v},
-		  {WordType::Noun, "Wohnung"_v},
-		  {WordType::Phrase, "Los geht's!"_v},
-		  {WordType::Phrase, "Ich bin dafür!"_v},
-	};
-
-	bool added_any = false;
-
-	for (const auto &spec : DEFAULT_SEEDS) {
-		auto g = ctx.arena_screen().guard();
-
-		Word matched_word{};
-		bool found = false;
-
-		WordStoreHelper::for_each_matching_word_range(
-			  ctx.arena_frame, ctx.word_store, spec.key, 0,
-			  ctx.word_store.word_count(), SearchMode::All,
-			  [&](Size, const Word &w) {
-				  if (learning_list_seed_matches(w, spec)) {
-					  matched_word = word_clone(ctx.arena, w);
-					  found = true;
-					  return false;
-				  }
-				  return true;
-			  });
-
-		if (!found) {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "Default learning-list seed not found: " StrView_Fmt,
-			             StrView_Arg(spec.key));
-			continue;
-		}
-
-		if (!add_word_to_learning_list_seeded(ctx.arena_frame, matched_word,
-		                                      *ctx.words, ctx.word_store,
-		                                      ctx.states)) {
-			ctx.app_status.push_error("Failed to seed learning list"_v);
-		}
-
-		added_any = true;
-	}
-
-	if (added_any) {
-		save_words_dat(ctx.arena_frame, ctx.settings, *ctx.words);
-	}
-	return true;
 }
-
-// inline void txt_to_xapian(WordStore &ws, StrView path, uint64_t timestamp) {
-// 	Measure m{__FUNCTION__};
-//
-// 	Arena a(1 << 30); // TODO: think harder
-//
-// 	// ***************************************************
-// 	// .txt file parsing and xapian db update
-// 	DynArr<Word> parsed_words;
-//
-// 	if (!wparse_file(a, path.to_cstr(a), parsed_words)) {
-// 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-// 		             "Loading source words from " StrView_Fmt " failed",
-// 		             StrView_Arg(path));
-// 		exit(-1);
-// 	}
-// 	m.point().printus("txt file parsed");
-// 	if (parsed_words.size > ws.word_count()) {
-// 		// TODO: update logic
-// 		SDL_Log("parsed %" PRSize ", but we have %" PRSize
-// 		        ". Should import the words",
-// 		        parsed_words.size, ws.word_count());
-//
-// 		Size added_count = 0;
-// 		if (!import_new_parsed_words(a, ws, parsed_words, added_count,
-// 		                             timestamp)) {
-// 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-// 			             "Importing parsed words failed");
-// 			exit(-1);
-// 		}
-// 		m.point().printus("new parsed words imported");
-// 		if (added_count > 0) {
-// 			SDL_Log("Imported %" PRSize " new words", added_count);
-// 		}
-// 	} else {
-// 		SDL_Log("parsed %" PRSize " and we have %" PRSize "", parsed_words.size,
-// 		        ws.word_count());
-// 	}
-// 	m.lap().printus("import active dictionary");
-// 	// ***************************************************
-// }
 
 inline bool init_runtime_data(AppContext &ctx) {
 	KLAPPT_PROFILE_SCOPE_N("init_runtime_data");
@@ -310,16 +155,31 @@ inline bool init_runtime_data(AppContext &ctx) {
 	WebPersistBatch persist_batch;
 
 	const auto lang = ctx.settings.tr_language;
-	const auto words_leaf = AssetsDL::words_snapshot_leaf[lang];
-	const auto word_store_leaf = AssetsDL::word_store_leaf[lang];
-	const auto states_leaf = AssetsDL::states_store_leaf[lang];
+	const auto asset_id = AssetsDL::dict_asset_id_for_lang(lang);
+
+	auto &scratch = ctx.arena_frame;
+	auto g = scratch.guard();
+
+	if (!AssetsDL::is_installed(scratch, asset_id)) {
+		auto code = lang_code(lang);
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "Cannot init runtime data: dictionary for " StrView_Fmt
+		             " is not installed",
+		             StrView_Arg(code));
+		return false;
+	}
+
+	const auto words_leaf = words_snapshot_leaf[lang];
+	const auto states_leaf = states_store_leaf[lang];
+	const auto word_store_path = AssetsDL::target_path(scratch, asset_id);
 
 	const auto lcode = lang_code(lang);
 	SDL_Log("Active translation language: " StrView_Fmt, StrView_Arg(lcode));
 
-	auto &scratch = ctx.arena_frame;
-	auto g = scratch.guard();
-	{ // opening
+	{ 
+		ctx.word_store.close();
+		ctx.states.close();
+
 		auto states_path = get_writable_file_path_for(scratch, states_leaf);
 		if (!ctx.states.open(states_path)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
@@ -328,15 +188,18 @@ inline bool init_runtime_data(AppContext &ctx) {
 		}
 		m.lap().printus("learning states opened");
 
-		auto word_store_path =
-			  get_writable_file_path_for(scratch, word_store_leaf);
 		if (!ctx.word_store.open(word_store_path)) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Opening Xapian words failed");
 			return false;
 		}
 		m.lap().printus("xapian opened");
 
+		if (ctx.words) {
+			delete ctx.words;
+			ctx.words = nullptr;
+		}
 		ctx.words = new Words;
+
 		FileLoader fl{};
 		if (fl.load_from_writable(scratch, words_leaf)) {
 			SDL_Log(StrView_Fmt " loaded: %" PRSize " bytes",

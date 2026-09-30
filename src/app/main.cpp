@@ -414,13 +414,14 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	if (ctx->settings.onboarding_stage < 0) {
 		if (!init_runtime_data(*ctx)) {
-			return SDL_APP_FAILURE;
-		}
+			ctx->go(Screen::UpdateDicts);
+		} else {
 #if HOTRELOAD
-		ctx->go(static_cast<Screen>(ctx->settings.default_screen));
+			ctx->go(static_cast<Screen>(ctx->settings.default_screen));
 #else
-		screen_default_go(ctx);
+			screen_default_go(ctx);
 #endif
+		}
 	}
 	m.lap().printus("runtime data initialized");
 

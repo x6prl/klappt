@@ -94,29 +94,29 @@ static void draw_option_row(AppContext *ctx, Clay_ElementId id, StrView label,
 }
 
 static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
-                                              AssetsDL::Type t,
+                                              AssetsDL::AssetId id,
                                               auto should_be_downloaded_f) {
-	auto &s = ctx->settings;
-	auto &r = AssetsDL::get(t, s.tr_language);
-	if (should_be_downloaded_f(ctx) && !r.is_unpacked && !r.is_zip_removed) {
-		auto pool_index = Worker::net_download_and_unpack_asset(ctx, t);
+	if (!should_be_downloaded_f(ctx)) {
+		return true;
+	}
+
+	// Reliable check against .installed marker on disk
+	if (!AssetsDL::is_installed(ctx->arena_frame, id)) {
+		auto pool_index = Worker::net_download_and_unpack_asset(ctx, id);
 		if (pool_index >= 0) {
 			download_track(ctx, pool_index, label);
-		} else {
-			if (pool_index == -2)
-				return false;
+		} else if (pool_index == -2) {
+			return false;
 		}
 	}
 	return true;
 }
 
 static bool run_download_and_unpack_tr_asset(AppContext *ctx) {
+	const auto id = AssetsDL::dict_asset_id_for_lang(ctx->settings.tr_language);
 	return check_and_run_download_and_unpack(
-		  ctx, tr()->screen_onboarding_asset_main_dict,
-		  AssetsDL::Type::XAPIAN_USER_LANG, [](AppContext *ctx) {
-			  (void)ctx;
-			  return true;
-		  });
+		  ctx, tr()->screen_onboarding_asset_main_dict, id,
+		  [](AppContext *) { return true; });
 }
 
 #if NEURO
@@ -124,42 +124,39 @@ static bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 	auto ret = true;
 	ret = ret && check_and_run_download_and_unpack(
 					   ctx, tr()->screen_onboarding_asset_tts,
-					   AssetsDL::Type::OPTIONAL_TTS, [](AppContext *ctx) {
-						   return ctx->settings.is_module_tts;
-					   });
+					   AssetsDL::AssetId::OPT_TTS,
+					   [](AppContext *c) { return c->settings.is_module_tts; });
 	ret = ret && check_and_run_download_and_unpack(
 					   ctx, tr()->screen_onboarding_asset_asr,
-					   AssetsDL::Type::OPTIONAL_ASR, [](AppContext *ctx) {
-						   return ctx->settings.is_module_asr;
-					   });
+					   AssetsDL::AssetId::OPT_ASR,
+					   [](AppContext *c) { return c->settings.is_module_asr; });
 	return ret;
 }
 
 static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
-	using AType = AssetsDL::Type;
 	auto &s = ctx->settings;
-	auto lang = ctx->settings.tr_language;
-	if (!AssetsDL::get(AType::XAPIAN_USER_LANG, lang).is_unpacked) {
+	const auto dict_id = AssetsDL::dict_asset_id_for_lang(s.tr_language);
+
+	if (!AssetsDL::is_installed(ctx->arena_frame, dict_id)) {
 		return false;
 	}
 	if (s.is_module_tts &&
-	    !AssetsDL::get(AType::OPTIONAL_TTS, lang).is_unpacked) {
+	    !AssetsDL::is_installed(ctx->arena_frame, AssetsDL::AssetId::OPT_TTS)) {
 		return false;
 	}
 	if (s.is_module_asr &&
-	    !AssetsDL::get(AType::OPTIONAL_ASR, lang).is_unpacked) {
+	    !AssetsDL::is_installed(ctx->arena_frame, AssetsDL::AssetId::OPT_ASR)) {
 		return false;
 	}
 	return true;
 }
 #else
 static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
-	return AssetsDL::get(AssetsDL::Type::XAPIAN_USER_LANG,
-	                     ctx->settings.tr_language)
-	      .is_unpacked;
+	const auto dict_id =
+		  AssetsDL::dict_asset_id_for_lang(ctx->settings.tr_language);
+	return AssetsDL::is_installed(ctx->arena_frame, dict_id);
 }
 #endif
-
 static void draw_segmented_progress_bar(AppContext *ctx, int current_step,
                                         int total_steps) {
 	(void)ctx;
@@ -788,6 +785,7 @@ static void step_draw_downloading_and_setup(AppContext *ctx) {
 		}
 
 		if (are_all_selected_assets_fully_unpacked(ctx)) {
+			ctx->downloads.pop(ctx->downloads.size);
 			onboarding_advance(ctx, 1);
 		}
 	}

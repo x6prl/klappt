@@ -9,7 +9,35 @@
 
 #include "ui/translations/langs.h"
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-designator"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+inline constexpr StrView states_store_leaf[lang_COUNT] = {
+	  [lang_en] = "states-en.lmdb"_v,
+	  [lang_ru] = "states-ru.lmdb"_v,
+	  [lang_tr] = "states-tr.lmdb"_v,
+	  [lang_ar] = "states-ar.lmdb"_v,
+};
+
+inline constexpr StrView words_snapshot_leaf[lang_COUNT] = {
+	  [lang_en] = "words-en.dat"_v,
+	  [lang_ru] = "words-ru.dat"_v,
+	  [lang_tr] = "words-tr.dat"_v,
+	  [lang_ar] = "words-ar.dat"_v,
+};
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 struct Settings {
+	uint8_t version{0};
+	uint8_t _reserved[3];
 	Theme::Type theme_type{};
 	Lang tr_language = lang_ru;
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "base/arr.h"
-#include "base/str_builder.h"
 #include "base/str_view.h"
 
 #include "platform/files.h"
@@ -28,29 +27,32 @@ static constexpr auto HOST = "http://0.0.0.0:8000/"_v;
 // static constexpr auto HOST = "http://10.224.66.46:8000/"_v;
 #endif
 
-static constexpr auto TTS_ESPEAKNG_DATA_AND_PIPER_ZIP =
-	  "espeak-ng-data-and-piper.zip"_v;
-static constexpr auto ASR_WHISPER_BASE_ZIP = "sherpa-onnx-whisper-base.zip"_v;
-
-// NOTE: making changes, check everywhere used the order and the indices
-enum class Type : int32_t {
-	XAPIAN_USER_LANG = 0,
-	OPTIONAL_XAPIAN_DE = 1,
-	OPTIONAL_XAPIAN_EN,
-	OPTIONAL_TTS,
-	OPTIONAL_ASR,
+enum AssetId : uint8_t {
+	DICT_EN = 0,
+	DICT_RU,
+	DICT_TR,
+	DICT_AR,
+	DICT_DE,
+	OPT_TTS,
+	OPT_ASR,
 	_COUNT
 };
 
-struct RemoteAssetStatus {
-	bool is_zip_ready_to_unpack{false};
-	bool is_unpacked{false};
-	bool is_zip_removed{false};
+inline constexpr AssetId dict_asset_id_for_lang(Lang lang) noexcept {
+	switch (lang) {
+	case lang_en: return AssetId::DICT_EN;
+	case lang_ru: return AssetId::DICT_RU;
+	case lang_tr: return AssetId::DICT_TR;
+	case lang_ar: return AssetId::DICT_AR;
+	default:      return AssetId::DICT_EN;
+	}
+}
 
-	Size expected_size{-1};
+struct AssetDesc {
+	StrView id_name;       // e.g. "words-ru"
+	StrView target_file;   // e.g. "words-ru.xapian"
+	StrView zip_file;      // e.g. "words-ru.xapian.zip"
 };
-
-inline constexpr StrView word_store_leaf_de = "words-de.xapian"_v;
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -59,27 +61,15 @@ inline constexpr StrView word_store_leaf_de = "words-de.xapian"_v;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
-
-inline constexpr StrView states_store_leaf[lang_COUNT] = {
-	  [lang_en] = "states-en.lmdb"_v,
-	  [lang_ru] = "states-ru.lmdb"_v,
-	  [lang_tr] = "states-tr.lmdb"_v,
-	  [lang_ar] = "states-ar.lmdb"_v,
-};
-
-inline constexpr StrView word_store_leaf[lang_COUNT] = {
-	  [lang_en] = "words-en.xapian"_v,
-	  [lang_ru] = "words-ru.xapian"_v,
-	  [lang_tr] = "words-tr.xapian"_v,
-	  [lang_ar] = "words-ar.xapian"_v,
-};
-
-inline constexpr StrView words_snapshot_leaf[lang_COUNT] = {
-	  [lang_en] = "words-en.dat"_v,
-	  [lang_ru] = "words-ru.dat"_v,
-	  [lang_tr] = "words-tr.dat"_v,
-	  [lang_ar] = "words-ar.dat"_v,
-};
+inline constexpr Arr<AssetDesc, (Size)AssetId::_COUNT> ASSET_REGISTRY = {{
+	[AssetId::DICT_EN] = {"words-en"_v, "words-en.xapian"_v, "words-en.xapian.zip"_v},
+	[AssetId::DICT_RU] = {"words-ru"_v, "words-ru.xapian"_v, "words-ru.xapian.zip"_v},
+	[AssetId::DICT_TR] = {"words-tr"_v, "words-tr.xapian"_v, "words-tr.xapian.zip"_v},
+	[AssetId::DICT_AR] = {"words-ar"_v, "words-ar.xapian"_v, "words-ar.xapian.zip"_v},
+	[AssetId::DICT_DE] = {"words-de"_v, "words-de.xapian"_v, "words-de.xapian.zip"_v},
+	[AssetId::OPT_TTS] = {"tts"_v,      "espeak-ng-data-and-piper"_v, "espeak-ng-data-and-piper.zip"_v},
+	[AssetId::OPT_ASR] = {"asr"_v,      "sherpa-onnx-whisper-base"_v, "sherpa-onnx-whisper-base.zip"_v},
+}};
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
@@ -87,81 +77,48 @@ inline constexpr StrView words_snapshot_leaf[lang_COUNT] = {
 #pragma GCC diagnostic pop
 #endif
 
-inline Arr<RemoteAssetStatus, (Size)lang_COUNT> xapian_trs = {};
-inline Arr<RemoteAssetStatus, (Size)Type::_COUNT - (Size)Type::OPTIONAL_XAPIAN_DE>
-	  optional_assets{};
-
-inline RemoteAssetStatus &get(AssetsDL::Type type, Lang tr_language) {
-	switch (type) {
-	case Type::XAPIAN_USER_LANG:
-		return xapian_trs[tr_language];
-	case Type::OPTIONAL_XAPIAN_EN:
-		return xapian_trs[(Size)(lang_en)];
-	case Type::OPTIONAL_XAPIAN_DE:
-	case Type::OPTIONAL_TTS:
-	case Type::OPTIONAL_ASR:
-		return optional_assets[(int)(type) - (int)(Type::OPTIONAL_XAPIAN_DE)];
-	case Type::_COUNT:
-	default:
-		break;
+inline AssetId find_asset_by_path(StrView file_path) {
+	for (Size i = 0; i < (Size)AssetId::_COUNT; ++i) {
+		const auto &desc = ASSET_REGISTRY[i];
+		if (file_path.is_contains_substr(desc.zip_file)) {
+			return static_cast<AssetId>(i);
+		}
 	}
-	return xapian_trs[tr_language];
+	return AssetId::_COUNT;
 }
 
-inline auto for_each_optional(auto f) {
-	for (auto i{(Size)(Type::OPTIONAL_XAPIAN_DE)}; i < (Size)(Type::_COUNT);
-	     ++i) {
-		const auto type = static_cast<Type>(i);
-		f(get(type, lang_en), type);
-	}
+inline StrView zip_path(Arena &a, AssetId id) {
+	return get_writable_file_path_for(a, ASSET_REGISTRY[(Size)id].zip_file);
 }
 
-struct AssetFileTarget {
-	StrView name{};
-	StrView suffix{};
-};
-
-inline AssetFileTarget asset_file_target(AssetsDL::Type type,
-                                         Lang tr_language) {
-	switch (type) {
-	case Type::XAPIAN_USER_LANG:
-		return {word_store_leaf[tr_language], ".zip"_v};
-	case Type::OPTIONAL_XAPIAN_DE:
-		return {word_store_leaf_de, ".zip"_v};
-	case Type::OPTIONAL_XAPIAN_EN:
-		return {word_store_leaf[lang_en], ".zip"_v};
-	case Type::OPTIONAL_TTS:
-		return {TTS_ESPEAKNG_DATA_AND_PIPER_ZIP, {}};
-	case Type::OPTIONAL_ASR:
-		return {ASR_WHISPER_BASE_ZIP, {}};
-	case Type::_COUNT:
-		break;
-	default:
-		break;
-	}
-	return {};
+inline StrView zip_tmp_path(Arena &a, AssetId id) {
+	return get_writable_file_path_for(a, ASSET_REGISTRY[(Size)id].zip_file, ".tmp"_v);
 }
 
-inline StrView zip_path(Arena &a, AssetsDL::Type type, Lang tr_language) {
-	const auto [name, suffix] = asset_file_target(type, tr_language);
-	return suffix ? get_writable_file_path_for(a, name, suffix)
-	              : get_writable_file_path_for(a, name);
+inline StrView marker_installed_path(Arena &a, AssetId id) {
+	return get_writable_file_path_for(a, ASSET_REGISTRY[(Size)id].target_file, ".installed"_v);
 }
 
-inline StrView get_url_for(Arena &a, StrView name, StrView suffix) {
-	if (suffix) {
-		StrBuilder strs{};
-		strs.push(a, HOST);
-		strs.push(a, name);
-		strs.push(a, suffix);
-		return strs.join(a);
-	} else {
-		return StrView::concat(a, HOST, name);
-	}
+inline StrView target_path(Arena &a, AssetId id) {
+	return get_writable_file_path_for(a, ASSET_REGISTRY[(Size)id].target_file);
 }
 
-inline StrView zip_url(Arena &a, AssetsDL::Type type, Lang tr_language) {
-	const auto [name, suffix] = asset_file_target(type, tr_language);
-	return get_url_for(a, name, suffix);
+inline StrView zip_url(Arena &a, AssetId id) {
+	return StrView::concat(a, HOST, ASSET_REGISTRY[(Size)id].zip_file);
+}
+
+inline bool is_installed(Arena &a, AssetId id) {
+	return fs_exists(marker_installed_path(a, id));
+}
+
+inline void mark_installed(Arena &a, AssetId id) {
+	fs_touch(marker_installed_path(a, id));
+}
+
+inline void clean_asset(Arena &a, AssetId id) {
+	fs_remove(zip_tmp_path(a, id));
+	fs_remove(zip_path(a, id));
+	fs_remove(marker_installed_path(a, id));
+	fs_remove_all(target_path(a, id));
 }
 } // namespace AssetsDL

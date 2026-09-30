@@ -616,6 +616,12 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 #endif
 				break;
 			}
+			case Screen::UpdateDicts: {
+				KLAPPT_PROFILE_SCOPE_N("render_screen.UpdateDicts");
+				app_bar_layout(ctx, "__"_v);
+				screen_update_dicts_draw(ctx);
+				break;
+			}
 			case Screen::FontPerf: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.FontPerf");
 				screen_font_rendering_perf_draw(ctx);

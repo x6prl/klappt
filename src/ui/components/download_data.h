@@ -2,13 +2,16 @@
 
 #include "base/arena.h"
 #include "base/fixed_str.h"
-#include "platform/net_worker.h"
 
+using NetFinishedCallback = void (*)(Size slot_index, int32_t request_id,
+                                     int status, StrView file_name,
+                                     DynArr<unsigned char> memory_buffer);
 struct DownloadData {
 	StrView title{};
 	enum Status {
 		EMPTY,
 		TRACKING,
+		UNPACKING,
 		FINISHED_OK,
 		FINISHED_CANCELLED,
 		FINISHED_ERROR
@@ -30,6 +33,5 @@ struct DownloadData {
 	FixedStr<128> copy_url{};
 	FixedStr<128> copy_file_name{};
 	DynArr<unsigned char> copy_memory_buffer{};
-	NetRequest::OnFinishedFunction copy_on_finished_func{};
-
+	NetFinishedCallback copy_on_finished_func{};
 };

@@ -6,6 +6,7 @@
 #include "base/dyn_arr.h"
 #include "base/fixed_str.h"
 #include "base/str_view.h"
+#include "ui/components/download_data.h"
 
 struct NetRequest {
 	using OnFinishedFunction = void (*)(Size slot_index, int32_t request_id,
@@ -46,9 +47,9 @@ struct NetRequest {
 		Atomic::set(&is_cancelled, false);
 	}
 };
-
 namespace Worker {
-Size net_download_and_unpack_asset(AppContext *ctx, AssetsDL::Type type);
+Size net_download_and_unpack_asset(AppContext *ctx, AssetsDL::AssetId id);
+void download_retry(AppContext *ctx, DownloadData &dl);
 
 // void net_cancel_all(AppContext *ctx);
 void net_cancel_request(AppContext *ctx, Size req_index_in_the_pool);
