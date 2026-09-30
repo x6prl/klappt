@@ -479,8 +479,9 @@ static void step_draw_card_display_settings(AppContext *ctx) {
 							ctx->settings.save(ctx->arena_frame);
 						});
 
-		draw_option_row(ctx, CLAY_ID("OptMarkSein"), "Mark 'sein' verbs"_v,
-		                "Shows * for verbs using 'sein' as auxiliary"_v,
+		draw_option_row(ctx, CLAY_ID("OptMarkSein"),
+		                tr()->screen_onboarding_opt_mark_sein,
+		                tr()->screen_onboarding_opt_mark_sein_desc,
 		                ctx->settings.is_mark_verb_aux_sein, [ctx](bool val) {
 							ctx->settings.is_mark_verb_aux_sein = val;
 							ctx->settings.save(ctx->arena_frame);
