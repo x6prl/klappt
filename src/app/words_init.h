@@ -28,7 +28,7 @@ inline void save_words_dat(Arena &scratch, const Settings &settings,
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "WordsCodec::encode failed");
 		return;
 	}
-	const auto leaf = AssetsDL::words_snapshot_leaf(settings.tr_language);
+	const auto leaf = AssetsDL::words_snapshot_leaf[settings.tr_language];
 	if (!file_save_relative(scratch, leaf, encoded.data, encoded.size)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Saving " StrView_Fmt " failed",
 		             StrView_Arg(leaf));
@@ -55,8 +55,6 @@ inline void sync_learning_words_to_store(Arena &scratch, const WordStore &store,
 			changed = true;
 			continue;
 		}
-
-		changed = changed;
 	}
 }
 
@@ -312,9 +310,9 @@ inline bool init_runtime_data(AppContext &ctx) {
 	WebPersistBatch persist_batch;
 
 	const auto lang = ctx.settings.tr_language;
-	const auto words_leaf = AssetsDL::words_snapshot_leaf(lang);
-	const auto word_store_leaf = AssetsDL::word_store_leaf(lang);
-	const auto states_leaf = AssetsDL::states_store_leaf(lang);
+	const auto words_leaf = AssetsDL::words_snapshot_leaf[lang];
+	const auto word_store_leaf = AssetsDL::word_store_leaf[lang];
+	const auto states_leaf = AssetsDL::states_store_leaf[lang];
 
 	const auto lcode = lang_code(lang);
 	SDL_Log("Active translation language: " StrView_Fmt, StrView_Arg(lcode));

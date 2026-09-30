@@ -10,9 +10,20 @@
 #include "base/str_view.h"
 #include "platform/fs.h"
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
 #define _LARGEFILE64_SOURCE 1
 #include "vendor/miniz/miniz.h"
-
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 namespace {
 bool unpack(std::string in_fname, std::string out_dir) {
 	Measure m{__FUNCTION__};

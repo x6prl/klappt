@@ -331,12 +331,6 @@ void keypad_island_commit(AppContext *ctx) {
 		auto color_text = g_keypad_island.pending.style.text;
 		auto labels = g_keypad_island.pending.labels;
 		auto font_size = sizes()->font.title_lg; // TODO: adjust size
-		auto ticks = ctx->ticks;
-		TTF_Font *font{};
-		{
-			KLAPPT_PROFILE_SCOPE_N("keypad_island.get_font");
-			font = ctx->text->get_font(FontID::MAIN, font_size);
-		}
 		for (Size i{0}; i < cells_count; ++i) {
 			auto &cell = cells[i];
 

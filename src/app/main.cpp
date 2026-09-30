@@ -364,10 +364,11 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	}
 	m.lap().printus("themes and sizes are set");
 
-	Worker::job_push(ctx, Job{
-								.id = -10,
-								.func = load_fonts_job,
-						  });
+	Worker::job_push(ctx, Job::Type::SINGLE_THREADED,
+	                 Job{
+						   .id = -10,
+						   .func = load_fonts_job,
+					 });
 	m.lap().printus("font job queued");
 
 #ifdef __EMSCRIPTEN__
@@ -434,7 +435,8 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		SDL_CreateThread(NetWorkerThread, "NetWorkerThread", ctx);
 #endif
 	};
-	Worker::job_push(ctx, Job{.id = -2, .func = init_other_workers_job});
+	Worker::job_push(ctx, Job::Type::SINGLE_THREADED,
+	                 Job{.id = -2, .func = init_other_workers_job});
 	m.lap().printus("backgroun workers run");
 
 	// sync with base font loading

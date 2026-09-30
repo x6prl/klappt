@@ -1,3 +1,4 @@
+#include "app/assets_dl.h"
 #include "screen_helpers.h"
 
 #include "app/app_context.h"
@@ -15,6 +16,13 @@
 #include "ui/trs.h"
 
 namespace {
+
+static void for_every_lang(auto f) {
+	for (int i{0}; i < (int)(lang_COUNT); ++i) {
+		auto lang = static_cast<Lang>(i);
+		f(i, lang);
+	}
+}
 
 static inline void onboarding_advance(AppContext *ctx, int delta = 1) {
 	ctx->settings.onboarding_stage += delta;
@@ -89,7 +97,7 @@ static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
                                               AssetsDL::Type t,
                                               auto should_be_downloaded_f) {
 	auto &s = ctx->settings;
-	auto &r = s.asset(t);
+	auto &r = AssetsDL::get(t, s.tr_language);
 	if (should_be_downloaded_f(ctx) && !r.is_unpacked && !r.is_zip_removed) {
 		auto pool_index = Worker::net_download_and_unpack_asset(ctx, t);
 		if (pool_index >= 0) {
@@ -105,7 +113,7 @@ static bool check_and_run_download_and_unpack(AppContext *ctx, StrView label,
 static bool run_download_and_unpack_tr_asset(AppContext *ctx) {
 	return check_and_run_download_and_unpack(
 		  ctx, tr()->screen_onboarding_asset_main_dict,
-		  AssetsDL::Type::XAPIAN_TR, [](AppContext *ctx) {
+		  AssetsDL::Type::XAPIAN_USER_LANG, [](AppContext *ctx) {
 			  (void)ctx;
 			  return true;
 		  });
@@ -130,21 +138,25 @@ static bool run_download_and_unpack_optional_assets(AppContext *ctx) {
 static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
 	using AType = AssetsDL::Type;
 	auto &s = ctx->settings;
-
-	if (!s.asset(AType::XAPIAN_TR).is_unpacked) {
+	auto lang = ctx->settings.tr_language;
+	if (!AssetsDL::get(AType::XAPIAN_USER_LANG, lang).is_unpacked) {
 		return false;
 	}
-	if (s.is_module_tts && !s.asset(AType::OPTIONAL_TTS).is_unpacked) {
+	if (s.is_module_tts &&
+	    !AssetsDL::get(AType::OPTIONAL_TTS, lang).is_unpacked) {
 		return false;
 	}
-	if (s.is_module_asr && !s.asset(AType::OPTIONAL_ASR).is_unpacked) {
+	if (s.is_module_asr &&
+	    !AssetsDL::get(AType::OPTIONAL_ASR, lang).is_unpacked) {
 		return false;
 	}
 	return true;
 }
 #else
 static bool are_all_selected_assets_fully_unpacked(AppContext *ctx) {
-	return ctx->settings.asset(AssetsDL::Type::XAPIAN_TR).is_unpacked;
+	return AssetsDL::get(AssetsDL::Type::XAPIAN_USER_LANG,
+	                     ctx->settings.tr_language)
+	      .is_unpacked;
 }
 #endif
 
@@ -221,7 +233,7 @@ static void step_draw_language(AppContext *ctx) {
 						 },
 			 }) {
 
-			Settings::for_every_lang([&](int i, Lang lang) {
+			for_every_lang([&](int i, Lang lang) {
 				if (lang == lang_ar || lang == lang_tr) {
 					return;
 				}

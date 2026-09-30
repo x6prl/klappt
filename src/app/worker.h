@@ -44,20 +44,36 @@ struct ThreadContext {
 
 struct Job {
 	using JobFunction = void (*)(void);
-	// enum class Type {
-	// 	SINGLE_THREADED,
-	// 	// MULTI_THREADED,
-	// };
+	using JobFunctionParam = void (*)(const Job &);
+	enum class Type {
+		SINGLE_THREADED,
+		SINGLE_THREADED_PARAMETRIZED,
+		// MULTI_THREADED,
+	} type{Job::Type::SINGLE_THREADED};
 	int id{-1};
 	// Type type{Type::SINGLE_THREADED};
 	// Size thread_count{2};
 	union {
 		JobFunction func{nullptr};
+		JobFunctionParam func_param;
 		// void (*func_mt)(AppContext *app_ctx, LaneContext *lane_ctx);
 	};
-	// union {
-	// 	StrView tts_text;
-	// };
+	union {
+		unsigned char u8_arr[16]{};
+		char i8_arr[16];
+		uint16_t u16_arr[8];
+		int16_t i16_arr[8];
+		uint32_t u32_arr[4];
+		int32_t i32_arr[4];
+		uint64_t u64_arr[2];
+		int64_t i64_arr[2];
+
+		StrView str;
+
+		void *ptr;
+		uint64_t u64_val;
+		int64_t i64_val;
+	};
 };
 
 struct AudioJob {
@@ -108,14 +124,13 @@ ThreadContext *tctx();
 // NOTE: commands to perform on main thread
 namespace MT {
 void run(MainThreadCallback func);
-void run_with_payload(void *payload,
-                                  MainThreadCallbackWithPayload func);
+void run_with_payload(void *payload, MainThreadCallbackWithPayload func);
 void touch_ui();
 } // namespace MT
 // NOTE: commands to perform on worker threads
 
 namespace Worker {
-void job_push(AppContext *ctx, Job job);
+void job_push(AppContext *ctx, Job::Type job_type, Job job);
 void audio_job_push(AppContext *ctx, AudioJob job);
 #if NEURO
 void neuro_job_push(AppContext *ctx, NeuroJob job);

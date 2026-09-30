@@ -2,11 +2,11 @@
 
 #include <SDL3/SDL_log.h>
 
-#include "app/assets_dl.h"
 #include "app/sizes.h"
 #include "app/themes.h"
 #include "base/str_view.h"
 #include "platform/files.h"
+
 #include "ui/translations/langs.h"
 
 struct Settings {
@@ -43,18 +43,6 @@ struct Settings {
 	FontScaleLevel font_scale{FontScaleLevel::Normal};
 
 	int32_t onboarding_stage{0};
-	AssetsDL assets;
-
-	static void for_every_lang(auto f) {
-		for (int i{0}; i < (int)std::to_underlying(lang_COUNT); ++i) {
-			auto lang = static_cast<Lang>(i);
-			f(i, lang);
-		}
-	}
-
-	AssetsDL::RemoteAsset &asset(AssetsDL::Type t) {
-		return assets.get(t, tr_language);
-	}
 
 	static StrView encode(Arena &a, const Settings &src) {
 		// TODO: :O :O :O fixme

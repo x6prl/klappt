@@ -1,7 +1,6 @@
 #include "net_worker.h"
 
 #include <filesystem>
-#include <utility>
 
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +10,7 @@
 #include <SDL3/SDL_timer.h>
 
 #include "app/app_context.h"
+#include "app/assets_dl.h"
 #include "app/net_context.h"
 #include "app/worker.h"
 #include "base/atomic.h"
@@ -847,70 +847,78 @@ Size Worker::net_download_memory(AppContext *ctx, StrView url,
 }
 
 namespace {
-using AType = AssetsDL::Type;
-template <AType ASSET_TYPE> //
-struct AssetsCallbacks {
-	static void set_asset_zip_ready_to_unpack(AppContext *ctx, void *payload) {
-		Size bytes_total = reinterpret_cast<int64_t>(payload);
-		ctx->settings.asset(ASSET_TYPE).expected_size = bytes_total;
-		ctx->settings.asset(ASSET_TYPE).is_zip_ready_to_unpack = true;
-		ctx->settings.save(ctx->arena_frame);
-		SDL_Log("downloaded SET %d", (int)(ASSET_TYPE));
-	};
-	static void set_asset_unpacked_and_remove_zip(AppContext *ctx) {
-		auto g = ctx->arena_frame.guard();
-		ctx->settings.asset(ASSET_TYPE).is_unpacked = true;
-		SDL_Log("unpacked SET %d", (int)ASSET_TYPE);
-		ctx->settings.asset(ASSET_TYPE).is_zip_ready_to_unpack = false;
-		SDL_Log("zip ready UNSET %d", (int)ASSET_TYPE);
-		auto zip_path = ctx->settings.assets.zip_path(
-			  ctx->arena_frame, ASSET_TYPE, ctx->settings.tr_language);
-		ctx->settings.save(ctx->arena_frame);
-		std::filesystem::remove(
-			  std::string_view{zip_path.data, (size_t)zip_path.size});
-		ctx->settings.asset(ASSET_TYPE).is_zip_removed = true;
-		ctx->settings.save(ctx->arena_frame);
-		SDL_Log("zip REMOVED %d", (int)ASSET_TYPE);
-	};
-	static void job_asset_unpack() {
-		bool res = false;
-		auto &a = tctx()->a;
-		auto g = a.guard();
-		auto &s = tctx()->app_ctx->settings;
-		res = unpack_asset(s.assets.zip_path(a, ASSET_TYPE, s.tr_language));
-		if (res) {
-			MT::run(set_asset_unpacked_and_remove_zip);
-		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s, %d: failed to unpack",
-			             __FILE__, __LINE__);
-		}
-	};
-	static void on_zip_downloaded(Size slot_index, int32_t request_id,
-	                              int status, StrView file_name,
-	                              DynArr<unsigned char> memory_buffer) {
-		(void)request_id;
-		(void)memory_buffer;
-		auto &slot = tctx()->net->requests_pool[slot_index];
-		if (status == NetRequest::STATUS_FINISHED) {
-			MT::run_with_payload(
-				  (void *)(int64_t)Atomic::get(&slot.req.bytes_total),
-				  set_asset_zip_ready_to_unpack);
-			Worker::job_push(tctx()->app_ctx, {.func = job_asset_unpack});
-		} else {
-			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-			             "%s, %d: Downloading of " StrView_Fmt
-			             " wasn't successfull",
-			             __FILE__, __LINE__, StrView_Arg(file_name));
-		}
-	};
-};
 
+namespace AssetsCallbacks {
+
+template <AssetsDL::Type ASSET_TYPE>
+void mt_set_asset_zip_ready_to_unpack(AppContext *ctx, void *payload) {
+	Size bytes_total = reinterpret_cast<int64_t>(payload);
+	auto &asset = AssetsDL::get(ASSET_TYPE, ctx->settings.tr_language);
+	asset.expected_size = bytes_total;
+	asset.is_zip_ready_to_unpack = true;
+	ctx->settings.save(ctx->arena_frame);
+	SDL_Log("downloaded SET %d", (int)(ASSET_TYPE));
+};
+void mt_set_asset_unpacked_and_remove_zip(AppContext *ctx, void *payload) {
+	AssetsDL::Type type = (AssetsDL::Type) reinterpret_cast<int64_t>(payload);
+	auto g = ctx->arena_frame.guard();
+	auto &asset = AssetsDL::get(type, ctx->settings.tr_language);
+	asset.is_unpacked = true;
+	SDL_Log("unpacked SET %d", (int)type);
+	asset.is_zip_ready_to_unpack = false;
+	SDL_Log("zip ready UNSET %d", (int)type);
+	auto zip_path =
+		  AssetsDL::zip_path(ctx->arena_frame, type, ctx->settings.tr_language);
+	ctx->settings.save(ctx->arena_frame);
+	std::filesystem::remove(
+		  std::string_view{zip_path.data, (size_t)zip_path.size});
+	asset.is_zip_removed = true;
+	ctx->settings.save(ctx->arena_frame);
+	SDL_Log("zip REMOVED %d", (int)type);
+};
+void job_asset_unpack(const Job &job) {
+	auto type = (AssetsDL::Type)job.i64_val;
+	bool res = false;
+	auto &a = tctx()->a;
+	auto g = a.guard();
+	auto &s = tctx()->app_ctx->settings;
+	res = unpack_asset(AssetsDL::zip_path(a, type, s.tr_language));
+	if (res) {
+		MT::run_with_payload((void *)type,
+		                     mt_set_asset_unpacked_and_remove_zip);
+	} else {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s, %d: failed to unpack",
+		             __FILE__, __LINE__);
+	}
+};
+template <AssetsDL::Type ASSET_TYPE>
+void on_zip_downloaded(Size slot_index, int32_t request_id, int status,
+                       StrView file_name, DynArr<unsigned char> memory_buffer) {
+	(void)request_id;
+	(void)memory_buffer;
+	auto &slot = tctx()->net->requests_pool[slot_index];
+	if (status == NetRequest::STATUS_FINISHED) {
+		MT::run_with_payload(
+			  (void *)(int64_t)Atomic::get(&slot.req.bytes_total),
+			  mt_set_asset_zip_ready_to_unpack<ASSET_TYPE>);
+		Worker::job_push(
+			  tctx()->app_ctx, Job::Type::SINGLE_THREADED_PARAMETRIZED,
+			  {.func_param = job_asset_unpack, .i64_val = (int64_t)ASSET_TYPE});
+	} else {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+		             "%s, %d: Downloading of " StrView_Fmt
+		             " wasn't successfull",
+		             __FILE__, __LINE__, StrView_Arg(file_name));
+	}
+};
+}; // namespace AssetsCallbacks
+
+using AType = AssetsDL::Type;
 template <AType... Types> struct AssetsCallbacksTables {
 	static constexpr auto on_zip_downloaded_table =
-		  std::array{&AssetsCallbacks<Types>::on_zip_downloaded...};
-
-	static constexpr auto job_asset_unpack_table =
-		  std::array{&AssetsCallbacks<Types>::job_asset_unpack...};
+		  std::array{&AssetsCallbacks::on_zip_downloaded<Types>...};
+	// static constexpr auto job_asset_unpack_table =
+	// 	  std::array{&AssetsCallbacks::job_asset_unpack<Types>...};
 };
 
 // NOTE: thorougly check the order)
@@ -922,27 +930,27 @@ template <AType... Types> struct AssetsCallbacksTables {
 // 	_COUNT
 // };
 using AssetsCbs =
-	  AssetsCallbacksTables<AType::XAPIAN_TR, AType::OPTIONAL_XAPIAN_DE,
+	  AssetsCallbacksTables<AType::XAPIAN_USER_LANG, AType::OPTIONAL_XAPIAN_DE,
                             AType::OPTIONAL_XAPIAN_EN, AType::OPTIONAL_TTS,
                             AType::OPTIONAL_ASR>;
-
 } // namespace
 
 Size Worker::net_download_and_unpack_asset(AppContext *ctx,
                                            AssetsDL::Type asset_type) {
 	auto &a = ctx->arena_frame;
-	StrView out_fname = ctx->settings.assets.zip_path(
-		  ctx->arena_frame, asset_type, ctx->settings.tr_language);
+	StrView out_fname = AssetsDL::zip_path(ctx->arena_frame, asset_type,
+	                                       ctx->settings.tr_language);
 
 	bool is_zip_dowloaded_and_present =
-		  ctx->settings.asset(asset_type).is_zip_ready_to_unpack;
+		  AssetsDL::get(asset_type, ctx->settings.tr_language)
+				.is_zip_ready_to_unpack;
 
 	if (is_zip_dowloaded_and_present) {
 		std::filesystem::path p = {out_fname.to_cstr(a)};
 		if (!std::filesystem::exists(p)             // does not exist
 		    || !std::filesystem::is_regular_file(p) // not a regular file
 		    || (std::filesystem::file_size(p) !=
-		        (uintmax_t)ctx->settings.asset(asset_type)
+		        (uintmax_t)AssetsDL::get(asset_type, ctx->settings.tr_language)
 		              .expected_size) // file size mismatch
 		) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
@@ -953,21 +961,21 @@ Size Worker::net_download_and_unpack_asset(AppContext *ctx,
 		}
 	}
 
-	StrView url = ctx->settings.assets.zip_url(ctx->arena_frame, asset_type,
-	                                           ctx->settings.tr_language);
+	StrView url = AssetsDL::zip_url(ctx->arena_frame, asset_type,
+	                                ctx->settings.tr_language);
 	if (!is_zip_dowloaded_and_present) {
 		return Worker::net_download_file(
 			  ctx, url, out_fname,
-			  AssetsCbs::on_zip_downloaded_table[std::to_underlying(
-					asset_type)]);
+			  AssetsCbs::on_zip_downloaded_table[(int)(asset_type)]);
 	} else {
 		SDL_Log(StrView_Fmt " already downloaded", StrView_Arg(out_fname));
-		auto is_unpacked = ctx->settings.asset(asset_type).is_unpacked;
+		auto is_unpacked =
+			  AssetsDL::get(asset_type, ctx->settings.tr_language).is_unpacked;
 		if (!is_unpacked) {
-			Worker::job_push(
-				  tctx()->app_ctx,
-				  {.func = AssetsCbs::job_asset_unpack_table[std::to_underlying(
-						 asset_type)]});
+			Worker::job_push(tctx()->app_ctx,
+			                 Job::Type::SINGLE_THREADED_PARAMETRIZED,
+			                 {.func_param = AssetsCallbacks::job_asset_unpack,
+			                  .i64_val = (int64_t)(asset_type)});
 		} else {
 			SDL_Log(StrView_Fmt " already unpacked", StrView_Arg(out_fname));
 			return -2;

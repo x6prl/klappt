@@ -244,7 +244,8 @@ void Worker::neuro_job_push(AppContext *ctx, NeuroJob job) {
 	SDL_Log("Main Thread: Pushing Neuro Job %d to the worker queue.", id);
 }
 #endif // NEURO
-void Worker::job_push(AppContext *ctx, Job job) {
+void Worker::job_push(AppContext *ctx, Job::Type job_type, Job job) {
+	job.type = job_type;
 	int id = worker_job_push_generic(
 		  ctx, job, [](AppContext *ctx) -> decltype(ctx->worker_job_queue) * {
 			  return &ctx->worker_job_queue;
@@ -254,13 +255,23 @@ void Worker::job_push(AppContext *ctx, Job job) {
 
 int SDLCALL WorkerThread(void *userdata) {
 	KLAPPT_PROFILE_THREAD("worker");
+	auto job_launcher = [](Job &job) {
+		switch (job.type) {
+		case Job::Type::SINGLE_THREADED:
+			job.func();
+			break;
+		case Job::Type::SINGLE_THREADED_PARAMETRIZED:
+			job.func_param(job);
+			break;
+		}
+	};
 	worker_thread_generic<Job>(
 		  userdata,
 		  [](AppContext *ctx) -> decltype(ctx->worker_job_queue) * {
 			  strncpy(tctx()->thread_name, "Worker0", 15);
 			  return &ctx->worker_job_queue;
 		  },
-		  [](Job &job) { job.func(); });
+		  job_launcher);
 	SDL_Log("Worker Thread: Exiting");
 	return 0;
 }

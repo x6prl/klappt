@@ -179,12 +179,6 @@ void list_island_commit(AppContext *ctx) {
 		                           background);
 
 		auto font_size = sizes()->font.title_md; // TODO: adjust size
-		TTF_Font *font{};
-		{
-			KLAPPT_PROFILE_SCOPE_N("list_island.get_font");
-			font = ctx->text->get_font(FontID::MAIN, font_size);
-		}
-		auto ticks = ctx->ticks;
 		const float local_x = ctx->tslt.x - box.x;
 		const float local_y = ctx->tslt.y - box.y;
 		for (Size i{0}; i < pending.label_count; ++i) {
