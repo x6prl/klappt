@@ -1287,7 +1287,7 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			const auto left =
 				  successful_reviews_to_next_mode(ctx->arena_frame, s);
 			draw_text(StrBuilder::concat(ctx->arena_frame,
-			                             tr()->screen_word_view_next_level_in,
+			                             tr()->screen_word_view_next_level_in, " "_v,
 			                             left,
 			                             tr()->screen_word_view_reviews_count),
 			          theme()->onSurfaceContainer, sizes()->font.label_md);
