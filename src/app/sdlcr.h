@@ -23,6 +23,7 @@ int g_nv = 0, g_ni = 0;
 void flush_text(Clay_SDL3RendererData *rd) {
 	if (g_ni == 0)
 		return;
+	rd->text->atlas_flush();
 	SDL_RenderGeometry(rd->renderer, rd->text->atlas.tex, g_v, g_nv, g_i, g_ni);
 	g_nv = 0;
 	g_ni = 0;

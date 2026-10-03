@@ -18,6 +18,10 @@ android {
     // Target API requirement for Google Play (API 35+)
     compileSdk 36
 
+    androidResources {
+        noCompress 'ttf', 'otf'
+    }
+
     if (buildAsApplication) {
         namespace "org.viktorfilinkov.klappt"
     }

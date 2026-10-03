@@ -9,6 +9,7 @@
 
 #include "app/app_status.h"
 #include "app/audio_context.h"
+#include "app/net_context.h" // TODO: exclude
 #include "app/textcache.h"
 #include "app/tslt.h"
 #include "app/worker.h"
@@ -82,8 +83,8 @@ struct AppContext {
 
 	using Idx = Size;
 	static constexpr Idx STACK_SIZE{16};
-	static constexpr Size MAIN_ARENA_SIZE = 32 << 20;
-	static constexpr Size TMP_ARENA_SIZE = 8 << 20;
+	static constexpr Size MAIN_ARENA_SIZE = 48 << 20;
+	static constexpr Size FRAME_ARENA_SIZE = 8 << 20;
 
 	SDL_Window *window{};
 	SDL_Renderer *renderer{};
@@ -91,8 +92,8 @@ struct AppContext {
 	Clay_Arena clay_arena{};
 	float scale{1.f}, display_width{1000.f};
 	uint64_t ticks{};
-	Arena arena{MAIN_ARENA_SIZE};
-	Arena arena_frame{TMP_ARENA_SIZE};
+	Arena arena{};
+	Arena arena_frame{};
 	TextCache *text{};
 	Words *words{};
 	WordStore word_store{};
@@ -102,9 +103,9 @@ struct AppContext {
 
 	// Word *word_edit{};
 
-	Idx current{};
-	Screen stack[STACK_SIZE]{};
-	Arena arena_screen_list[STACK_SIZE]{};
+	Idx current{0};
+	Screen stack[STACK_SIZE]{Screen::Onboarding};
+	Arena arena_screen_list[STACK_SIZE];
 	Arena &arena_screen() { return arena_screen_list[current]; }
 
 	// used to burst high FPS for the next 1000ms
@@ -140,11 +141,31 @@ struct AppContext {
 	JobQueue<NeuroJob> neuro_worker_job_queue{};
 #endif
 
-	SDL_Semaphore *fonts_ready_sem{};
+	SDL_Semaphore *fonts_ready_sem{nullptr};
 
 	// uint64_t last_ticks[10]{};
 	// uint64_t last_ticksef[10]{};
-
+	//
+	explicit AppContext(Arena &&main_arena)
+		  :                                                  //
+			ticks{SDL_GetTicks()},                           //
+			arena_frame(main_arena, FRAME_ARENA_SIZE),       //
+			fonts_ready_sem{SDL_CreateSemaphore(0)},         //
+			exercises{.a = Arena{main_arena, Size{1} << 20}} //
+	{
+		arena = static_cast<Arena &&>(main_arena);
+		for (int i{0}; i < STACK_SIZE; ++i) {
+			arena_screen_list[i] = Arena{arena, Size{1} << 19};
+		}
+		text = new (arena.push(sizeof(TextCache))) TextCache{};
+		word_edit_state =
+			  new (arena.push(sizeof(WordEditState))) WordEditState{};
+		downloads = DynArr<DownloadData>{
+			  .data = arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
+			  .size = 0,
+			  .reserved = NetContext::MAX_REQUESTS,
+		};
+	}
 	void anim() {
 		KLAPPT_PROFILE_SCOPE_N("AppContext::anim");
 		animate = true;

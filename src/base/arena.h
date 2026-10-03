@@ -14,16 +14,16 @@ using Size = int64_t;
 
 struct Arena {
 	using Offset = Size;
-	unsigned char *data{};
+	unsigned char *data{nullptr};
 	Offset offset{0};
 	Offset objects_size{0};
-	const Size capacity{0};
-	const bool is_mmaped{true};
+	Size capacity{0};
+	bool is_mmaped{false};
 
 	struct [[nodiscard]] TempGuard {
-		Arena *a;
+		Arena *a{nullptr};
 		const Offset pos{0};
-		const Offset objects;
+		const Offset objects{0};
 
 		TempGuard(Arena *_a)
 			  : a{_a}, pos{a->offset}, objects{_a->objects_size} {}
@@ -35,7 +35,35 @@ struct Arena {
 		}
 	};
 
-	Arena(Size arena_size = Size{1} << 19) : capacity{arena_size} {
+	Arena() = default;
+	Arena(Arena &&other) noexcept
+		  : data{other.data}, offset{other.offset},
+			objects_size{other.objects_size}, capacity{other.capacity},
+			is_mmaped{other.is_mmaped} {
+		other.data = nullptr;
+		other.offset = 0;
+		other.objects_size = 0;
+		other.capacity = 0;
+		other.is_mmaped = false;
+	}
+
+	Arena &operator=(Arena &&other) noexcept {
+		if (this != &other) {
+			data = other.data;
+			offset = other.offset;
+			objects_size = other.objects_size;
+			capacity = other.capacity;
+			is_mmaped = other.is_mmaped;
+
+			other.data = nullptr;
+			other.offset = 0;
+			other.objects_size = 0;
+			other.capacity = 0;
+			other.is_mmaped = false;
+		}
+		return *this;
+	}
+	explicit Arena(Size arena_size) {
 		// NOTE: page-aligned (4-16KiB)
 		data = static_cast<decltype(data)>(
 			  mmap(nullptr, arena_size, PROT_READ | PROT_WRITE,
@@ -43,13 +71,15 @@ struct Arena {
 		if (data == MAP_FAILED) {
 			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 			             "mmap failed for arena size %" PRSize, arena_size);
-			exit(-8);
+			exit(-8); // TODO: just return false
 		}
+		capacity = arena_size;
+		is_mmaped = true;
 		SDL_Log("Created arena of size %" PRSize " KiB", arena_size / 1024);
 	}
 	explicit Arena(Arena &from, Size arena_size = Size{1} << 19)
 		  : data{static_cast<unsigned char *>(from.push(arena_size, 64))},
-			capacity{arena_size}, is_mmaped{false} {}
+			capacity{arena_size} {}
 	~Arena() {
 		if (is_mmaped) {
 			if (data && MAP_FAILED != data) {
@@ -58,7 +88,7 @@ struct Arena {
 				        " KiB, used: %" PRSize " KiB",
 				        capacity / 1024, objects_size / 1024);
 			}
-		} else {
+		} else if (data) {
 			SDL_Log("Destroyed sub-arena of size %" PRSize
 			        " KiB, used: %" PRSize " KiB",
 			        capacity / 1024, objects_size / 1024);

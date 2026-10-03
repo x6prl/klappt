@@ -323,7 +323,7 @@ int SDLCALL NetWorkerThread(void *userdata) {
 	auto &job_queue = app_ctx->net_worker_job_queue;
 
 	ThreadContext tctx_var = {
-		  .a = {1 << 20},
+		  .a = Arena{1 << 20},
 		  .app_ctx = app_ctx,
 	};
 	_tctx = &tctx_var;
@@ -971,8 +971,10 @@ Size Worker::net_download_and_unpack_asset(AppContext *ctx,
 	auto out_tmp_fname = AssetsDL::zip_tmp_path(a, id);
 	auto url = AssetsDL::zip_url(a, id);
 
+		SDL_Log("CALLED %d .", static_cast<int>(id));
+
 	// wipe old .zip.tmp
-	fs_remove(out_tmp_fname);
+	// fs_remove(out_tmp_fname);
 
 	return Worker::net_download_file(ctx, url, out_tmp_fname,
 	                                 on_asset_zip_downloaded);

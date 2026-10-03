@@ -1,12 +1,10 @@
 #include "textcache.h"
 
 #include <SDL3/SDL_log.h>
-#include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3/SDL_surface.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <cassert>
-
-#include <initializer_list>
 
 #include "base/profiler.h"
 
@@ -27,6 +25,27 @@ uint32_t hash_glyph_key(uint32_t cp, uint16_t font_id, uint16_t font_size) {
 }
 } // namespace
 
+void TextCache::atlas_flush() {
+	if (!atlas_dirty) {
+		return;
+	}
+
+	const int height = static_cast<int>(dirty_max_y - dirty_min_y);
+	if (height <= 0) {
+		atlas_dirty = false;
+		return;
+	}
+
+	SDL_Rect upload{0, dirty_min_y, ATLAS_SIZE, height};
+	const void *src =
+		  atlas_pixels + (static_cast<size_t>(dirty_min_y) * ATLAS_SIZE);
+	SDL_UpdateTexture(atlas.tex, &upload, src, ATLAS_SIZE * sizeof(uint32_t));
+
+	atlas_dirty = false;
+	dirty_min_y = ATLAS_SIZE;
+	dirty_max_y = 0;
+}
+
 void TextCache::atlas_init(SDL_Renderer *r) {
 	assert(!atlas.tex);
 
@@ -34,6 +53,18 @@ void TextCache::atlas_init(SDL_Renderer *r) {
 
 	atlas_blend = SDL_BLENDMODE_BLEND;
 
+	// CPU buffer
+	if (!atlas_pixels) {
+		atlas_pixels = static_cast<uint32_t *>(SDL_calloc(
+			  static_cast<size_t>(ATLAS_SIZE) * ATLAS_SIZE, sizeof(uint32_t)));
+		if (!atlas_pixels) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "Failed to allocate CPU atlas staging buffer");
+			exit(-6);
+		}
+	}
+
+	// GPU texture
 	SDL_PropertiesID props = SDL_CreateProperties();
 	SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER,
 	                      SDL_PIXELFORMAT_RGBA32);
@@ -49,6 +80,9 @@ void TextCache::atlas_init(SDL_Renderer *r) {
 	if (atlas.tex) {
 		SDL_SetTextureBlendMode(atlas.tex, atlas_blend);
 		SDL_SetTextureScaleMode(atlas.tex, SDL_SCALEMODE_LINEAR);
+		// cearing GPU texture with blank CPU buffer
+		SDL_UpdateTexture(atlas.tex, nullptr, atlas_pixels,
+		                  ATLAS_SIZE * sizeof(uint32_t));
 	} else {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR,
 		             "Glyph atlas texture allocation failed: %s",
@@ -180,8 +214,20 @@ const TextCache::GlyphEntry *TextCache::load_glyph(uint32_t codepoint,
 		uint16_t rx = 0, ry = 0;
 		if (atlas_alloc(static_cast<uint16_t>(surf->w),
 		                static_cast<uint16_t>(surf->h), rx, ry)) {
-			SDL_Rect upload{rx, ry, surf->w, surf->h};
-			SDL_UpdateTexture(atlas.tex, &upload, surf->pixels, surf->pitch);
+			// NOTE: we blit into CPU buffer
+			const auto *src_row = static_cast<const uint8_t *>(surf->pixels);
+			uint32_t *dst_row =
+				  atlas_pixels + (static_cast<size_t>(ry) * ATLAS_SIZE + rx);
+			const size_t row_bytes =
+				  static_cast<size_t>(surf->w) * sizeof(uint32_t);
+
+			for (int y = 0; y < surf->h; ++y) {
+				std::memcpy(dst_row, src_row, row_bytes);
+				src_row += surf->pitch;
+				dst_row += ATLAS_SIZE;
+			}
+
+			mark_dirty(ry, static_cast<uint16_t>(surf->h));
 
 			g.page = 0;
 			g.rx = rx;
@@ -336,6 +382,7 @@ void TextCache::draw_string(SDL_Renderer *r, StrView str, uint16_t font_id,
 			inds[ni++] = b + 3;
 
 			if (nv >= 4 * 60) {
+				atlas_flush();
 				SDL_RenderGeometry(r, atlas.tex, verts, nv, inds, ni);
 				nv = 0;
 				ni = 0;
@@ -345,23 +392,58 @@ void TextCache::draw_string(SDL_Renderer *r, StrView str, uint16_t font_id,
 	}
 
 	if (ni > 0) {
+		atlas_flush();
 		SDL_RenderGeometry(r, atlas.tex, verts, nv, inds, ni);
 	}
 }
 
-void TextCache::prewarm(DynArr<uint16_t> sizes) {
-	for (const auto fid : {FontID::MAIN}) {
-		for (const auto sz : sizes) {
-			// Bake ASCII printable characters 32..126
-			for (uint32_t c = 32; c <= 126; ++c) {
-				get_glyph(c, fid, sz);
+bool TextCache::prewarm(Arr<uint16_t, 6> sizes, int count) {
+	KLAPPT_PROFILE_SCOPE_N("TextCache::prewarm");
+	static constexpr uint16_t fonts[] = {FontID::MAIN};
+	static constexpr uint32_t german_chars[] = {
+		  0x00E4u, 0x00F6u, 0x00FCu, 0x00C4u, 0x00D6u, 0x00DCu, 0x00DFu,
+	};
+	constexpr Size FONTS_COUNT = sizeof(fonts) / sizeof(fonts[0]);
+	constexpr Size GERMAN_COUNT =
+		  sizeof(german_chars) / sizeof(german_chars[0]);
+
+	static Size font_idx = 0;
+	static Size size_idx = 0;
+	static uint32_t ch = 33; // from `!`
+	static Size german_idx = 0;
+
+	for (; font_idx < FONTS_COUNT; ++font_idx) {
+		const auto font = fonts[font_idx];
+
+		for (; size_idx < sizes.size(); ++size_idx) {
+			const auto sz = sizes[size_idx];
+
+			// some ASCII
+			for (; ch <= 126 // to `~`
+			       && count > 0;
+			     ++ch, --count) {
+				get_glyph(ch, font, sz);
 			}
-			// Common German characters
-			for (const uint32_t umlaut :
-			     {0x00E4u, 0x00F6u, 0x00FCu, 0x00C4u, 0x00D6u, 0x00DCu,
-			      0x00DFu}) { // ä, ö, ü, Ä, Ö, Ü, ß
-				get_glyph(umlaut, fid, sz);
+			if (count <= 0 && ch <= 126) {
+				return true;
 			}
+
+			// ä, ö, ü, Ä, Ö, Ü, ß
+			for (; german_idx < GERMAN_COUNT && count > 0;
+			     ++german_idx, --count) {
+				get_glyph(german_chars[german_idx], font, sz);
+			}
+			if (count <= 0 && german_idx < GERMAN_COUNT) {
+				return true;
+			}
+
+			// reset cursor for the next font size
+			ch = 32;
+			german_idx = 0;
 		}
+
+		size_idx = 0;
 	}
+
+	return false;
 }

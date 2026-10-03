@@ -5,7 +5,6 @@
 #include <clay/clay.h>
 
 #include "base/arr.h"
-#include "base/dyn_arr.h"
 #include "base/hash.h"
 #include "base/pair.h"
 #include "base/str_view.h"
@@ -102,10 +101,26 @@ struct TextCache {
 	SDL_BlendMode atlas_blend{SDL_BLENDMODE_BLEND};
 
 	// -------------------------------------------------------------------------
+	// CPU Staging Buffer
+	// -------------------------------------------------------------------------
+	uint32_t *atlas_pixels{nullptr};
+	uint16_t dirty_min_y{ATLAS_SIZE};
+	uint16_t dirty_max_y{0};
+	bool atlas_dirty{false};
+	inline void mark_dirty(uint16_t y, uint16_t h) {
+		if (y < dirty_min_y)
+			dirty_min_y = y;
+		if (y + h > dirty_max_y)
+			dirty_max_y = y + h;
+		atlas_dirty = true;
+	}
+	void atlas_flush();
+
+	// -------------------------------------------------------------------------
 	// API
 	// -------------------------------------------------------------------------
 	void atlas_init(SDL_Renderer *r);
-	void prewarm(DynArr<uint16_t> sizes);
+	bool prewarm(Arr<uint16_t, 6> sizes, int count);
 
 	TTF_Font *get_font(uint16_t font_id, uint16_t font_size);
 	int get_font_ascent(uint16_t font_id, uint16_t font_size);

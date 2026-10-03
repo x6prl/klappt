@@ -17,15 +17,12 @@
 
 #include "app/app_context.h"
 #include "app/event_codes.h"
-#include "app/net_context.h"
 #include "app/sizes.h"
 #include "app/textcache.h"
 #include "app/words_init.h"
 #include "app/worker.h"
-#include "base/dyn_arr.h"
 #include "base/measure.h"
 #include "base/profiler.h"
-#include "base/stats.h"
 #include "base/str_view.h"
 #include "domain/settings.h"
 #include "platform/files.h"
@@ -165,7 +162,52 @@ static void WaitForProfilerConnection() {
 }
 #endif
 
+void run_font_warmup(AppContext *ctx, bool &is_warming_up) {
+	Arr<uint16_t, 6> s = {sizes()->font.body_md, sizes()->font.body_sm,
+	                      sizes()->font.label_md, sizes()->font.label_sm};
+
+	is_warming_up = ctx->text->prewarm(s, 200);
+	ctx->text->atlas_flush();
+	if (is_warming_up) {
+		ctx->push_one_frame();
+	}
+}
+
 static void load_fonts_job() {
+	auto load_font_from_asset_helper = [](const char *path,
+	                                      float ptsize) -> TTF_Font * {
+		KLAPPT_PROFILE_SCOPE_N("load_font_from_asset");
+		size_t data_size = 0;
+		void *data = SDL_LoadFile(path, &data_size);
+		if (!data) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font %s: %s",
+			             path, SDL_GetError());
+			return nullptr;
+		}
+
+		// wrap buffer in SDL_IOStream
+		SDL_IOStream *stream = SDL_IOFromConstMem(data, data_size);
+		if (!stream) {
+			SDL_free(data);
+			return nullptr;
+		}
+
+		const bool is_closeio = true;
+		// NOTE: nevertheless we cannot free memory buffer with the font
+		TTF_Font *font = TTF_OpenFontIO(stream, is_closeio, ptsize);
+		if (!font) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+			             "TTF_OpenFontIO failed for %s: %s", path,
+			             SDL_GetError());
+			SDL_free(data);
+			return nullptr;
+		}
+
+		return font;
+	};
+
+	KLAPPT_PROFILE_SCOPE_N("load_fonts_job");
+
 	auto *ctx = tctx()->app_ctx;
 	auto base_pathv = get_app_base_path();
 	auto base_path =
@@ -177,11 +219,11 @@ static void load_fonts_job() {
 		  (base_path / "Font-Awesome-7-Free-Solid-900.otf").string();
 
 	ctx->text->base_fonts[FontID::MAIN] =
-		  TTF_OpenFont(ui_path.c_str(), sizes()->font.body_md);
-	ctx->text->base_fonts[FontID::ARABIC_MAIN] =
-		  TTF_OpenFont(arabic_path.c_str(), sizes()->font.body_sm);
+		  load_font_from_asset_helper(ui_path.c_str(), sizes()->font.body_md);
+	ctx->text->base_fonts[FontID::ARABIC_MAIN] = load_font_from_asset_helper(
+		  arabic_path.c_str(), sizes()->font.body_sm);
 	ctx->text->base_fonts[FontID::ICONS] =
-		  TTF_OpenFont(icons_path.c_str(), sizes()->dim.icon_sm);
+		  load_font_from_asset_helper(icons_path.c_str(), sizes()->dim.icon_sm);
 
 	// unblock UI init
 	SDL_SignalSemaphore(ctx->fonts_ready_sem);
@@ -193,10 +235,10 @@ static void load_fonts_job() {
 	const auto mono_bold_path = (base_path / "JetBrainsMono-Bold.ttf").string();
 
 	ctx->text->base_fonts[FontID::MONOSPACE_REGULAR] =
-		  TTF_OpenFont(mono_reg_path.c_str(), 48);
+		  load_font_from_asset_helper(mono_reg_path.c_str(), 48);
 	ctx->text->base_fonts[FontID::MONOSPACE_BOLD] =
-		  TTF_OpenFont(mono_bold_path.c_str(), 48);
-	SDL_Log("Thread Worker: deffered fonts loaded");
+		  load_font_from_asset_helper(mono_bold_path.c_str(), 48);
+	SDL_Log("Thread Worker: deferred fonts loaded");
 }
 
 SDL_Renderer *create_renderer(SDL_Window *window) {
@@ -295,20 +337,10 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		return SDL_Fail();
 	m.lap().printus("TTF_Init");
 
-	auto text_cache = new TextCache{};
-	auto ctx = new AppContext{
-		  .ticks = SDL_GetTicks(),
-		  .text = text_cache,
-		  .current = 0,
-		  .stack = {Screen::Onboarding},
-		  .word_edit_state = new WordEditState{},
-		  .fonts_ready_sem = SDL_CreateSemaphore(0),
-	};
-	ctx->downloads = DynArr<DownloadData>{
-		  .data = ctx->arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
-		  .size = 0,
-		  .reserved = NetContext::MAX_REQUESTS,
-	};
+	Arena main_arena{AppContext::MAIN_ARENA_SIZE};
+	auto ctx = new (main_arena.push(sizeof(AppContext)))
+		  AppContext(static_cast<Arena &&>(main_arena));
+
 	*appstate = ctx;
 	m.lap().printus("AppContext created");
 
@@ -381,13 +413,20 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 			ctx->app_status.set_exit_with_error("cannot create renderer"_v);
 			return SDL_Fail();
 		}
-		// turn off vsync
-		SDL_SetRenderVSync(renderer, -1);
+
+		const int synchronize_present_with_every_vertical_refresh = 1;
+		if (!SDL_SetRenderVSync(
+				  renderer, synchronize_present_with_every_vertical_refresh)) {
+			SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to turn on vsync : %s",
+			             SDL_GetError());
+		} else {
+			SDL_Log("vsync set");
+		}
 		ctx->renderer = renderer;
 	}
 	m.lap().printus("renderer created");
 
-	text_cache->atlas_init(ctx->renderer);
+	ctx->text->atlas_init(ctx->renderer);
 	m.lap().printus("text atlas init");
 
 #ifdef HOTRELOAD
@@ -450,25 +489,6 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 		mw.lap().printus("Font sync complete");
 	}
 
-	// NOTE: too slow :c
-	if (false) {
-		Measure mw{"TextCache prewarm"};
-		auto &a = ctx->arena_frame;
-		auto g = a.guard();
-		auto s = DynArr<uint16_t>::with(
-			  a,
-			  //
-			  sizes()->font.body_md // takes 834 ms
-
-			  // ,sizes()->font.body_sm
-		      // ,sizes()->font.label_md, sizes()->font.label_sm
-		      // ,sizes()->font.title_md, sizes()->font.title_lg
-		      //
-		);
-		ctx->text->prewarm(s);
-		mw.lap().printms("completed");
-	}
-
 	SDL_Log("Application started successfully!");
 	m.total().printus("total");
 
@@ -517,49 +537,40 @@ extern "C" SDL_AppResult SDLCALL SDL_AppEvent(void *appstate,
 	}
 }
 
-// void update_ticks_array(uint64_t (*ts)[10], uint64_t t) {
-//	for (int i{}; i < 9; ++i) {
-//		(*ts)[i] = (*ts)[i + 1];
-//	}
-//	(*ts)[9] = t;
-// }
-//
 // NOTE: When "waitevent" is set, this callback is only called _after_
 // SDL_AppEvent https://wiki.libsdl.org/SDL3/SDL_HINT_MAIN_CALLBACK_RATE
 extern "C" SDL_AppResult SDLCALL SDL_AppIterate(void *appstate) {
+	auto *ctx = static_cast<AppContext *>(appstate);
 	KLAPPT_PROFILE_SCOPE_N("SDL_AppIterate");
-	static uint64_t last_tick;
-	auto tick = SDL_GetTicks();
-	auto delta = tick - last_tick;
-	Measure m{__FUNCTION__};
-	static Stats st{};
-	// TODO: research: 4 gives us about 120fps
-	if (delta > 4) {
-		KLAPPT_PROFILE_NAME_F("SDL_AppIterate:frame delta=%llu ms",
-		                      static_cast<unsigned long long>(delta));
-		last_tick = tick;
-		auto *ctx = (AppContext *)appstate;
-		ctx->ticks = tick;
-		KLAPPT_PROFILE_FRAME_N(FrameName(ctx->screen()));
-		// update_ticks_array(&(ctx->last_ticks), tick);
-		SDL_AppResult ret;
-		{
-			KLAPPT_PROFILE_SCOPE_N("ui_iterate");
-			ret = ui_iterate(ctx);
-		}
-		// update_ticks_array(&(ctx->last_ticksef), SDL_GetTicks());
-		m.lap();
-		if (m.tlap > uint64_t(st.avg() * 2)) {
-			// m.printms();
-			// SDL_Log("and average %d us", st.avg() / 1000);
-		}
-		st.push(static_cast<int>(m.tlap));
-		return ret;
-	} else {
-		KLAPPT_PROFILE_NAME_F("SDL_AppIterate:skip delta=%llu ms",
-		                      static_cast<unsigned long long>(delta));
-		return SDL_APP_CONTINUE;
+
+	static bool is_warming_up = true;
+	const auto ticks = SDL_GetTicks();
+	ctx->ticks = ticks;
+
+#if defined(TRACY_ENABLE)
+	static uint64_t last_ticks = SDL_GetTicks();
+	const auto iterate_delta = ticks - last_ticks;
+	KLAPPT_PROFILE_NAME_F("SDL_AppIterate:frame delta=%llu ms",
+	                      static_cast<unsigned long long>(iterate_delta));
+	last_ticks = ticks;
+#endif
+	KLAPPT_PROFILE_FRAME_N(FrameName(ctx->screen()));
+
+	SDL_AppResult ret;
+	{
+		KLAPPT_PROFILE_SCOPE_N("ui_iterate");
+		ret = ui_iterate(ctx);
 	}
+
+	if (is_warming_up) [[unlikely]] {
+		const auto render_elapsed = SDL_GetTicks() - ticks;
+		SDL_Log("warming up in progress: frame rendered in %lu",
+		        render_elapsed);
+		Measure m{"warmup cycle"};
+		run_font_warmup(ctx, is_warming_up);
+		m.lap().printus();
+	}
+	return ret;
 }
 
 extern "C" void SDLCALL SDL_AppQuit(void *appstate, SDL_AppResult result) {

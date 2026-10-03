@@ -167,7 +167,7 @@ struct ExerciseState {
 
 namespace Engine {
 struct Exercises {
-	Arena a{1 << 20}; // 1 MB
+	Arena a{};
 
 	DynArr<ExerciseState> exercises{};
 	DynArr<ExerciseResult> results{};
