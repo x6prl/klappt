@@ -132,7 +132,7 @@ void touch_ui();
 namespace Worker {
 void job_push(AppContext *ctx, Job::Type job_type, Job job);
 void audio_job_push(AppContext *ctx, AudioJob job);
-void send_haptic_feedback(AppContext *ctx);
+void send_haptic_feedback(AppContext *ctx); // TODO: forbid sending more than one per frame?..
 #if NEURO
 void neuro_job_push(AppContext *ctx, NeuroJob job);
 #endif
