@@ -6,7 +6,6 @@
 #include "app/worker.h"
 #include "base/arr.h"
 #include "base/str_view.h"
-#include "domain/settings.h"
 #include "platform/net_worker.h"
 
 #include "ui/components/button.h"

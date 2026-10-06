@@ -6,6 +6,7 @@
 #include "app/app_context.h"
 #include "app/sizes.h"
 #include "app/themes.h"
+#include "app/worker.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
 
@@ -54,7 +55,12 @@ struct MobileButtonResult {
 	bool tapped{};
 	bool long_tapped{};
 
-	bool activated() const { return tapped || long_tapped; }
+	bool activated() const {
+		if (tapped) {
+			Worker::send_haptic_feedback(tctx()->app_ctx);
+		}
+		return tapped || long_tapped;
+	}
 };
 
 inline Clay_Color mobile_button_mix(Clay_Color lhs, Clay_Color rhs, float t) {

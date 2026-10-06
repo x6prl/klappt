@@ -409,6 +409,7 @@ void keypad_island_commit(AppContext *ctx) {
 		if (cell_pressed) {
 			if (pending.on_tap) {
 				pending.on_tap(ctx, static_cast<int>(i));
+				Worker::send_haptic_feedback(ctx);
 			}
 			break;
 		}

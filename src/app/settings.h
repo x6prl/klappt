@@ -47,7 +47,7 @@ struct Settings {
 	// subdicts
 	bool is_subdict_de{false};
 	bool is_subdict_en{false};
-	// behaviour
+	// global features
 	bool is_using_suggestions{false};
 	// displaying
 	bool is_mark_verb_aux_sein{true};

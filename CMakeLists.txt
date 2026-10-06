@@ -443,6 +443,7 @@ set(APP_PLATFORM_FILES
     src/platform/audio.cpp
     src/platform/zip.cpp
     src/platform/fs.cpp
+    src/platform/haptic.cpp
     $<$<BOOL:${ENABLE_NEURO}>:src/platform/neuro.cpp>
 )
 set(APP_BASE_FILES

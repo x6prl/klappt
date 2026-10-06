@@ -10,6 +10,7 @@
 #include "app/app_status.h"
 #include "app/audio_context.h"
 #include "app/net_context.h" // TODO: exclude
+#include "app/settings.h"
 #include "app/textcache.h"
 #include "app/tslt.h"
 #include "app/worker.h"
@@ -18,7 +19,6 @@
 #include "base/str_view.h"
 #include "domain/engine.h"
 #include "domain/exercises.h"
-#include "domain/settings.h"
 #include "domain/word_store.h"
 #include "domain/words.h"
 #include "platform/audio.h"
@@ -147,11 +147,11 @@ struct AppContext {
 	// uint64_t last_ticksef[10]{};
 	//
 	explicit AppContext(Arena &&main_arena)
-		  :                                                  //
-			ticks{SDL_GetTicks()},                           //
-			arena_frame(main_arena, FRAME_ARENA_SIZE),       //
-			fonts_ready_sem{SDL_CreateSemaphore(0)},         //
-			exercises{.a = Arena{main_arena, Size{1} << 20}} //
+		  :                                                   //
+			ticks{SDL_GetTicks()},                            //
+			arena_frame(main_arena, FRAME_ARENA_SIZE),        //
+			exercises{.a = Arena{main_arena, Size{1} << 20}}, //
+			fonts_ready_sem{SDL_CreateSemaphore(0)}           //
 	{
 		arena = static_cast<Arena &&>(main_arena);
 		for (int i{0}; i < STACK_SIZE; ++i) {

@@ -135,6 +135,7 @@ inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
 }
 
 inline bool seed_default_learning_list(AppContext &ctx) {
+	(void)ctx;
 	return true; // TODO: rethink
 }
 

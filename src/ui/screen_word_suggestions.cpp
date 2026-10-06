@@ -59,7 +59,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 	auto draw_item = [total_items](AppContext *ctx, int i,
 	                               Clay_ElementId item_id) {
 		if (i == 0) {
-			CLAY(CLAY_ID_LOCAL("BottomSpacer"),
+			CLAY(CLAY_IDI_LOCAL("BottomSpacer", item_id.id),
 			     {.layout = {
 						.sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0)},
 						.childAlignment = {CLAY_ALIGN_X_CENTER,
@@ -69,7 +69,7 @@ void screen_word_suggestions_draw(AppContext *ctx) {
 				          sizes()->font.title_lg);
 			}
 		} else if (i == total_items - 1) {
-			CLAY(CLAY_ID("AddSelectedContainer"),
+			CLAY(CLAY_IDI_LOCAL("AddSelectedContainer", item_id.id),
 			     {
 					   .layout =
 							 {

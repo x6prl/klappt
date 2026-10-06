@@ -24,7 +24,6 @@
 #include "base/measure.h"
 #include "base/profiler.h"
 #include "base/str_view.h"
-#include "domain/settings.h"
 #include "platform/files.h"
 #include "platform/fs.h"
 #ifdef __EMSCRIPTEN__

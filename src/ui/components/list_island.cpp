@@ -6,6 +6,7 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "app/worker.h"
 #include "render_helpers.h"
 
 #include "app/sizes.h"
@@ -246,6 +247,7 @@ void list_island_commit(AppContext *ctx) {
 		    ctx->tslt.is_tap()) {
 			if (pending.on_tap) {
 				pending.on_tap(ctx, static_cast<int>(i));
+				Worker::send_haptic_feedback(ctx);
 			}
 			break;
 		}

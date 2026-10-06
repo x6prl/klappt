@@ -15,6 +15,7 @@
 #ifndef __EMSCRIPTEN__
 #include "base/dyn_arr.h"
 #endif
+#include "platform/haptic.h"
 
 thread_local ThreadContext *_tctx{};
 ThreadContext *tctx() { return _tctx; }
@@ -233,6 +234,13 @@ void Worker::audio_job_push(AppContext *ctx, AudioJob job) {
 			  return &ctx->audio_worker_job_queue;
 		  });
 	SDL_Log("Main Thread: Pushing Audio Job %d to the worker queue.", id);
+}
+
+void Worker::send_haptic_feedback(AppContext *ctx) {
+#if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
+	Worker::job_push(tctx()->app_ctx, Job::Type::SINGLE_THREADED,
+	                 {.func = &haptic_tap});
+#endif
 }
 #if NEURO
 void Worker::neuro_job_push(AppContext *ctx, NeuroJob job) {
