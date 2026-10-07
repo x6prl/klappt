@@ -240,6 +240,8 @@ void Worker::send_haptic_feedback(AppContext *ctx) {
 #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
 	Worker::job_push(tctx()->app_ctx, Job::Type::SINGLE_THREADED,
 	                 {.func = &haptic_tap});
+#else
+	(void)ctx;
 #endif
 }
 #if NEURO
