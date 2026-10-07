@@ -165,7 +165,6 @@ Sizes sizes_create(float scale, DensityMode density,
 		  .word_card_height = to_f_t(base_card_h),
 		  .action_btn_size = to_f_t(44.0f),
 		  .accent_border_width = to_f_t(3.0f),
-		  .form_label_width = to_f_t(100.0f),
 		  .icon_sm = to_f_t(16.0f),
 		  .icon_md = to_f_t(24.0f),
 	};

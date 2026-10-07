@@ -383,7 +383,6 @@ static DynArr<KeywordRange> split_keywords_into_rows(
 
 static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
                            const Word &w, const WordPayload &word_payload) {
-	const float label_width = sizes()->dim.form_label_width;
 	const uint16_t form_font_size = sizes()->font.body_md;
 	const uint16_t translation_font_size = sizes()->font.body_sm;
 
@@ -593,6 +592,27 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		}
 
 		if (!forms.is_empty()) {
+			float label_width = 0.f;
+			auto label_color = theme()->onSurfaceContainer;
+			{
+				Clay_TextElementConfig label_text_config = {
+					  .textColor = label_color,
+					  .fontId = FontID::MAIN,
+					  .fontSize = form_font_size,
+					  .wrapMode = CLAY_TEXT_WRAP_WORDS,
+					  .textAlignment = CLAY_TEXT_ALIGN_CENTER,
+				};
+				for (auto &[title, _] : forms) {
+					auto w =
+						  ctx->text
+								->measure_text({.length = (int32_t)title.size,
+					                            .chars = title.data,
+					                            .baseChars = title.data},
+					                           &label_text_config)
+								.width;
+					label_width = w > label_width ? w : label_width;
+				}
+			}
 			CLAY(CLAY_ID("WordFormsBlock"),
 			     {
 					   .layout =
@@ -629,8 +649,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						                                   : CLAY_SIZING_FIT(0),
 						                             CLAY_SIZING_FIT(0)}},
 							 }) {
-							draw_text(label, theme()->onSurfaceContainer,
-							          form_font_size);
+							draw_text(label, label_color, form_font_size);
 						}
 						if (value) {
 							draw_text(value, theme()->onSurface,
@@ -645,10 +664,11 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 		     {
 				   .layout =
 						 {
-							   .sizing =
-									 {CLAY_SIZING_GROW(0),
-		                              CLAY_SIZING_FIXED(
-											1.f)}, // TODO: think about scale
+							   .sizing = {CLAY_SIZING_GROW(0),
+		                                  CLAY_SIZING_FIXED(1.f)}, // TODO:
+		                                                           // think
+		                                                           // about
+		                                                           // scale
 						 },
 				   .backgroundColor = theme()->outline,
 			 }) {}
@@ -683,7 +703,9 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						 }) {
 						const float badge_dim = sizes()->dim.icon_sm;
 						if (word_payload.senses.size > 1) {
-							CLAY(CLAY_IDI("SenseNumberBadge", sense_index),
+							CLAY(CLAY_IDI("SenseNumberB"
+							              "adge",
+							              sense_index),
 							     {
 									   .layout =
 											 {
@@ -719,7 +741,9 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 }) {
 
 							if (sense.valency) {
-								CLAY(CLAY_IDI("ValencyBadge", sense_index),
+								CLAY(CLAY_IDI("ValencyBadg"
+								              "e",
+								              sense_index),
 								     {
 										   .layout =
 												 {.sizing = {CLAY_SIZING_FIT(0),
@@ -919,8 +943,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							 {
 								   .sizing = {CLAY_SIZING_GROW(0),
 			                                  CLAY_SIZING_FIXED(
-													1.f)}, // TODO: think about
-			                                               // scale
+													1.f)}, // TODO: think
+			                                               // about scale
 							 },
 					   .backgroundColor = theme()->outline,
 				 }) {}
@@ -962,7 +986,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 					           //    dpi(8.f),
 					           //    0,
 					           //    dpi(8.f),
-					           // }, // CLAY_CORNER_RADIUS(dpi(8.f)),
+					           // }, //
+					           // CLAY_CORNER_RADIUS(dpi(8.f)),
 							   .border =
 									 {.color = theme()->secondary,
 					                  .width =
@@ -1287,8 +1312,8 @@ static void draw_learning_state(AppContext *ctx, const Engine::State &s) {
 			const auto left =
 				  successful_reviews_to_next_mode(ctx->arena_frame, s);
 			draw_text(StrBuilder::concat(ctx->arena_frame,
-			                             tr()->screen_word_view_next_level_in, " "_v,
-			                             left,
+			                             tr()->screen_word_view_next_level_in,
+			                             " "_v, left,
 			                             tr()->screen_word_view_reviews_count),
 			          theme()->onSurfaceContainer, sizes()->font.label_md);
 		} else {

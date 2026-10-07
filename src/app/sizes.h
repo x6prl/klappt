@@ -64,7 +64,6 @@ struct Sizes {
 		f_t action_btn_size;     // 44dp - square action buttons (copy, back,
 		                         // refresh)
 		f_t accent_border_width; // 3dp  - example card vertical border
-		f_t form_label_width;    // 100dp- fixed width column for "er/sie/es:"
 		f_t icon_sm;             // 16dp
 		f_t icon_md;             // 24dp
 	} dim;
