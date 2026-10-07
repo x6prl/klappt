@@ -1,3 +1,4 @@
+#include "app/worker.h"
 #include "domain/word_id.h"
 #include "screen_helpers.h"
 
@@ -81,6 +82,22 @@ bool push_and_fill_state(AppContext *ctx, WordId word_id) {
 		}
 	}
 	return true;
+}
+
+[[nodiscard]]
+bool find_and_push_word_if_exist(AppContext *ctx, StrView word,
+                                 bool is_phrase) {
+	WordId word_id{};
+	if (ctx->word_store.find_word(ctx->arena_frame, word, is_phrase, word_id))
+		  [[likely]] {
+		if (!push_and_fill_state(ctx, word_id)) {
+			ctx->app_status.push_error("Word view stack cap reached"_v);
+		} else {
+			Worker::send_haptic_feedback(ctx);
+		}
+		return true;
+	}
+	return false;
 }
 
 [[maybe_unused]]
@@ -917,15 +934,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 							}
 
 							if (is_hovered && ctx->tslt.is_tap()) {
-								WordId word_id{};
-								if (ctx->word_store.find_word(ctx->arena_frame,
-								                              word_text, false,
-								                              word_id)) {
-									if (!push_and_fill_state(ctx, word_id)) {
-										ctx->app_status.push_error(
-											  "Word view stack cap reached"_v);
-									}
-								} else {
+								if (!find_and_push_word_if_exist(ctx, word_text,
+								                                 false)) {
 									ctx->app_status.push_error(
 										  "The word is not found in dictionary"_v);
 								}
@@ -1009,15 +1019,8 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 						}
 
 						if (Clay_PointerOver(card_id) && ctx->tslt.is_tap()) {
-							WordId word_id{};
-							if (ctx->word_store.find_word(ctx->arena_frame,
-							                              ex.text, true,
-							                              word_id)) {
-								if (!push_and_fill_state(ctx, word_id)) {
-									ctx->app_status.push_error(
-										  "Word view stack cap reached"_v);
-								}
-							} else {
+							if (!find_and_push_word_if_exist(ctx, ex.text,
+							                                 true)) {
 								ctx->app_status.push_error(
 									  "The example is not found in dictionary"_v);
 							}

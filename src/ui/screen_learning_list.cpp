@@ -25,9 +25,9 @@ void screen_learning_list_draw(AppContext *ctx) {
 		CLAY(CLAY_ID("WordsSearchSlot"),
 		     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
-			auto search =
-				  mobile_text_input(ctx, CLAY_ID("WordsSearch"),
-			                        &ctx->learning_search, tr()->screen_learning_list_search_words);
+			auto search = mobile_text_input(
+				  ctx, CLAY_ID("WordsSearch"), &ctx->learning_search,
+				  tr()->screen_learning_list_search_words);
 			if (search.changed || search.submitted || search.blurred) {
 				ctx->push_one_frame();
 			}
@@ -81,6 +81,7 @@ void screen_learning_list_draw(AppContext *ctx) {
 
 									if (tap_state ==
 						                TapSwipeLongTap::State::Tap) {
+										Worker::send_haptic_feedback(ctx);
 										screen_word_view_push(ctx, w.word_id);
 									} else if (tap_state ==
 						                       TapSwipeLongTap::State::

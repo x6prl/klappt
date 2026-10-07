@@ -1,3 +1,4 @@
+#include "app/worker.h"
 #include "domain/word_store_helpers.h"
 #include "screen_helpers.h"
 
@@ -152,12 +153,14 @@ void screen_dictionary_draw(AppContext *ctx) {
 											// SDL_Log(StrView_Fmt,
 								            //                  StrView_Arg(
 								            // 			  w.translations_raw));
+											Worker::send_haptic_feedback(ctx);
 											toggle_word_from_learning_list_and_save_words_dat(
 												  ctx, &w);
 										} else if (tap_state ==
 							                       TapSwipeLongTap::Tap) {
 											screen_word_view_push(ctx,
 								                                  w.word_id);
+											Worker::send_haptic_feedback(ctx);
 											ctx->anim();
 										}
 									}
