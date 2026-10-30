@@ -1,8 +1,15 @@
 package org.viktorfilinkov.klappt;
 
+import java.lang.reflect.Field;
+
 import android.os.Handler;
 import android.os.Message;
-import java.lang.reflect.Field;
+import android.os.Build;
+
+import android.view.View;
+import android.view.Window;
+import android.view.WindowInsetsController;
+
 import org.libsdl.app.SDLActivity;
 
 public class KlapptActivity extends SDLActivity {
@@ -28,5 +35,42 @@ public class KlapptActivity extends SDLActivity {
             } catch (Throwable ignored) {}
         }
         return super.sendCommand(command, data);
+    }
+
+    public void setSystemBarIconsDark(final boolean dark) {
+        runOnUiThread(() -> {
+            Window window = getWindow();
+
+            if (Build.VERSION.SDK_INT >= 30) {
+                WindowInsetsController controller =
+                    window.getInsetsController();
+
+                if (controller == null)
+                    return;
+
+                final int mask =
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS |
+                    WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+
+                controller.setSystemBarsAppearance(
+                    dark ? mask : 0,
+                    mask
+                );
+            } else {
+                View decor = window.getDecorView();
+                int flags = decor.getSystemUiVisibility();
+                int mask = 0;
+
+                if (Build.VERSION.SDK_INT >= 23)
+                    mask |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+
+                if (Build.VERSION.SDK_INT >= 26)
+                    mask |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+
+                decor.setSystemUiVisibility(
+                    dark ? (flags | mask) : (flags & ~mask)
+                );
+            }
+        });
     }
 }
