@@ -120,7 +120,7 @@ static void draw_wrapped_diff_tokens(AppContext *ctx,
 	const float horizontal_insets =
 		  static_cast<float>(sizes()->space.lg * 4 + sizes()->space.sm);
 	const float max_row_width =
-		  std::max(100.0f, ctx->display_width - horizontal_insets);
+		  std::max(100.0f, ctx->window_width - horizontal_insets);
 
 	auto get_token_width = [&](StrView token) -> float {
 		auto slice = CLAY__INIT(Clay_StringSlice){
@@ -283,10 +283,10 @@ void screen_exercise_review_draw(AppContext *ctx) {
 
 		const float source_font_size =
 			  is_phrase ? get_font_size_based_on_str_size(
-								ctx->display_width, ctx->scale,
+								ctx->window_width, ctx->scale,
 								diff.source.utf8_length(), 15.f, 20.f)
 						: get_font_size_based_on_str_size(
-								ctx->display_width, ctx->scale,
+								ctx->window_width, ctx->scale,
 								diff.source.utf8_length(), 20.f, 30.f);
 		const auto font_id = translation_font_id(ctx);
 

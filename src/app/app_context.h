@@ -24,8 +24,8 @@
 #include "platform/audio.h"
 
 #include "ui/components/download_data.h"
-#include "ui/components/text_input_state.h"
-#include "ui/components/word_edit_state.h"
+#include "ui/components/line_input_state.h"
+// #include "ui/components/word_edit_state.h"
 #include "ui/components/word_view_state.h"
 
 enum class Screen {
@@ -43,6 +43,7 @@ enum class Screen {
 	TTS_ASR,
 	UpdateDicts,
 	FontPerf,
+	TsltTest,
 };
 
 inline const char *screen_name(Screen s) {
@@ -75,6 +76,8 @@ inline const char *screen_name(Screen s) {
 		return "UpdateDicts";
 	case Screen::FontPerf:
 		return "FontPerf";
+	case Screen::TsltTest:
+		return "TsltTest";
 	}
 	return "Unknown";
 }
@@ -90,7 +93,9 @@ struct AppContext {
 	SDL_Renderer *renderer{};
 	AppStatus app_status;
 	Clay_Arena clay_arena{};
-	float scale{1.f}, display_width{1000.f};
+	float scale{1.f};
+	float window_width{1000.f};
+	float window_height{1000.f};
 	uint64_t ticks{};
 	Arena arena{};
 	Arena arena_frame{};
@@ -113,18 +118,24 @@ struct AppContext {
 	uint64_t animation_ticks_start{};
 	SDL_TimerID animation_timer_id{0};
 
-	TapSwipeLongTap tslt{};
+	TapScrollLongTap tslt{};
 	UI_Audio_ASR_TTS audio_asr_tts_status;
 	// SDL_AudioDeviceID audioDevice{};
 	// MIX_Track *track{};
-	MobileTextInputState mobile_text_input{};
+	LineInputState *focused_input{nullptr};
+	uint32_t focused_input_id{0}; // Clay_ElementId.id
+	LineInputState dictionary_search;
+	LineInputState learning_search; // squash?
+	LineInputState tts_input;       // squash?
+
+	// MobileTextInputState mobile_text_input{};
 	bool is_dictionary_search_translations_only{false};
-	MobileTextInputBuffer dictionary_search{}; // TODO: make them slim
-	MobileTextInputBuffer learning_search{};
-	MobileTextInputBuffer tts_input{};
+	// MobileTextInputBuffer dictionary_search{}; // TODO: make them slim
+	// MobileTextInputBuffer learning_search{};
+	// MobileTextInputBuffer tts_input{};
 	StrView asr_result{};
 	DynArr<WordViewState> word_view_states{};
-	WordEditState *word_edit_state{};
+	// WordEditState *word_edit_state{};
 	Settings settings{};
 
 	JobQueue<Job> worker_job_queue{};
@@ -158,8 +169,8 @@ struct AppContext {
 			arena_screen_list[i] = Arena{arena, Size{1} << 19};
 		}
 		text = new (arena.push(sizeof(TextCache))) TextCache{};
-		word_edit_state =
-			  new (arena.push(sizeof(WordEditState))) WordEditState{};
+		// word_edit_state =
+		// 	  new (arena.push(sizeof(WordEditState))) WordEditState{};
 		downloads = DynArr<DownloadData>{
 			  .data = arena.pushN<DownloadData>(NetContext::MAX_REQUESTS),
 			  .size = 0,
@@ -181,8 +192,17 @@ struct AppContext {
 		return Screen::Trainer;
 	}
 	void on_screen_change(Screen from, Screen to) {
-		(void)from;
-		(void)to;
+		if (from != to) {
+			arena_screen().clear();
+		}
+
+		if (focused_input) {
+			focused_input = nullptr;
+			focused_input_id = 0;
+			if (window && SDL_TextInputActive(window)) {
+				SDL_StopTextInput(window);
+			}
+		}
 		// SDL_Log("on_screen_change %d -> %d", (int)from, (int)to);
 
 		// { // text_input_reset

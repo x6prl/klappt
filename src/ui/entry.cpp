@@ -28,7 +28,7 @@
 #include "components/button.h"
 #include "components/keypad_island.h"
 #include "components/list_island.h"
-#include "components/text_input.h"
+#include "ui/components/line_input.h"
 
 #include "trs.h"
 
@@ -38,6 +38,7 @@ constexpr Uint64 interaction_animation_duration_ms = 700;
 
 Uint32 SDLCALL animation_timer_cb(void *userdata, SDL_TimerID,
                                   Uint32 interval) {
+	// TODO: think about possible multithreading issues
 	auto *ctx = static_cast<AppContext *>(userdata);
 	SDL_Event event{};
 	event.type = SDL_EVENT_USER;
@@ -46,7 +47,7 @@ Uint32 SDLCALL animation_timer_cb(void *userdata, SDL_TimerID,
 
 	return (ctx->ticks - ctx->animation_ticks_start <
 	        interaction_animation_duration_ms) ||
-	                   ctx->tslt.is_swipe()
+	                   ctx->tslt.is_scroll()
 	             ? interval
 	             : 0;
 }
@@ -299,43 +300,38 @@ StrView review_x_of_n(AppContext *ctx) {
 
 } // namespace
 
-extern "C" void ui_clay_init(AppContext *ctx) {
-	KLAPPT_PROFILE_SCOPE_N("ui_clay_init");
+extern "C" void ui_init(AppContext *ctx) {
+	KLAPPT_PROFILE_SCOPE_N("ui_init");
 	clay_init(ctx);
 	Clay_SetMeasureTextFunction(measure_text_sdl, ctx->text);
-}
-
-extern "C" void ui_settings_init(AppContext *ctx) {
-	KLAPPT_PROFILE_SCOPE_N("ui_settings_init");
-	SDL_Log("UI SETTINGS INIT");
 	set_language(ctx->settings.tr_language);
+#ifdef ANDROID
+	// NOTE: set theme again, because it should set status bar icons color when
+	// Android Window is present, which is not true on early app init
+	theme_set(theme()->theme);
+#endif // ANDROID
+
+	ctx->tslt.on_display_scale_changed(ctx->scale);
+	auto init_li = [ctx](LineInputState *state) {
+		if (!state->data) {
+			LineInput::init(state, ctx->arena, ctx->text);
+		}
+	};
+	init_li(&ctx->dictionary_search);
+	init_li(&ctx->learning_search);
+	init_li(&ctx->tts_input);
+	ctx->dictionary_search.focus_requested = true;
 }
 
 extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 	KLAPPT_PROFILE_SCOPE_N("ui_event");
 	KLAPPT_PROFILE_NAME_F("ui_event:type=%u screen=%s", event->type,
 	                      screen_name(ctx->screen()));
-	const auto ticks = ctx->ticks;
-
 	{
 		KLAPPT_PROFILE_SCOPE_N("ui_event.pointer_state");
-		switch (event->type) {
-		case SDL_EVENT_FINGER_UP:
-		case SDL_EVENT_FINGER_CANCELED:
-		case SDL_EVENT_FINGER_DOWN:
-		case SDL_EVENT_FINGER_MOTION: {
-			int width = 0;
-			int height = 0;
-			SDL_GetWindowSizeInPixels(ctx->window, &width, &height);
-			ctx->tslt.handle_touch_event(ticks, event,
-			                             static_cast<float>(width),
-			                             static_cast<float>(height));
-			break;
-		}
-		default:
-			ctx->tslt.handle_event(ticks, event);
-			break;
-		}
+		ctx->tslt.handle_sdl_event(ctx->window_width, ctx->window_height,
+		                           ctx->ticks, event);
+
 		switch (event->type) {
 		case SDL_EVENT_FINGER_CANCELED:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -360,10 +356,13 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 		clay_handle_event(event);
 	}
 	{
-		KLAPPT_PROFILE_SCOPE_N("ui_event.mobile_text_input_handle_event");
-		if (mobile_text_input_handle_event(ctx, event)) {
-			ctx->push_one_frame();
-			return SDL_APP_CONTINUE;
+		if (ctx->focused_input) {
+			KLAPPT_PROFILE_SCOPE_N("ui_event.line_input_keys");
+			if (LineInput::handle_keyboard_event(ctx->arena_frame,
+			                                     ctx->focused_input, event)) {
+				ctx->push_one_frame();
+				return SDL_APP_CONTINUE;
+			}
 		}
 	}
 
@@ -382,8 +381,10 @@ extern "C" SDL_AppResult ui_event(AppContext *ctx, SDL_Event *event) {
 
 			Clay_SetLayoutDimensions(Clay_Dimensions{
 				  static_cast<float>(width), static_cast<float>(height)});
-			ctx->display_width = width;
+			ctx->window_width = width;
+			ctx->window_height = height;
 			ctx->scale = SDL_GetWindowDisplayScale(ctx->window);
+			ctx->tslt.on_display_scale_changed(ctx->scale);
 
 			sizes_set_scale(ctx->scale, ctx->settings.density,
 			                ctx->settings.font_scale);
@@ -478,17 +479,12 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 	KLAPPT_PROFILE_SCOPE_N("ui_iterate");
 	KLAPPT_PROFILE_NAME_F("ui_iterate:%s", screen_name(ctx->screen()));
 	auto _tmp_arena_guard = ctx->arena_frame.guard();
-	auto g = ctx->arena_frame.guard();
 	ctx->text->set_time(ctx->ticks);
 	static Uint64 frame_ticks_last = ctx->ticks;
 	const Uint64 frame_ticks = ctx->ticks;
 	const float frame_delta_time_seconds =
 		  static_cast<float>(frame_ticks - frame_ticks_last) / 1000.0f;
 	frame_ticks_last = frame_ticks;
-	{
-		KLAPPT_PROFILE_SCOPE_N("mobile_text_input_begin_frame");
-		mobile_text_input_begin_frame(ctx);
-	}
 
 	{
 		KLAPPT_PROFILE_SCOPE_N("clay_update_scroll");
@@ -515,13 +511,14 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 						   .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
 						   .padding =
 								 {
-									   .top = pad_top, // Pushes icons safely
-	                                                   // below the clock
-	                                                   // .bottom = pad_bottom,
+									   .top = pad_top, // Pushes icons
+	                                                   // safely below the
+	                                                   // clock .bottom =
+	                                                   // pad_bottom,
 								 },
 						   .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					 },
-			   .backgroundColor = theme()->safePaddingBackground,
+			   .backgroundColor = theme()->surfaceContainerLow,
 		 }) {
 		CLAY(CLAY_ID("Content"),
 		     {.layout =
@@ -627,6 +624,9 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 				screen_font_rendering_perf_draw(ctx);
 				break;
 			}
+			case Screen::TsltTest:
+				screen_tslt_test_draw(ctx);
+				break;
 			}
 			CLAY(CLAY_ID("BottomNotsafeFiller"),
 			     {.layout =
@@ -643,10 +643,10 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 		KLAPPT_PROFILE_SCOPE_N("Clay_EndLayout");
 		render_commands = Clay_EndLayout();
 	}
-	{
-		KLAPPT_PROFILE_SCOPE_N("mobile_text_input_sync");
-		mobile_text_input_sync(ctx);
-	}
+	// {
+	// 	KLAPPT_PROFILE_SCOPE_N("mobile_text_input_sync");
+	// 	mobile_text_input_sync(ctx);
+	// }
 	Clay_SDL3RendererData renderer_data{
 		  .renderer = ctx->renderer,
 		  .text = ctx->text,
@@ -680,10 +680,10 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 		break;
 	}
 
-	{
-		KLAPPT_PROFILE_SCOPE_N("mobile_text_input_end_frame");
-		mobile_text_input_end_frame(ctx);
-	}
+	// {
+	// 	KLAPPT_PROFILE_SCOPE_N("mobile_text_input_end_frame");
+	// 	mobile_text_input_end_frame(ctx);
+	// }
 	{
 		KLAPPT_PROFILE_SCOPE_N("tslt.flush_delayed_reset");
 		ctx->tslt.flush_delayed_reset();

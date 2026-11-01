@@ -1,4 +1,9 @@
 #include "themes.h"
+
+#include "app/worker.h"
+
+#include "platform/android.h"
+
 namespace {
 Theme::Type current_theme{Theme::Light};
 constexpr Theme app_themes[Theme::Themes_COUNT] =
@@ -36,9 +41,10 @@ constexpr Theme app_themes[Theme::Themes_COUNT] =
 				  .outline = {121, 116, 126, 255}, // Grey
 				  .shadow = {0, 0, 0, 64},         // 25% Black for shadows
 
-				  .safePaddingBackground = {31, 30, 35,
-                                            255}, // surfaceContainerLow
-                                                  // from Dark theme
+				  // .safePaddingBackground = {31, 30, 35,
+				  //                                       255}, // surfaceContainerLow
+				  //                                             // from Dark theme
+				  .is_light = true,
 			},
 
 			// ------------------------------------
@@ -75,15 +81,33 @@ constexpr Theme app_themes[Theme::Themes_COUNT] =
 				  .outline = {147, 143, 153, 255}, // Lighter Grey
 				  .shadow = {0, 0, 0, 128},        // 50% Black
 
-				  .safePaddingBackground = {31, 30, 35,
-                                            255}, // surfaceContainerLow
+				  // .safePaddingBackground = {31, 30, 35,
+				  //                                       255}, // surfaceContainerLow
+				  .is_light = false,
 			}};
+
+void push_job_status_bar_icons_color() {
+	Worker::job_push(
+		  tctx()->app_ctx, Job::Type::SINGLE_THREADED_PARAMETRIZED,
+		  {
+				.func_param =
+					  [](const Job &job) {
+						  android_set_status_bar_icons_dark((bool)job.i64_val);
+					  },
+				.i64_val = (int64_t)app_themes[current_theme].is_light,
+
+		  });
+}
 } // namespace
 
 const Theme *theme() { return &app_themes[current_theme]; }
-void theme_set(Theme::Type type) { current_theme = type; };
+void theme_set(Theme::Type type) {
+	current_theme = type;
+	push_job_status_bar_icons_color();
+};
 Theme::Type theme_next() {
 	current_theme = static_cast<Theme::Type>(
 		  (static_cast<int>(current_theme) + 1) % Theme::Themes_COUNT);
+	push_job_status_bar_icons_color();
 	return current_theme;
 }

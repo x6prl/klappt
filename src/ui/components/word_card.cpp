@@ -43,6 +43,10 @@ void word_main(Clay_ElementId id, AppContext *ctx, const Word &w,
 		if (ctx->settings.is_mark_verb_irregular &&
 		    grammar::is_irrregular(w.v)) {
 			post = "!"_v;
+			// auto s = word_to_lexeme_str(ctx->arena_frame, ctx->arena_frame,
+			// w);
+			//
+			// SDL_Log(StrView_Fmt, StrView_Arg(s));
 		}
 		if (ctx->settings.is_mark_verb_aux_sein && grammar::is_aux_sein(w.v)) {
 			post = StrView::concat(ctx->arena_frame, post, "*"_v);
@@ -135,10 +139,10 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 
 } // namespace
 
-TapSwipeLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
+TapScrollLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
                                             const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_for_words_list");
-	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
+	TapScrollLongTap::State ret{TapScrollLongTap::State::FingerUp};
 	auto is_usual_card = !w.in_learning_list;
 
 	uint16_t border_width =
@@ -177,8 +181,8 @@ TapSwipeLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
 		                tr_plain, col, sizes()->font.body_sm,
 		                translation_font_id(ctx));
 
-		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
-		                          ctx->tslt.state == TapSwipeLongTap::LongTap);
+		bool is_tap_or_longtap = (ctx->tslt.state == TapScrollLongTap::Tap ||
+		                          ctx->tslt.state == TapScrollLongTap::LongTap);
 		if (Clay_Hovered() && is_tap_or_longtap) {
 			ret = ctx->tslt.state;
 		}
@@ -232,11 +236,11 @@ bool word_card_suggestions(AppContext *ctx, Clay_ElementId id, const Word &w) {
 }
 
 // tapped, longtapped
-TapSwipeLongTap::State word_card_learning_list(AppContext *ctx,
+TapScrollLongTap::State word_card_learning_list(AppContext *ctx,
                                                Clay_ElementId id, const Word &w,
                                                int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
-	TapSwipeLongTap::State ret{TapSwipeLongTap::State::KeyUp};
+	TapScrollLongTap::State ret{TapScrollLongTap::State::FingerUp};
 
 	CLAY(id,
 	     {
@@ -335,8 +339,8 @@ TapSwipeLongTap::State word_card_learning_list(AppContext *ctx,
 					  }));
 		}
 
-		bool is_tap_or_longtap = (ctx->tslt.state == TapSwipeLongTap::Tap ||
-		                          ctx->tslt.state == TapSwipeLongTap::LongTap);
+		bool is_tap_or_longtap = (ctx->tslt.state == TapScrollLongTap::Tap ||
+		                          ctx->tslt.state == TapScrollLongTap::LongTap);
 		if (Clay_Hovered() && is_tap_or_longtap) {
 			ret = ctx->tslt.state;
 		}

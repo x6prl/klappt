@@ -137,10 +137,10 @@ void screen_exercise_draw(AppContext *ctx) {
 
 		const float source_font_size =
 			  is_phrase
-					? get_font_size_based_on_str_size(ctx->display_width,
+					? get_font_size_based_on_str_size(ctx->window_width,
 		                                              ctx->scale, text_length,
 		                                              16.f, 22.f)
-					: get_font_size_based_on_str_size(ctx->display_width,
+					: get_font_size_based_on_str_size(ctx->window_width,
 		                                              ctx->scale, text_length,
 		                                              22.f, 36.f);
 

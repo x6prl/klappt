@@ -15,6 +15,7 @@
 #include "platform/neuro.h"
 
 #include "ui/components/button.h"
+#include "ui/components/line_input.h"
 #include "ui/components/lists.h"
 
 #include "ui/trs.h"
@@ -881,7 +882,7 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 				const float card_pad_h = static_cast<float>(
 					  sizes()->pad.card.left + sizes()->pad.card.right);
 				const float max_content_width =
-					  static_cast<float>(ctx->display_width) - screen_pad_h -
+					  static_cast<float>(ctx->window_width) - screen_pad_h -
 					  card_pad_h;
 
 				const float pill_pad_h =
@@ -1434,6 +1435,7 @@ void screen_word_view_draw(AppContext *ctx) {
 				  ctx, CLAY_ID_LOCAL("BackButton"), Icons::BACK);
 			if (back_button.activated()) {
 				on_back_button_pressed(ctx);
+				LineInput::request_focus(&ctx->dictionary_search);
 			}
 
 #if NEURO
@@ -1454,7 +1456,7 @@ void screen_word_view_draw(AppContext *ctx) {
 					  Icons::ROTATE);
 				if (back_and_clear_and_focus.activated()) {
 					ctx->dictionary_search.clear();
-					ctx->mobile_text_input.activate_text_input = true;
+					LineInput::request_focus(&ctx->dictionary_search);
 					ctx->pop();
 				}
 			}

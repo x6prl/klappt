@@ -34,8 +34,7 @@ struct Theme {
 	Clay_Color outline;
 	Clay_Color shadow;
 
-	// Other
-	Clay_Color safePaddingBackground;
+	bool is_light;
 };
 
 const Theme *theme();

@@ -145,8 +145,8 @@ inline MobileButtonStyle mobile_button_style_app_bar() {
 inline MobileButtonResult mobile_button_state(const AppContext *ctx,
                                               Clay_ElementId id) {
 	const bool hit = Clay_PointerOver(id);
-	const bool held = hit && (ctx->tslt.state == TapSwipeLongTap::KeyDown ||
-	                          ctx->tslt.state == TapSwipeLongTap::LongTap);
+	const bool held = hit && (ctx->tslt.state == TapScrollLongTap::FingerDown ||
+	                          ctx->tslt.state == TapScrollLongTap::LongTap);
 	return {
 		  .held = held,
 		  .tapped = hit && ctx->tslt.is_tap(),

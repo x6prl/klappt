@@ -40,7 +40,7 @@ StrView from_number_impl(Arena &a, auto val) {
 	static_assert(std::is_arithmetic_v<decltype(val)>,
 	              "from_number is only for arithmetic types");
 	constexpr Size BUF_SIZE = 32;
-	auto strbuf = a.pushN<char>(BUF_SIZE); // TODO: then rewind?..
+	auto strbuf = a.pushN<char>(BUF_SIZE);
 	std::to_chars_result res;
 	if constexpr (std::is_integral_v<decltype(val)>) {
 		res = std::to_chars(strbuf, strbuf + BUF_SIZE, val);
@@ -50,7 +50,8 @@ StrView from_number_impl(Arena &a, auto val) {
 	}
 }
 
-uint32_t decode_utf8_at(const char *data, Size size, Size i, Size &char_len) {
+UTF32Codepoint decode_utf8_at(const char *data, Size size, Size i,
+                              Size &char_len) {
 	uint8_t b0 = static_cast<uint8_t>(data[i]);
 	char_len = bytes_for_utf8[b0];
 
@@ -77,7 +78,7 @@ uint32_t decode_utf8_at(const char *data, Size size, Size i, Size &char_len) {
 	return b0;
 }
 
-bool is_unicode_punctuation(uint32_t cp) {
+bool is_unicode_punctuation(UTF32Codepoint cp) {
 	// standard ASCII punctuation: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
 	if (cp < 0x80) {
 		return std::ispunct(static_cast<unsigned char>(cp)) != 0;
@@ -320,7 +321,7 @@ StrView StrView::utf8_remove_punctuation(Arena &a) const {
 
 	for (Size i = 0; i < size;) {
 		Size char_len = 0;
-		uint32_t cp = decode_utf8_at(data, size, i, char_len);
+		UTF32Codepoint cp = decode_utf8_at(data, size, i, char_len);
 
 		if (!is_unicode_punctuation(cp)) {
 			for (Size j = 0; j < char_len; ++j) {
@@ -379,7 +380,7 @@ bool StrView::is_contains_punctuation() const {
 bool StrView::is_contains_punctuation_unicode() const {
 	for (Size i = 0; i < size;) {
 		Size char_len = 0;
-		uint32_t cp = decode_utf8_at(data, size, i, char_len);
+		UTF32Codepoint cp = decode_utf8_at(data, size, i, char_len);
 		if (is_unicode_punctuation(cp)) {
 			return true;
 		}
@@ -701,4 +702,69 @@ StrView StrView::from_number_hex(Arena &a, uint64_t val) {
 	return {data, 16};
 }
 
+StrView StrView::from_utf32(Arena &a, UTF32Codepoint *str, Size size) {
+	if (!size) {
+		return {};
+	}
+
+	char *utf8_buf = a.pushN<char>(size * 4);
+	char *ptr = utf8_buf;
+
+	for (Size i = 0; i < size; ++i) {
+		ptr += UTF32::encode_to_utf8(str[i], ptr);
+	}
+
+	return {utf8_buf, static_cast<Size>(ptr - utf8_buf)};
+}
+
 int8_t StrView::utf8_codepoint_size(uint8_t b) { return bytes_for_utf8[b]; }
+
+Size UTF32::decode_one_from_utf8(const char *str, Size size,
+                                       UTF32Codepoint &cp) {
+	Size cp_size{};
+	cp = decode_utf8_at(str, size, 0, cp_size);
+	return cp_size;
+};
+
+int UTF32::encode_to_utf8(UTF32Codepoint cp, char buf[]) {
+	if (cp <= 0x7F) {
+		buf[0] = (char)cp;
+		return 1;
+	}
+	if (cp <= 0x7FF) {
+		buf[0] = (char)(0xC0 | (cp >> 6));
+		buf[1] = (char)(0x80 | (cp & 0x3F));
+		return 2;
+	}
+	if (cp >= 0xD800 && cp <= 0xDFFF) [[unlikely]] {
+		return 0;
+	}
+
+	if (cp <= 0xFFFF) {
+		buf[0] = (char)(0xE0 | (cp >> 12));
+		buf[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
+		buf[2] = (char)(0x80 | (cp & 0x3F));
+		return 3;
+	}
+	if (cp <= 0x10FFFF) {
+		buf[0] = (char)(0xF0 | (cp >> 18));
+		buf[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+		buf[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
+		buf[3] = (char)(0x80 | (cp & 0x3F));
+		return 4;
+	}
+
+	return 0;
+}
+
+Pair<UTF32Codepoint *, Size> UTF32::decode_from_utf8(Arena &a, StrView from) {
+	auto ret = a.pushN<UTF32Codepoint>(from.size);
+	auto utf32_cursor = ret;
+	for (Size i = 0; i < from.size;) {
+		Size char_len = 0;
+		*utf32_cursor = decode_utf8_at(from.data, from.size, i, char_len);
+		++utf32_cursor;
+		i += char_len;
+	}
+	return {ret, (Size)(utf32_cursor - ret)};
+}

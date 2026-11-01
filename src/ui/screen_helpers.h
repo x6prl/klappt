@@ -54,6 +54,9 @@ void screen_update_dicts_draw(AppContext *ctx);
 void screen_font_rendering_perf_go(AppContext *ctx);
 void screen_font_rendering_perf_draw(AppContext *ctx);
 
+void screen_tslt_test_push(AppContext *ctx);
+void screen_tslt_test_draw(AppContext *ctx);
+
 #if NEURO
 void screen_tts_asr_go(AppContext *ctx);
 void screen_tts_asr_draw(AppContext *ctx);

@@ -3,8 +3,9 @@
 #include "domain/word.h"
 #include "platform/neuro.h"
 
+#include "ui/components/line_input.h"
 #include "ui/components/lists.h"
-#include "ui/components/text_input.h"
+// #include "ui/components/text_input.h"
 #include "ui/components/word_card.h"
 
 #include "ui/trs.h"
@@ -25,15 +26,14 @@ void screen_learning_list_draw(AppContext *ctx) {
 		CLAY(CLAY_ID("WordsSearchSlot"),
 		     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
-			auto search = mobile_text_input(
-				  ctx, CLAY_ID("WordsSearch"), &ctx->learning_search,
-				  tr()->screen_learning_list_search_words);
-			if (search.changed || search.submitted || search.blurred) {
-				ctx->push_one_frame();
-			}
+
+			LineInput::ui_line_input(ctx, CLAY_ID("WordsSearch"),
+			                         &ctx->learning_search,
+			                         tr()->screen_dictionary_search_words,
+			                         line_input_style_default());
 		}
 		auto now = time(nullptr);
-		const auto query = ctx->learning_search.view();
+		const auto query = ctx->learning_search.to_utf8(ctx->arena_frame);
 		const auto total_words = matching_learning_word_count(
 			  ctx->arena_frame, *ctx->words, query);
 		CLAY(CLAY_ID("WordsListSlot"),
@@ -80,11 +80,11 @@ void screen_learning_list_draw(AppContext *ctx) {
 										  due_mark);
 
 									if (tap_state ==
-						                TapSwipeLongTap::State::Tap) {
+						                TapScrollLongTap::State::Tap) {
 										Worker::send_haptic_feedback(ctx);
 										screen_word_view_push(ctx, w.word_id);
 									} else if (tap_state ==
-						                       TapSwipeLongTap::State::
+						                       TapScrollLongTap::State::
 						                             LongTap) {
 #if NEURO
 										if (ctx->settings.is_module_tts) {

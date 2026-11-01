@@ -100,9 +100,9 @@ void clay_init(AppContext *ctx) {
 	ctx->clay_arena = clay_arena;
 	auto window_size = get_window_sizef(ctx->window);
 	clay_layout_dimensions = window_size;
-	Clay_Initialize(ctx->clay_arena, clay_layout_dimensions,
-	                {.errorHandlerFunction = clay_handle_errors,
-	                 .userData = nullptr});
+	Clay_Initialize(
+		  ctx->clay_arena, clay_layout_dimensions,
+		  {.errorHandlerFunction = clay_handle_errors, .userData = nullptr});
 	Clay_SetDpiScale(ctx->scale);
 	Clay_SetCullingEnabled(true);
 }

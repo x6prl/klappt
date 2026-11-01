@@ -1,3 +1,4 @@
+#include "app/sizes.h"
 #include "app/worker.h"
 #include "domain/word_store_helpers.h"
 #include "screen_helpers.h"
@@ -7,8 +8,9 @@
 #include "base/str_view.h"
 
 #include "ui/components/button.h"
+#include "ui/components/line_input_state.h"
 #include "ui/components/lists.h"
-#include "ui/components/text_input.h"
+#include "ui/components/line_input.h"
 #include "ui/components/word_card.h"
 
 #include "ui/translations/langs.h"
@@ -16,9 +18,8 @@
 
 void screen_dictionary_go(AppContext *ctx) {
 	ctx->dictionary_search.clear();
-	ctx->mobile_text_input.activate_text_input = true;
+	LineInput::request_focus(&ctx->dictionary_search);
 	ctx->go(Screen::Dictionary);
-	ctx->push_one_frame();
 }
 
 void screen_dictionary_draw(AppContext *ctx) {
@@ -85,7 +86,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 
 			if (b.activated()) {
 				ctx->dictionary_search.clear();
-				ctx->mobile_text_input.activate_text_input = true;
+				LineInput::request_focus(&ctx->dictionary_search);
 			}
 		}
 	}
@@ -104,18 +105,15 @@ void screen_dictionary_draw(AppContext *ctx) {
 		CLAY(CLAY_ID("WordsSearchSlot"),
 		     {.layout = {.sizing = {CLAY_SIZING_GROW(0),
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
-			auto search = mobile_text_input(
-				  ctx, CLAY_ID("WordsSearch"), &ctx->dictionary_search,
-				  tr()->screen_dictionary_search_words,
-				  mobile_text_input_style_default(), floating_button_clear_id);
-			if (search.changed || search.submitted || search.blurred) {
-				ctx->push_one_frame();
-			}
+			LineInput::ui_line_input(
+				  ctx, CLAY_ID("DictSearchInput"), &ctx->dictionary_search,
+				  tr()->screen_dictionary_search_words, line_input_style_default(),
+				  floating_button_clear_id);
 		}
 		// NOTE: at least 2 chars to start searching
-		if (ctx->dictionary_search.view().utf8_length() >= 2) {
+		if (ctx->dictionary_search.length >= 2) {
 			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
-			const auto query = ctx->dictionary_search.view();
+			const auto query = ctx->dictionary_search.to_utf8(ctx->arena_frame);
 			const auto mode = ctx->is_dictionary_search_translations_only
 			                        ? SearchMode::TranslationsOnly
 			                        : SearchMode::All;
@@ -149,7 +147,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 										auto tap_state = word_card_dictionary(
 											  ctx, CLAY_IDI("Word", index), w);
 										if (tap_state ==
-							                TapSwipeLongTap::LongTap) {
+							                TapScrollLongTap::LongTap) {
 											// SDL_Log(StrView_Fmt,
 								            //                  StrView_Arg(
 								            // 			  w.translations_raw));
@@ -157,7 +155,7 @@ void screen_dictionary_draw(AppContext *ctx) {
 											toggle_word_from_learning_list_and_save_words_dat(
 												  ctx, &w);
 										} else if (tap_state ==
-							                       TapSwipeLongTap::Tap) {
+							                       TapScrollLongTap::Tap) {
 											screen_word_view_push(ctx,
 								                                  w.word_id);
 											Worker::send_haptic_feedback(ctx);

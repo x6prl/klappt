@@ -337,7 +337,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	m.lap().printus("TTF_Init");
 
 	Arena main_arena{AppContext::MAIN_ARENA_SIZE};
-	auto ctx = new (main_arena.push(sizeof(AppContext)))
+	auto ctx = new (main_arena.push(sizeof(AppContext), 64))
 		  AppContext(static_cast<Arena &&>(main_arena));
 
 	*appstate = ctx;
@@ -368,11 +368,12 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 
 	int width, height;
 	SDL_ShowWindow(window);
-	SDL_GetWindowSize(window, &width, &height);
+	SDL_GetWindowSizeInPixels(window, &width, &height);
 
 	ctx->window = window;
 	ctx->scale = SDL_GetWindowDisplayScale(window);
-	ctx->display_width = static_cast<float>(width);
+	ctx->window_width = static_cast<float>(width);
+	ctx->window_height = static_cast<float>(height);
 	m.lap().printus("window values received");
 
 	FileLoader settings_file{};
@@ -439,8 +440,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppInit(void **appstate, int argc,
 	m.lap().printus("hotreload module loaded");
 #endif
 
-	ui_clay_init(ctx);
-	ui_settings_init(ctx);
+	ui_init(ctx);
 
 	m.lap().printus("ui clay init");
 
@@ -525,8 +525,7 @@ extern "C" SDL_AppResult SDLCALL SDL_AppEvent(void *appstate,
 			// return SDL_APP_CONTINUE;
 		}
 		if (reloaded) {
-			ui_clay_init(ctx);
-			ui_settings_init(ctx);
+			ui_init(ctx);
 		}
 	}
 #endif

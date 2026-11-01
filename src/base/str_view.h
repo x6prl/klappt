@@ -12,10 +12,8 @@
 #define StrView_Fmt "%.*s"
 #define StrView_Arg(str_view) (int)((str_view).size), ((str_view).data)
 
-/*
- * not a string view, actually!
- * can mutate data, be carefull with string literals
- */
+using UTF32Codepoint = uint32_t;
+
 struct StrView {
 	const char *data{nullptr};
 	Size size{0};
@@ -136,6 +134,9 @@ struct StrView {
 
 	static StrView from_number_hex(Arena &a, uint64_t val);
 
+	// allocates same size*4
+	static StrView from_utf32(Arena &a, UTF32Codepoint *str, Size size);
+
 	static StrView from_chars(Arena &a, const char *data, int size);
 	static StrView from_chars(Arena &a, const char *data);
 
@@ -148,3 +149,13 @@ struct StrView {
 constexpr StrView operator""_v(const char *str, std::size_t size) noexcept {
 	return {str, static_cast<Size>(size)};
 }
+
+/****************
+ * UTF32 basics *
+ ****************/
+namespace UTF32 {
+Size decode_one_from_utf8(const char *str, Size size,
+                                 UTF32Codepoint &cp);
+int encode_to_utf8(UTF32Codepoint cp, char buf[]);
+Pair<UTF32Codepoint *, Size> decode_from_utf8(Arena &a, StrView from);
+} // namespace UTF32
