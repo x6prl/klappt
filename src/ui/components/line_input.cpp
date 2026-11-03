@@ -23,6 +23,29 @@
 
 namespace {
 
+// Map UTF-32 codepoint index to UTF-16 code unit offset
+inline LineInputPosition utf32_to_utf16_offset(const UTF32Codepoint *data,
+                                               LineInputPosition utf32_idx) {
+	int u16_offset = 0;
+	for (LineInputPosition i = 0; i < utf32_idx; ++i) {
+		u16_offset += (data[i] >= 0x10000) ? 2 : 1;
+	}
+	return u16_offset;
+}
+
+// Map UTF-16 code unit offset to UTF-32 codepoint index
+inline LineInputPosition utf16_to_utf32_offset(const UTF32Codepoint *data,
+                                               LineInputPosition length,
+                                               LineInputPosition u16_offset) {
+	int u16 = 0;
+	for (int i = 0; i < length; ++i) {
+		if (u16 >= u16_offset)
+			return i;
+		u16 += (data[i] >= 0x10000) ? 2 : 1;
+	}
+	return length;
+}
+
 float get_glyph_width(LineInputState *state, UTF32Codepoint cp) {
 	auto g = state->text_cache->get_glyph(cp, state->font_id, state->font_size);
 	return g->advance;
@@ -176,7 +199,189 @@ void copy_selection_to_primary(Arena &scratch, LineInputState *input,
 #define STB_TEXTEDIT_IMPLEMENTATION
 #include "stb_textedit.h"
 
-void sync_state_to_android_ime(LineInputState *input);
+#if defined(ANDROID)
+#include <atomic>
+
+constexpr Sint32 SDL_USER_DELETE_SURROUNDING_EVENT_CODE = 0x53444C01;
+
+// ring buffer for queued composition text
+static char line_edit_editing_buf[8][LineInputState::CAPACITY * 4 + 1];
+static std::atomic<int> line_edit_editing_idx{0};
+
+static jclass s_input_conn_cls = nullptr;
+static jmethodID s_update_state_mid = nullptr;
+
+static bool ensure_jni_cached(JNIEnv *env) {
+	if (s_input_conn_cls && s_update_state_mid) {
+		return true;
+	}
+
+	jclass local_cls = env->FindClass("org/libsdl/app/SDLInputConnection");
+	if (!local_cls) {
+		return false;
+	}
+
+	s_input_conn_cls = (jclass)env->NewGlobalRef(local_cls);
+	env->DeleteLocalRef(local_cls);
+
+	if (!s_input_conn_cls) {
+		return false;
+	}
+
+	s_update_state_mid = env->GetStaticMethodID(s_input_conn_cls, "updateState",
+	                                            "(Ljava/lang/String;IIII)V");
+
+	return s_update_state_mid != nullptr;
+}
+
+void notify_ime_state(LineInputState *input, STB_TexteditState *stb) {
+	JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+	if (!env) {
+		return;
+	}
+
+	if (!ensure_jni_cached(env)) {
+		return;
+	}
+
+	// Convert UTF-32 directly to standard UTF-16
+	jchar u16_buf[LineInputState::CAPACITY * 2];
+	jsize u16_len = 0;
+	for (LineInputPosition i = 0; i < input->length; ++i) {
+		uint32_t cp = input->data[i];
+		if (cp < 0x10000) {
+			u16_buf[u16_len++] = (jchar)cp;
+		} else if (cp <= 0x10FFFF) {
+			cp -= 0x10000;
+			u16_buf[u16_len++] = (jchar)(0xD800 + (cp >> 10));
+			u16_buf[u16_len++] = (jchar)(0xDC00 + (cp & 0x3FF));
+		}
+	}
+
+	jstring jstr = env->NewString(u16_buf, u16_len);
+
+	// Convert offsets to UTF-16 code units
+	int u16_sel_start = utf32_to_utf16_offset(input->data, stb->select_start);
+	int u16_sel_end = utf32_to_utf16_offset(input->data, stb->select_end);
+
+	int u16_comp_start = -1;
+	int u16_comp_end = -1;
+	if (input->composition_start != input->composition_end) {
+		u16_comp_start =
+			  utf32_to_utf16_offset(input->data, input->composition_start);
+		u16_comp_end =
+			  utf32_to_utf16_offset(input->data, input->composition_end);
+	}
+
+	env->CallStaticVoidMethod(s_input_conn_cls, s_update_state_mid, jstr,
+	                          (jint)u16_sel_start, (jint)u16_sel_end,
+	                          (jint)u16_comp_start, (jint)u16_comp_end);
+
+	env->DeleteLocalRef(jstr);
+}
+
+extern "C" {
+
+JNIEXPORT void JNICALL
+Java_org_libsdl_app_SDLInputConnection_nativeSetComposingRegion(JNIEnv *,
+                                                                jclass,
+                                                                jint start,
+                                                                jint end) {
+	int lo = std::min(start, end);
+	int hi = std::max(start, end);
+
+	SDL_Event ev;
+	SDL_zero(ev);
+	ev.type = SDL_EVENT_TEXT_EDITING;
+	ev.edit.text = nullptr;
+	ev.edit.start = lo;
+	ev.edit.length = hi - lo;
+	SDL_PushEvent(&ev);
+}
+
+JNIEXPORT void JNICALL
+Java_org_libsdl_app_SDLInputConnection_nativeSetComposingText(
+	  JNIEnv *env, jclass, jstring text, jint newCursorPosition) {
+	jsize u16_len = env->GetStringLength(text);
+	const jchar *u16 = env->GetStringChars(text, nullptr);
+	if (!u16)
+		return;
+
+	int idx = line_edit_editing_idx.fetch_add(1, std::memory_order_relaxed) & 7;
+	char *ptr = line_edit_editing_buf[idx];
+
+	// Convert UTF-16 -> standard UTF-8
+	for (jsize i = 0; i < u16_len; ++i) {
+		uint32_t cp = u16[i];
+		if (cp >= 0xD800 && cp <= 0xDBFF && (i + 1 < u16_len)) {
+			uint32_t lo = u16[i + 1];
+			if (lo >= 0xDC00 && lo <= 0xDFFF) {
+				cp = 0x10000 + (((cp & 0x3FF) << 10) | (lo & 0x3FF));
+				++i;
+			}
+		}
+		ptr += UTF32::encode_to_utf8(cp, ptr);
+	}
+	*ptr = '\0';
+	env->ReleaseStringChars(text, u16);
+
+	SDL_Event ev;
+	SDL_zero(ev);
+	ev.type = SDL_EVENT_TEXT_EDITING;
+	ev.edit.text = line_edit_editing_buf[idx];
+	ev.edit.start = newCursorPosition;
+	ev.edit.length = 0;
+	SDL_PushEvent(&ev);
+}
+
+JNIEXPORT void JNICALL
+Java_org_libsdl_app_SDLInputConnection_nativeFinishComposingText(JNIEnv *,
+                                                                 jclass) {
+	SDL_Event ev;
+	SDL_zero(ev);
+	ev.type = SDL_EVENT_TEXT_EDITING;
+	ev.edit.text = "";
+	ev.edit.start = -1;
+	ev.edit.length = 0;
+	SDL_PushEvent(&ev);
+}
+
+JNIEXPORT void JNICALL
+Java_org_libsdl_app_SDLInputConnection_nativeDeleteSurroundingText(
+	  JNIEnv *, jclass, jint beforeLength, jint afterLength,
+	  jboolean isCodePoints) {
+	SDL_Event ev;
+	SDL_zero(ev);
+	ev.type = SDL_EVENT_USER;
+	ev.user.code = SDL_USER_DELETE_SURROUNDING_EVENT_CODE;
+	ev.user.data1 = (void *)(uintptr_t)beforeLength;
+	ev.user.data2 =
+		  (void *)(uintptr_t)((afterLength << 1) | (isCodePoints ? 1 : 0));
+	SDL_PushEvent(&ev);
+}
+
+JNIEXPORT void JNICALL
+Java_org_libsdl_app_SDLInputConnection_nativeSetSelection(JNIEnv *, jclass,
+                                                          jint start,
+                                                          jint end) {
+	int lo = std::min(start, end);
+	int hi = std::max(start, end);
+
+	SDL_Event ev;
+	SDL_zero(ev);
+	ev.type = SDL_EVENT_TEXT_EDITING;
+	ev.edit.text = "";
+	ev.edit.start = lo;
+	ev.edit.length = hi - lo;
+	SDL_PushEvent(&ev);
+}
+
+} // extern "C"
+
+#else
+inline void notify_ime_state(LineInputState *, auto *) {}
+#endif
+
 namespace {
 #if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
 
@@ -219,34 +424,33 @@ void log_line_input_event(const SDL_Event &event) {
 	}
 }
 
-void log_line_input_state(const char *stage, const LineInputState *input,
+void log_line_input_state(const char *stage, LineInputState *input,
                           const STB_TexteditState *stb) {
 
 	SDL_Log("[LineInput] %s "
 	        "cursor=%d selection=(%d,%d) length=%d "
-	        "composition=(length=%d cursor=%d selection=%d) "
+	        "composition=(start=%d end=%d) "
 	        "dragging=%d popup=%d scroll_x=%.2f",
 	        stage, static_cast<int>(stb->cursor),
 	        static_cast<int>(stb->select_start),
 	        static_cast<int>(stb->select_end), static_cast<int>(input->length),
-	        static_cast<int>(input->composition_length),
-	        static_cast<int>(input->composition_cursor),
-	        static_cast<int>(input->composition_sel_length),
+	        static_cast<int>(input->composition_start),
+	        static_cast<int>(input->composition_end),
 	        static_cast<int>(input->is_dragging),
 	        static_cast<int>(input->is_show_popup_menu), input->scroll_x);
+	auto str = input->to_utf8(tctx()->app_ctx->arena_frame);
+	SDL_Log("[LineInput] content |" StrView_Fmt "|", StrView_Arg(str));
 }
 #endif
 
 void clear_composition(LineInputState *input, bool notify_ime = true) {
-	const bool had_composition = input->is_composing();
-
-	// SDL_Log("[LineInput] clear_composition?");
-	input->composition_length = 0;
-	input->composition_cursor = 0;
-	input->composition_sel_length = 0;
-
-	if (had_composition && notify_ime) {
-		SDL_Log("[LineInput] clear_composition for window");
+	SDL_Log("[LineInput] clear_composition");
+	if (input->composition_start == 0 && input->composition_end == 0) {
+		return; // Nothing to clear, don't spam IPC / Android IME
+	}
+	input->composition_start = 0;
+	input->composition_end = 0;
+	if (notify_ime) {
 		SDL_ClearComposition(tctx()->app_ctx->window);
 	}
 }
@@ -319,8 +523,8 @@ void select_word(LineInputState *input) {
 	};
 
 	auto stb_state = static_cast<STB_TexteditState *>(input->stb_state);
-	int start = stb_state->cursor;
-	int end = stb_state->cursor;
+	LineInputPosition start = stb_state->cursor;
+	LineInputPosition end = stb_state->cursor;
 	auto data = input->data;
 
 	while (start > 0 && !is_word_boundary(data[start - 1]))
@@ -340,6 +544,15 @@ inline void native_input_activate(SDL_Window *window,
 	if (props) {
 		SDL_SetNumberProperty(props, SDL_PROP_TEXTINPUT_TYPE_NUMBER,
 		                      style.text_type);
+#if defined(ANDROID)
+		constexpr Sint64 ANDROID_INPUT_TYPE_FILTER =
+			  0x00000001 | // TYPE_CLASS_TEXT
+			  0x000000B0;  // TYPE_TEXT_VARIATION_FILTER
+
+		SDL_SetNumberProperty(props,
+		                      SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER,
+		                      ANDROID_INPUT_TYPE_FILTER);
+#endif
 		SDL_SetNumberProperty(props, SDL_PROP_TEXTINPUT_CAPITALIZATION_NUMBER,
 		                      style.capitalization);
 		SDL_SetBooleanProperty(props, SDL_PROP_TEXTINPUT_AUTOCORRECT_BOOLEAN,
@@ -359,7 +572,6 @@ inline void focus_input(AppContext *ctx, LineInputState *input,
 	ctx->focused_input = input;
 	ctx->focused_input_id = id.id;
 	native_input_activate(ctx->window, style);
-	sync_state_to_android_ime(input);
 
 	SDL_Rect rect{
 		  .x = static_cast<int>(box.x),
@@ -378,50 +590,6 @@ inline void native_input_deactivate(SDL_Window *window) {
 }
 
 } // namespace
-
-void sync_state_to_android_ime(LineInputState *input) {
-#if defined(ANDROID)
-	auto *stb_state = static_cast<STB_TexteditState *>(input->stb_state);
-	JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
-	if (!env)
-		return;
-
-	// JNI's NewStringUTF expects modified UTF-8, which cannot represent a
-	// supplementary-plane code point in normal UTF-8. Build UTF-16 directly.
-	jchar utf16_buf[LineInputState::CAPACITY * 2];
-	jsize utf16_length = 0;
-	for (LineInputPosition i = 0; i < input->length; ++i) {
-		const UTF32Codepoint cp = input->data[i];
-		if (cp <= 0xFFFF) {
-			utf16_buf[utf16_length++] = static_cast<jchar>(cp);
-		} else if (cp <= 0x10FFFF) {
-			const UTF32Codepoint value = cp - 0x10000;
-			utf16_buf[utf16_length++] =
-				  static_cast<jchar>(0xD800 + (value >> 10));
-			utf16_buf[utf16_length++] =
-				  static_cast<jchar>(0xDC00 + (value & 0x3FF));
-		}
-	}
-
-	jstring jtext = env->NewString(utf16_buf, utf16_length);
-	if (!jtext)
-		return;
-	jclass cls = env->FindClass("org/libsdl/app/SDLInputConnection");
-	if (cls) {
-		jmethodID mid = env->GetStaticMethodID(cls, "setNativeBufferState",
-		                                       "(Ljava/lang/String;II)V");
-		if (mid) {
-			int sel_start = stb_state->select_start;
-			int sel_end = stb_state->select_end;
-			env->CallStaticVoidMethod(cls, mid, jtext, sel_start, sel_end);
-		}
-		env->DeleteLocalRef(cls);
-	}
-	env->DeleteLocalRef(jtext);
-#else
-	(void)input;
-#endif
-}
 
 namespace LineInput {
 
@@ -442,13 +610,14 @@ void clear(LineInputState *input) {
 	input->length = 0;
 	input->scroll_x = 0.0f;
 	input->is_show_popup_menu = false;
+
 	if (input->stb_state) {
 		stb_textedit_initialize_state(
 			  static_cast<STB_TexteditState *>(input->stb_state), 1);
 	}
+
 	clear_composition(input);
 	input->is_dragging = false;
-	sync_state_to_android_ime(input); // <--- Keep this
 }
 
 bool handle_keyboard_event(Arena &scratch, LineInputState *input,
@@ -456,64 +625,169 @@ bool handle_keyboard_event(Arena &scratch, LineInputState *input,
 	auto g = scratch.guard();
 	auto *stb_state = static_cast<STB_TexteditState *>(input->stb_state);
 	bool handled = false;
+	bool is_supress_notify_ime_state = false;
 
 #if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
 	log_line_input_event(*event);
-	// log_line_input_state("BEFORE", input, stb_state);
 #endif
 
 	switch (event->type) {
-	case SDL_EVENT_WINDOW_FOCUS_LOST:
-		// native_input_deactivate(tctx()->app_ctx->window);
+#if defined(ANDROID)
+	case SDL_EVENT_USER: {
+		if (event->user.code == SDL_USER_DELETE_SURROUNDING_EVENT_CODE) {
+			int before = (int)(uintptr_t)event->user.data1;
+			uintptr_t packed = (uintptr_t)event->user.data2;
+			int after = (int)(packed >> 1);
+			bool isCodePoints = (packed & 1) != 0;
+
+			LineInputPosition sel_min =
+				  std::min(stb_state->select_start, stb_state->select_end);
+			LineInputPosition sel_max =
+				  std::max(stb_state->select_start, stb_state->select_end);
+
+			// calculate codepoint count to delete before selection
+			LineInputPosition del_before_cp = 0;
+			if (isCodePoints) {
+				del_before_cp = std::min(before, sel_min);
+			} else {
+				LineInputPosition target_u16 =
+					  utf32_to_utf16_offset(input->data, sel_min) - before;
+				LineInputPosition new_idx = utf16_to_utf32_offset(
+					  input->data, input->length, std::max(0, target_u16));
+				del_before_cp = sel_min - new_idx;
+			}
+
+			// calculate codepoint count to delete after selection
+			LineInputPosition del_after_cp = 0;
+			if (isCodePoints) {
+				del_after_cp = std::min(after, (int)(input->length - sel_max));
+			} else {
+				LineInputPosition cur_u16 =
+					  utf32_to_utf16_offset(input->data, sel_max);
+				LineInputPosition new_idx = utf16_to_utf32_offset(
+					  input->data, input->length, cur_u16 + after);
+				del_after_cp = new_idx - sel_max;
+			}
+
+			// atomic removal
+			if (del_after_cp > 0) {
+				my_delete_chars(input, sel_max, del_after_cp);
+			}
+			if (del_before_cp > 0) {
+				my_delete_chars(input, sel_min - del_before_cp, del_before_cp);
+				sel_min -= del_before_cp;
+			}
+
+			stb_state->cursor = sel_min;
+			stb_state->select_start = stb_state->select_end = stb_state->cursor;
+			input->composition_start = input->composition_end = 0;
+			handled = true;
+			notify_ime_state(input, stb_state);
+		}
 		break;
+	}
+#endif
+	case SDL_EVENT_WINDOW_FOCUS_LOST:
+		break;
+
 	case SDL_EVENT_TEXT_EDITING: {
+#if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
+		log_line_input_state("BEFORE", input, stb_state);
+#endif
 		handled = true;
 		const char *text = event->edit.text;
-		input->composition_length = 0;
-		input->composition_cursor = 0;
-		input->composition_sel_length = 0;
 
+		// 1. Setting composing region over existing text
+		if (text == nullptr && event->edit.start >= 0) {
+			input->composition_start = utf16_to_utf32_offset(
+				  input->data, input->length, event->edit.start);
+			input->composition_end =
+				  utf16_to_utf32_offset(input->data, input->length,
+			                            event->edit.start + event->edit.length);
+			// Cursor and selection remain where they were
+			is_supress_notify_ime_state = true;
+			break;
+		}
+
+		// 2. Empty text: Cancel/finish or explicit selection change
 		if (!text || text[0] == '\0') {
-			if (event->edit.start >= 0 && event->edit.start <= input->length) {
-				stb_state->select_start = event->edit.start;
-				stb_state->select_end =
-					  std::clamp(event->edit.start + event->edit.length, 0,
-				                 static_cast<int>(input->length));
-				// Android uses a signed selection length. The cursor belongs at
-				// the active end, which is especially important for a backwards
-				// spacebar-swipe selection (negative length).
+			if (event->edit.start < 0) {
+				// finishComposingText
+				input->composition_start = input->composition_end = 0;
+			} else if (event->edit.start >= 0) {
+				// setSelection from IME
+				LineInputPosition u32_start = utf16_to_utf32_offset(
+					  input->data, input->length, event->edit.start);
+				LineInputPosition u32_end = utf16_to_utf32_offset(
+					  input->data, input->length,
+					  event->edit.start + event->edit.length);
+				stb_state->select_start = u32_start;
+				stb_state->select_end = u32_end;
 				stb_state->cursor = stb_state->select_end;
 			}
 		} else {
+			// 3. Active composition insertion
 			auto text_len = strlen(text);
 			StrView utf8_str{text, (Size)text_len};
-			auto [utf32_codepoints, length] =
-				  UTF32::decode_from_utf8(scratch, utf8_str);
+			auto [utf32_cp, len] = UTF32::decode_from_utf8(scratch, utf8_str);
 
-			input->composition_length = std::min(
-				  static_cast<int>(length),
-				  static_cast<int>(LineInputState::COMPOSITION_CAPACITY));
-
-			for (int i = 0; i < input->composition_length; ++i) {
-				input->composition_data[i] = utf32_codepoints[i];
+			// Remove old composition span or existing selection
+			if (input->composition_start != input->composition_end) {
+				my_delete_chars(input, input->composition_start,
+				                input->composition_end -
+				                      input->composition_start);
+				stb_state->cursor = input->composition_start;
+			} else if (stb_state->select_start != stb_state->select_end) {
+				LineInputPosition sel_min =
+					  std::min(stb_state->select_start, stb_state->select_end);
+				LineInputPosition sel_max =
+					  std::max(stb_state->select_start, stb_state->select_end);
+				my_delete_chars(input, sel_min, sel_max - sel_min);
+				stb_state->cursor = sel_min;
+				input->composition_start = sel_min;
+			} else {
+				input->composition_start = stb_state->cursor;
 			}
 
-			input->composition_cursor = (event->edit.start >= 0)
-			                                  ? event->edit.start
-			                                  : input->composition_length;
-			input->composition_sel_length =
-				  (event->edit.length >= 0) ? event->edit.length : 0;
+			// Insert directly into input->data
+			len = std::min(
+				  len, (Size)std::max(
+							 0, (LineInputPosition)(LineInputState::CAPACITY -
+			                                        input->length)));
+			if (len > 0) {
+				my_insert_chars(input, input->composition_start, utf32_cp,
+				                (int)len);
+				input->composition_end =
+					  input->composition_start + (LineInputPosition)len;
+
+				// Apply Android newCursorPosition semantics:
+				LineInputPosition newCursorPos = event->edit.start;
+				LineInputPosition target_cursor =
+					  (newCursorPos > 0)
+							? (input->composition_end + (newCursorPos - 1))
+							: (input->composition_start + newCursorPos);
+
+				stb_state->cursor =
+					  std::clamp(target_cursor, 0, (int)input->length);
+				stb_state->select_start = stb_state->select_end =
+					  stb_state->cursor;
+			} else {
+				input->composition_end = input->composition_start;
+			}
 		}
+
 		input->is_show_popup_menu = false;
+		notify_ime_state(input, stb_state);
+#if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
+		log_line_input_state("AFTER", input, stb_state);
+#endif
 		break;
 	}
-	case SDL_EVENT_TEXT_INPUT: {
-		const bool had_composition = input->is_composing();
-		input->composition_length = 0;
-		input->composition_cursor = 0;
-		input->composition_sel_length = 0;
-		handled = had_composition;
 
+	case SDL_EVENT_TEXT_INPUT: {
+#if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
+		log_line_input_state("BEFORE", input, stb_state);
+#endif
 		const char *p = event->text.text;
 		if (!p || !p[0]) {
 			break;
@@ -525,7 +799,7 @@ bool handle_keyboard_event(Arena &scratch, LineInputState *input,
 			  UTF32::decode_from_utf8(scratch, utf8_str);
 
 		if (length > 0) {
-			Size valid_len = 0;
+			LineInputPosition valid_len = 0;
 			for (Size i = 0; i < length; ++i) {
 				if (utf32_codepoints[i] != '\n' &&
 				    utf32_codepoints[i] != '\r') {
@@ -534,16 +808,49 @@ bool handle_keyboard_event(Arena &scratch, LineInputState *input,
 			}
 
 			if (valid_len > 0) {
-				stb_textedit_paste(input, stb_state, utf32_codepoints,
-				                   (int)valid_len);
+				LineInputPosition comp_len =
+					  input->composition_end - input->composition_start;
+
+				// If committing the word that was already composed, finalize
+				// in-place
+				if (comp_len > 0 && comp_len == valid_len &&
+				    memcmp(&input->data[input->composition_start],
+				           utf32_codepoints,
+				           valid_len * sizeof(UTF32Codepoint)) == 0) {
+					input->composition_start = input->composition_end = 0;
+				} else {
+					if (comp_len > 0) {
+						my_delete_chars(input, input->composition_start,
+						                comp_len);
+						stb_state->cursor = input->composition_start;
+						input->composition_start = input->composition_end = 0;
+					}
+					LineInputPosition sel_len = std::abs(
+						  stb_state->select_end - stb_state->select_start);
+					LineInputPosition available =
+						  LineInputState::CAPACITY - input->length + sel_len;
+					valid_len = std::min(valid_len, std::max(0, available));
+					stb_textedit_paste(input, stb_state, utf32_codepoints,
+					                   (int)valid_len);
+				}
+				stb_state->select_start = stb_state->select_end =
+					  stb_state->cursor;
 				handled = true;
 			}
 		}
 
 		input->is_show_popup_menu = false;
+		notify_ime_state(input, stb_state);
+#if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
+		log_line_input_state("AFTER", input, stb_state);
+#endif
 		break;
 	}
 	case SDL_EVENT_KEY_DOWN: {
+#if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
+		log_line_input_state("BEFORE", input, stb_state);
+#endif
+		// Existing key handling follows...
 		bool is_shift = (event->key.mod & SDL_KMOD_SHIFT) != 0;
 		// macOS/iOS uses GUI (Cmd), others use Ctrl
 		bool is_ctrl = (event->key.mod & SDL_KMOD_CTRL) ||
@@ -570,12 +877,14 @@ bool handle_keyboard_event(Arena &scratch, LineInputState *input,
 			key = STB_TEXTEDIT_K_DELETE;
 			break;
 		case SDLK_Z:
-			if (is_ctrl)
+			if (is_ctrl) {
 				key = is_shift ? STB_TEXTEDIT_K_REDO : STB_TEXTEDIT_K_UNDO;
+			}
 			break;
 		case SDLK_Y:
-			if (is_ctrl)
+			if (is_ctrl) {
 				key = STB_TEXTEDIT_K_REDO;
+			}
 			break;
 		case SDLK_C:
 			if (is_ctrl && (stb_state->select_start != stb_state->select_end)) {
@@ -606,7 +915,11 @@ bool handle_keyboard_event(Arena &scratch, LineInputState *input,
 			break;
 		case SDLK_RETURN:
 		case SDLK_KP_ENTER:
+			// TODO: think about smarter handling
+			tctx()->app_ctx->focused_input = nullptr;
+			tctx()->app_ctx->focused_input_id = 0;
 			native_input_deactivate(tctx()->app_ctx->window);
+			tctx()->app_ctx->push_one_frame();
 			handled = true;
 			break;
 		}
@@ -622,13 +935,19 @@ bool handle_keyboard_event(Arena &scratch, LineInputState *input,
 			}
 			input->is_show_popup_menu = false;
 			handled = true;
+#if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
+			log_line_input_state("AFTER", input, stb_state);
+#endif
 		}
 		break;
 	}
 	}
 #if defined(ANDROID) && defined(LINE_INPUT_DEBUG)
-	// log_line_input_state("AFTER", input, stb_state);
+// log_line_input_state("AFTER", input, stb_state);
 #endif
+	if (!is_supress_notify_ime_state) {
+		notify_ime_state(input, stb_state);
+	}
 	return handled;
 }
 
@@ -648,11 +967,13 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 	bool is_focused = (ctx->focused_input == input);
 	if (input->focus_requested) {
 		focus_input(ctx, input, id, widget_bounding_box, style);
+		notify_ime_state(input,
+		                 static_cast<STB_TexteditState *>(input->stb_state));
 		input->focus_requested = false;
 		is_focused = true;
 	}
 
-	const bool has_value = (input->length > 0 || input->is_composing());
+	const bool has_value = input->length > 0;
 
 	auto clear_btn_container_id = CLAY_IDI("LineInputClearBtnContainer", id.id);
 	auto clear_data = Clay_GetElementData(clear_btn_container_id);
@@ -712,9 +1033,10 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 			}
 			if (stb_state->select_end == stb_state->select_start) {
 				select_word(input);
-				sync_state_to_android_ime(input);
 			}
 			input->is_show_popup_menu = true;
+
+			notify_ime_state(input, stb_state);
 			ctx->push_one_frame();
 		} else if (tslt.consume_tap()) {
 			if (!is_focused) {
@@ -726,18 +1048,16 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 			ctx->push_one_frame();
 			if (tslt.tap_count == 2) {
 				select_word(input);
-				sync_state_to_android_ime(input);
 				copy_selection_to_primary(ctx->arena_frame, input, stb_state);
 				input->is_show_popup_menu = true;
 			} else if (tslt.tap_count >= 3) {
 				select_all(input);
-				sync_state_to_android_ime(input);
 				copy_selection_to_primary(ctx->arena_frame, input, stb_state);
 				input->is_show_popup_menu = true;
 			} else {
-				sync_state_to_android_ime(input);
 				input->is_show_popup_menu = false;
 			}
+			notify_ime_state(input, stb_state);
 		}
 	} else if (is_focused) {
 		if (tslt.is_started_inside(widget_bounding_box) &&
@@ -745,6 +1065,7 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 			// dragging
 			if (tslt.is_scroll()) {
 				clear_composition(input);
+
 				input->is_show_popup_menu = false;
 				float local_motion_x = (tslt.motion_x - (widget_bounding_box.x +
 				                                         style.padding_x)) +
@@ -762,14 +1083,15 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 				}
 				stb_textedit_drag(input, stb_state, local_motion_x,
 				                  local_motion_y);
+				notify_ime_state(input, stb_state);
 			} else {
 				input->is_dragging = false;
+
 				copy_selection_to_primary(ctx->arena_frame, input, stb_state);
-				sync_state_to_android_ime(input); // <--- Add this
 			}
 		} else if (!is_touch_on_clear_btn &&
 		           !is_touch_on_focus_preserving_element &&
-		           tslt.is_tap_or_longtap_or_scroll()) {
+		           tslt.is_tap_or_longtap()) {
 			// outside click
 			auto popup_menu_data = Clay_GetElementData(popup_menu_clay_id);
 			bool is_touching_popup_menu =
@@ -777,10 +1099,13 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 				  tslt.is_started_inside(popup_menu_data.boundingBox);
 
 			if (!is_touching_popup_menu && tslt.is_tap_or_longtap_or_scroll()) {
+				clear_composition(input);
+
 				ctx->focused_input = nullptr;
 				ctx->focused_input_id = 0;
+
 				native_input_deactivate(ctx->window);
-				clear_composition(input);
+
 				is_focused = false;
 				ctx->push_one_frame();
 				input->is_show_popup_menu = false;
@@ -788,26 +1113,7 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 		}
 	}
 
-	LineInputPosition comp_replace_start =
-		  std::min(stb_state->select_start, stb_state->select_end);
-	LineInputPosition comp_replace_end =
-		  std::max(stb_state->select_start, stb_state->select_end);
-	LineInputPosition total_glyphs = input->length + input->composition_length;
 	UTF32Codepoint *display_data = input->data;
-	LineInputPosition comp_insert_idx = stb_state->cursor;
-
-	if (input->is_composing()) {
-		total_glyphs -= comp_replace_end - comp_replace_start;
-		comp_insert_idx = comp_replace_start;
-		display_data = ctx->arena_frame.pushN<UTF32Codepoint>(total_glyphs);
-		memcpy(display_data, input->data,
-		       comp_replace_start * sizeof(UTF32Codepoint));
-		memcpy(display_data + comp_insert_idx, input->composition_data,
-		       input->composition_length * sizeof(UTF32Codepoint));
-		memcpy(display_data + comp_insert_idx + input->composition_length,
-		       input->data + comp_replace_end,
-		       (input->length - comp_replace_end) * sizeof(UTF32Codepoint));
-	}
 	float render_cursor_x{0.0f};
 	float render_sel_x1{0.0f};
 	float render_sel_x2{0.0f};
@@ -824,42 +1130,30 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 			  std::max(stb_state->select_start, stb_state->select_end);
 		render_is_has_selection = (sel_min != sel_max);
 
-		LineInputPosition target_cursor_idx =
-			  input->is_composing()
-					? (comp_insert_idx + input->composition_cursor)
-					: stb_state->cursor;
+		LineInputPosition target_cursor_idx = stb_state->cursor;
 
-		for (LineInputPosition i = 0; i < total_glyphs; ++i) {
-			if (i == target_cursor_idx)
+		for (LineInputPosition i = 0; i <= input->length; ++i) {
+			if (i == target_cursor_idx) {
 				render_cursor_x = current_x;
-
-			if (input->is_composing()) {
-				if (i == comp_insert_idx)
-					render_comp_x1 = current_x;
-				if (i == comp_insert_idx + input->composition_length)
-					render_comp_x2 = current_x;
 			}
 
-			if (!input->is_composing()) {
-				if (i == sel_min)
-					render_sel_x1 = current_x;
-				if (i == sel_max)
-					render_sel_x2 = current_x;
+			if (i == input->composition_start) {
+				render_comp_x1 = current_x;
+			}
+			if (i == input->composition_end) {
+				render_comp_x2 = current_x;
 			}
 
-			current_x += get_glyph_width(input, display_data[i]);
-		}
-
-		if (target_cursor_idx == total_glyphs)
-			render_cursor_x = current_x;
-		if (input->is_composing() &&
-		    (comp_insert_idx + input->composition_length) == total_glyphs)
-			render_comp_x2 = current_x;
-		if (!input->is_composing()) {
-			if (sel_min == total_glyphs)
+			if (i == sel_min) {
 				render_sel_x1 = current_x;
-			if (sel_max == total_glyphs)
+			}
+			if (i == sel_max) {
 				render_sel_x2 = current_x;
+			}
+
+			if (i < input->length) {
+				current_x += get_glyph_width(input, display_data[i]);
+			}
 		}
 	}
 
@@ -883,8 +1177,9 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 			}
 		}
 	}
-	if (input->scroll_x < 0.0f)
+	if (input->scroll_x < 0.0f) {
 		input->scroll_x = 0.0f;
+	}
 
 	if (is_focused && elem_data.found) {
 		SDL_Rect ime_rect{
@@ -929,7 +1224,7 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 					.childOffset = {-input->scroll_x, 0.0f},
 			  }}) {
 
-			if (render_is_has_selection && !input->is_composing()) {
+			if (render_is_has_selection) {
 				CLAY(CLAY_ID_LOCAL("SelectionRec"),
 				     {
 						   .layout = {.sizing =
@@ -958,7 +1253,7 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 					 }) {}
 			}
 
-			if (input->is_composing() && (render_comp_x2 > render_comp_x1)) {
+			if ((render_comp_x2 > render_comp_x1)) {
 				CLAY(CLAY_ID_LOCAL("CompositionUnderline"),
 				     {
 						   .layout = {.sizing =
@@ -967,7 +1262,7 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 														render_comp_x2 -
 														render_comp_x1),
 												  .height =
-														CLAY_SIZING_FIXED(2.0f),
+														CLAY_SIZING_FIXED(4.0f),
 											}},
 						   .backgroundColor = style.caret,
 						   .floating =
@@ -988,9 +1283,9 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 					 }) {}
 			}
 
-			if (total_glyphs > 0) {
+			if (input->length > 0) {
 				StrView str = StrView::from_utf32(ctx->arena_frame,
-				                                  display_data, total_glyphs);
+				                                  display_data, input->length);
 				draw_text(str, style.text, input->font_size, input->font_id,
 				          CLAY_TEXT_WRAP_NONE, CLAY_TEXT_ALIGN_LEFT);
 			} else if (!is_focused) {
@@ -1022,7 +1317,7 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 								 },
 					 }) {
 
-					if (input->is_show_popup_menu && !input->is_composing()) {
+					if (input->is_show_popup_menu) {
 						CLAY(popup_menu_clay_id,
 						     {
 								   .layout =
@@ -1140,7 +1435,6 @@ void ui_line_input(AppContext *ctx, Clay_ElementId id, LineInputState *input,
 		}
 	}
 }
-
 } // namespace LineInput
 
 void LineInputState::clear() { LineInput::clear(this); }

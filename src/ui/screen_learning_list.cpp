@@ -33,7 +33,8 @@ void screen_learning_list_draw(AppContext *ctx) {
 			                         line_input_style_default());
 		}
 		auto now = time(nullptr);
-		const auto query = ctx->learning_search.to_utf8(ctx->arena_frame);
+		const auto query = LineInput::effective_utf8(ctx->arena_frame,
+		                                             &ctx->learning_search);
 		const auto total_words = matching_learning_word_count(
 			  ctx->arena_frame, *ctx->words, query);
 		CLAY(CLAY_ID("WordsListSlot"),

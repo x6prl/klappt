@@ -8,9 +8,9 @@
 #include "base/str_view.h"
 
 #include "ui/components/button.h"
+#include "ui/components/line_input.h"
 #include "ui/components/line_input_state.h"
 #include "ui/components/lists.h"
-#include "ui/components/line_input.h"
 #include "ui/components/word_card.h"
 
 #include "ui/translations/langs.h"
@@ -107,13 +107,16 @@ void screen_dictionary_draw(AppContext *ctx) {
 		                            CLAY_SIZING_FIXED(search_height)}}}) {
 			LineInput::ui_line_input(
 				  ctx, CLAY_ID("DictSearchInput"), &ctx->dictionary_search,
-				  tr()->screen_dictionary_search_words, line_input_style_default(),
-				  floating_button_clear_id);
+				  tr()->screen_dictionary_search_words,
+				  line_input_style_default(), floating_button_clear_id);
 		}
+		const auto query = ctx->dictionary_search.to_utf8(ctx->arena_frame);
+
 		// NOTE: at least 2 chars to start searching
-		if (ctx->dictionary_search.length >= 2) {
+		if (query.size >= 2) {
 			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
-			const auto query = ctx->dictionary_search.to_utf8(ctx->arena_frame);
+
+			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
 			const auto mode = ctx->is_dictionary_search_translations_only
 			                        ? SearchMode::TranslationsOnly
 			                        : SearchMode::All;

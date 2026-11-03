@@ -10,7 +10,6 @@ struct LineInputState {
 	constexpr static LineInputPosition CAPACITY = 256;
 	constexpr static LineInputPosition UNDO_STATE_COUNT = 16;
 	constexpr static LineInputPosition UNDO_CHAR_COUNT = 256;
-	static constexpr LineInputPosition COMPOSITION_CAPACITY = 8;
 
 	uint16_t font_size{0};
 	uint16_t font_id{0};
@@ -27,15 +26,9 @@ struct LineInputState {
 
 	void *stb_state{nullptr};
 
-	UTF32Codepoint composition_data[COMPOSITION_CAPACITY]{};
-	LineInputPosition composition_length{0};
-	LineInputPosition composition_cursor{0};
-	LineInputPosition composition_sel_length{0};
+	LineInputPosition composition_start{0};
+	LineInputPosition composition_end{0};
 
-	[[nodiscard]]
-	bool is_composing() const {
-		return composition_length > 0;
-	}
 	void clear();
 	[[nodiscard]]
 	StrView to_utf8(Arena &a) const {
