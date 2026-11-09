@@ -12,6 +12,7 @@
 #include "base/shuffle.h"
 #include "domain/exercises.h"
 #include "domain/words.h"
+#include "ui/trs.h"
 
 void screen_default_go(AppContext *ctx);
 
@@ -81,8 +82,11 @@ inline void on_back_button_pressed(AppContext *ctx) {
 			// exercise
 			return;
 		} else {
-			// NOTE: it was, but we ignore it
-			// TODO: think more
+			// NOTE: it was
+			ctx->app_status.push_notification(
+				  {tr()->screen_exercise_cannot_go_back_notification_title,
+			       tr()->screen_exercise_cannot_go_back_notification_body,
+			       ctx->ticks + AppStatus::Notification::DEFAULT_TTL_MS});
 			return;
 		}
 	} break;

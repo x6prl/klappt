@@ -126,7 +126,13 @@ void app_bar_layout(AppContext *ctx, StrView title) {
 				auto back = mobile_button(ctx, CLAY_ID("BackButton"),
 				                          Icons::BACK, app_bar_button_style);
 				if (back.tapped) {
-					ctx->pop();
+					if (ctx->on_app_bar_back_button_cb) {
+						if ((ctx->on_app_bar_back_button_cb)(ctx)) {
+							ctx->pop();
+						}
+					} else {
+						ctx->pop();
+					}
 				}
 			}
 		}
@@ -527,6 +533,185 @@ extern "C" SDL_AppResult ui_iterate(AppContext *ctx) {
 						  .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					},
 		      .backgroundColor = theme()->surface}) {
+			if (!ctx->app_status.notifications.is_empty() ||
+			    !ctx->app_status.error_msgs.is_empty()) {
+				MobileButtonStyle close_btn_style =
+					  mobile_button_style_surface_container_high();
+
+				const Sizes *s = sizes();
+				close_btn_style.font_id = FontID::ICONS;
+				close_btn_style.font_size =
+					  static_cast<uint16_t>(s->dim.icon_md);
+				close_btn_style.height = s->dim.min_touch_target;
+				close_btn_style.min_width = s->dim.action_btn_size;
+				// style.padding_x = s->space.xs;
+				// style.padding_y = s->space.xs;
+				close_btn_style.corner_radius = s->radius.sm.topLeft;
+				close_btn_style.border_width = 0;
+				CLAY(CLAY_ID("NotificationsContainer"),
+				     {
+						   .layout =
+								 {
+									   .sizing =
+											 {
+												   .width = CLAY_SIZING_GROW(0),
+												   .height = CLAY_SIZING_FIT(0),
+											 },
+									   .padding = sizes()->pad.card,
+									   .childGap = sizes()->space.xs,
+									   .layoutDirection = CLAY_TOP_TO_BOTTOM,
+								 },
+						   .floating =
+								 {
+									   .offset = {0.f, 0.0f},
+									   .zIndex = 100,
+									   .attachPoints =
+											 {.element =
+				                                    CLAY_ATTACH_POINT_CENTER_TOP,
+				                              .parent =
+				                                    CLAY_ATTACH_POINT_CENTER_TOP},
+									   .attachTo = CLAY_ATTACH_TO_PARENT,
+									   .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT,
+								 },
+					 }) {
+					for (Size i{0}; i < ctx->app_status.notifications.size;
+					     ++i) {
+						auto &n = ctx->app_status.notifications[i];
+						auto notification_el_id =
+							  CLAY_IDI_LOCAL("Notifications", i);
+						auto notification_el_data =
+							  Clay_GetElementData(notification_el_id);
+						float offset_x = 0.f;
+						if (notification_el_data.found &&
+						    ctx->tslt.is_scroll_started_inside(
+								  notification_el_data.boundingBox)) {
+							offset_x = ctx->tslt.motion_offset_x();
+							if (abs(offset_x * 2.2f) >
+							    notification_el_data.boundingBox.width) {
+								ctx->app_status.notifications.remove_by_val(n);
+								ctx->tslt.reset_tap_state();
+								continue;
+							}
+						}
+						if (ctx->ticks > n.deadline) {
+							ctx->app_status.notifications.remove_by_val(n);
+							continue;
+						}
+						CLAY(notification_el_id,
+						     {
+								   .layout =
+										 {.sizing =
+						                        {
+													  .width =
+															CLAY_SIZING_GROW(0),
+													  .height =
+															CLAY_SIZING_FIT(0),
+												},
+						                  .padding = sizes()->pad.card_compact,
+						                  .childAlignment =
+						                        {CLAY_ALIGN_X_LEFT,
+						                         CLAY_ALIGN_Y_CENTER}},
+								   .backgroundColor =
+										 theme()->surfaceContainerHigh,
+								   .cornerRadius = sizes()->radius.md,
+								   .clip = {.horizontal = true,
+						                    .childOffset = {offset_x, 0.f}},
+							 }) {
+							CLAY(CLAY_IDI_LOCAL("NotificationContent", i),
+							     {.layout = {
+										.sizing = {CLAY_SIZING_PERCENT(0.8f),
+							                       CLAY_SIZING_FIT(0)},
+										.layoutDirection = CLAY_TOP_TO_BOTTOM,
+								  }}) {
+								draw_text(n.title,
+								          theme()->onSurfaceContainerHigh,
+								          sizes()->font.body_md, FontID::MAIN,
+								          CLAY_TEXT_WRAP_WORDS,
+								          CLAY_TEXT_ALIGN_LEFT);
+								if (n.body) {
+									draw_text(n.body,
+									          theme()->onSurfaceContainerHigh,
+									          sizes()->font.label_md,
+									          FontID::MAIN,
+									          CLAY_TEXT_WRAP_WORDS,
+									          CLAY_TEXT_ALIGN_LEFT);
+								}
+							}
+
+							CLAY(CLAY_IDI_LOCAL("NSpacer", i),
+							     {.layout = {
+										.sizing =
+											  {
+													.width =
+														  CLAY_SIZING_GROW(0),
+													.height =
+														  CLAY_SIZING_GROW(0),
+											  },
+								  }}) {}
+
+							auto close_button = mobile_button(
+								  ctx,
+								  CLAY_IDI_LOCAL("CloseNotificationBtn", i),
+								  "×"_v, close_btn_style);
+							bool has_action = !!n.on_click_cb;
+							if (close_button.activated()) {
+								ctx->app_status.notifications.remove_by_val(n);
+								ctx->push_one_frame();
+							} else if (has_action &&
+							           notification_el_data.found &&
+							           ctx->tslt
+							                 .is_tap_started_and_ended_inside(
+												   notification_el_data
+														 .boundingBox) &&
+							           ctx->tslt.consume_tap() &&
+							           n.on_click_cb) {
+								n.on_click_cb(ctx);
+								ctx->app_status.notifications.remove_by_val(n);
+								ctx->push_one_frame();
+							}
+						}
+					}
+					for (Size i{0}; i < ctx->app_status.error_msgs.size; ++i) {
+						auto &emsg = ctx->app_status.error_msgs[i];
+						auto emsg_item_id = CLAY_IDI_LOCAL("ErrorMessage", i);
+						CLAY(emsg_item_id,
+						     {
+								   .layout =
+										 {.sizing =
+						                        {
+													  .width =
+															CLAY_SIZING_GROW(0),
+													  .height =
+															CLAY_SIZING_FIT(0),
+												},
+						                  .padding = sizes()->pad.card},
+								   .backgroundColor =
+										 theme()->surfaceContainerHigh,
+								   .cornerRadius = sizes()->radius.md,
+								   .border =
+										 {
+											   .color = theme()->error,
+											   .width = {2, 2, 2, 2},
+										 },
+							 }) {
+							draw_text(emsg, theme()->onSurfaceContainerHigh);
+							if (ctx->tslt.is_tap_started_and_ended_inside(
+									  Clay_GetElementData(emsg_item_id)
+											.boundingBox) &&
+							    ctx->tslt.consume_tap()) {
+								ctx->app_status.error_msgs.pop();
+							}
+
+							// NOTE: we are not handling button click, the whole
+							// notification goes as a button
+							(void)mobile_button(
+								  ctx,
+								  CLAY_IDI_LOCAL("CloseNotificationBtn", i),
+								  "×"_v, close_btn_style);
+						}
+					}
+				}
+			}
 			switch (ctx->screen()) {
 			case Screen::Trainer: {
 				KLAPPT_PROFILE_SCOPE_N("render_screen.Start");

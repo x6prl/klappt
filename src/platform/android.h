@@ -35,6 +35,6 @@ inline void android_set_status_bar_icons_dark(bool dark) {
 }
 #else
 
-inline void android_set_status_bar_icons_dark(bool dark) {}
+inline void android_set_status_bar_icons_dark(bool dark) { (void)dark; }
 
 #endif // ANDROID

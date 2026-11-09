@@ -1,3 +1,5 @@
+#include "app/app_status.h"
+#include "base/str_builder.h"
 #include "screen_helpers.h"
 
 #include "app/app_context.h"
@@ -11,6 +13,7 @@
 #include "ui/components/list_island.h"
 
 #include "ui/trs.h"
+#include <SDL3/SDL_log.h>
 
 namespace {
 
@@ -70,11 +73,10 @@ void screen_exercise_go(AppContext *ctx, bool reset_stack) {
 	KLAPPT_PROFILE_SCOPE_N("screen_exercise_go");
 	Measure m{__FUNCTION__};
 	auto generate_at_most = ctx->settings.exercise_round_size;
-	Size due_count{};
 	{
 		KLAPPT_PROFILE_SCOPE_N("generate_new_exercises");
-		due_count =
-			  ctx->exercises.generate_new_exercises(ctx, generate_at_most);
+		// Size due_count =
+		ctx->exercises.generate_new_exercises(ctx, generate_at_most);
 	}
 	m.lap().printus();
 	if (reset_stack) {
@@ -82,6 +84,19 @@ void screen_exercise_go(AppContext *ctx, bool reset_stack) {
 	} else {
 		ctx->push(Screen::Exercice);
 	}
+	ctx->on_app_bar_back_button_cb = [](AppContext *ctx) {
+		SDL_Log("ON APP BACK BTN");
+		ctx->app_status.push_notification(
+			  {tr()->screen_exercise_exit_trainer_notification_title,
+		       tr()->screen_exercise_exit_trainer_notification_body,
+		       ctx->ticks + AppStatus::Notification::DEFAULT_TTL_MS,
+		       [](AppContext *ctx) {
+		SDL_Log("ON NOT CLICked");
+				   ctx->on_app_bar_back_button_cb = nullptr;
+				   ctx->pop();
+			   }});
+		return false;
+	};
 }
 
 void screen_exercise_draw(AppContext *ctx) {
@@ -228,7 +243,10 @@ void screen_exercise_draw(AppContext *ctx) {
 			if (!is_phrase && es.source_sub0().size > 0) {
 				auto sub_color = theme()->onSurface;
 				sub_color.a = static_cast<uint8_t>(sub_color.a * 0.6f);
-				draw_text(es.source_sub0(), sub_color, sizes()->font.label_md,
+				auto also_sub0_str = StrBuilder::concat(
+					  ctx->arena_frame, tr()->screen_exercise_also, " "_v,
+					  es.source_sub0());
+				draw_text(also_sub0_str, sub_color, sizes()->font.label_md,
 				          font_id, CLAY_TEXT_WRAP_WORDS,
 				          CLAY_TEXT_ALIGN_CENTER);
 			}

@@ -111,6 +111,7 @@ struct AppContext {
 	Idx current{0};
 	Screen stack[STACK_SIZE]{Screen::Onboarding};
 	Arena arena_screen_list[STACK_SIZE];
+	bool (*on_app_bar_back_button_cb)(AppContext *ctx){nullptr};
 	Arena &arena_screen() { return arena_screen_list[current]; }
 
 	// used to burst high FPS for the next 1000ms
@@ -192,6 +193,7 @@ struct AppContext {
 		return Screen::Trainer;
 	}
 	void on_screen_change(Screen from, Screen to) {
+		on_app_bar_back_button_cb = nullptr;
 		if (from != to) {
 			arena_screen().clear();
 		}

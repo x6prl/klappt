@@ -146,11 +146,10 @@ StrView extract_exercise_prompts(Arena &a, Arena &scratch, const Word &word,
 
 	if (!clean_subs.is_empty()) {
 		if (clean_subs.size == 1) {
-			exercise->source_sub0 =
-				  StrBuilder::concat(a, "also: "_v, clean_subs[0]);
+			exercise->source_sub0 = clean_subs[0].copy(a);
 		} else {
-			exercise->source_sub0 = StrBuilder::concat(
-				  a, "also: "_v, clean_subs[0], ", "_v, clean_subs[1]);
+			exercise->source_sub0 =
+				  StrBuilder::concat(a, clean_subs[0], ", "_v, clean_subs[1]);
 		}
 	} else {
 		exercise->source_sub0 = {};
