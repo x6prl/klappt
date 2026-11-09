@@ -137,22 +137,16 @@ inline uint16_t translation_font_id(const AppContext *ctx) {
 	                                            : FontID::MAIN;
 }
 
-inline float get_font_size_based_on_str_size(float viewport_width, float scale,
-                                             Size str_size,
-                                             float min_font_size = 16.f,
-                                             float max_font_size = 28.f) {
-	const float effective_scale = scale > 0.05f ? scale : sizes()->scale;
-
+inline float get_font_size_based_on_str_size(float viewport_width,
+                                             Size str_size, float min_font_size,
+                                             float max_font_size) {
 	const float length_factor =
 		  std::clamp(static_cast<float>(str_size) - 15.f, 0.f, 10.f) / 10.f;
 	const auto target_text_width =
 		  viewport_width * (0.8f + 0.15f * length_factor);
 
-	const float min_scaled = effective_scale * min_font_size;
-	const float max_scaled = effective_scale * max_font_size;
-
 	return std::clamp((target_text_width / static_cast<float>(str_size)),
-	                  min_scaled, max_scaled);
+	                  min_font_size, max_font_size);
 }
 
 inline void add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,

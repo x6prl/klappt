@@ -1,11 +1,8 @@
-#include "app/app_status.h"
-#include "base/str_builder.h"
 #include "screen_helpers.h"
 
-#include "app/app_context.h"
 #include "base/measure.h"
 #include "base/profiler.h"
-#include "base/str_view.h"
+#include "base/str_builder.h"
 #include "domain/exercises.h"
 #include "domain/word.h"
 
@@ -17,8 +14,7 @@
 
 namespace {
 
-static inline float
-calculate_exercise_internal_progress(const ExerciseState &ex) {
+float calculate_exercise_internal_progress(const ExerciseState &ex) {
 	Size total_substages = 0;
 	Size passed_substages = 0;
 
@@ -38,8 +34,7 @@ calculate_exercise_internal_progress(const ExerciseState &ex) {
 	       static_cast<float>(total_substages);
 }
 
-static inline void draw_exercise_progress_bar(AppContext *ctx,
-                                              const ExerciseState &ex) {
+void draw_exercise_progress_bar(const ExerciseState &ex) {
 	const float progress = calculate_exercise_internal_progress(ex);
 
 	CLAY(CLAY_ID("ExerciseProgressBarTrack"),
@@ -91,7 +86,7 @@ void screen_exercise_go(AppContext *ctx, bool reset_stack) {
 		       tr()->screen_exercise_exit_trainer_notification_body,
 		       ctx->ticks + AppStatus::Notification::DEFAULT_TTL_MS,
 		       [](AppContext *ctx) {
-		SDL_Log("ON NOT CLICked");
+				   SDL_Log("ON NOT CLICked");
 				   ctx->on_app_bar_back_button_cb = nullptr;
 				   ctx->pop();
 			   }});
@@ -148,16 +143,18 @@ void screen_exercise_draw(AppContext *ctx) {
 			   .backgroundColor = theme()->surface,
 		 }) {
 
-		draw_exercise_progress_bar(ctx, current_ex);
+		draw_exercise_progress_bar(current_ex);
 
+		const float font_size_biggest =
+			  sizes()->font.title_lg +
+			  (sizes()->font.display - sizes()->font.title_lg) * 0.5f;
 		const float source_font_size =
-			  is_phrase
-					? get_font_size_based_on_str_size(ctx->window_width,
-		                                              ctx->scale, text_length,
-		                                              16.f, 22.f)
-					: get_font_size_based_on_str_size(ctx->window_width,
-		                                              ctx->scale, text_length,
-		                                              22.f, 36.f);
+			  is_phrase ? get_font_size_based_on_str_size(
+								ctx->window_width, text_length,
+								sizes()->font.body_sm, sizes()->font.title_lg)
+						: get_font_size_based_on_str_size(
+								ctx->window_width, text_length,
+								sizes()->font.title_md, font_size_biggest);
 
 		const auto font_id = translation_font_id(ctx);
 

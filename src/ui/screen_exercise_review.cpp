@@ -1,10 +1,8 @@
 #include "screen_helpers.h"
 
-#include "app/app_context.h"
 #include "app/words_init.h"
 #include "app/worker.h"
 #include "base/str_builder.h"
-#include "base/str_view.h"
 #include "domain/exercises.h"
 #include "platform/neuro.h"
 
@@ -64,9 +62,8 @@ struct CoalescedDiff {
 	DynArr<int> is_right;
 };
 
-static inline CoalescedDiff coalesce_diff_parts(Arena &a,
-                                                const DynArr<StrView> &parts,
-                                                const DynArr<int> &is_right) {
+CoalescedDiff coalesce_diff_parts(Arena &a, const DynArr<StrView> &parts,
+                                  const DynArr<int> &is_right) {
 	CoalescedDiff out{};
 	if (parts.size == 0)
 		return out;
@@ -105,10 +102,9 @@ static inline CoalescedDiff coalesce_diff_parts(Arena &a,
 	return out;
 }
 
-static void draw_wrapped_diff_tokens(AppContext *ctx,
-                                     const DynArr<StrView> &raw_parts,
-                                     const DynArr<int> &raw_is_right,
-                                     bool is_actual, float font_size) {
+void draw_wrapped_diff_tokens(AppContext *ctx, const DynArr<StrView> &raw_parts,
+                              const DynArr<int> &raw_is_right, bool is_actual,
+                              float font_size) {
 	if (raw_parts.size == 0)
 		return;
 
@@ -281,13 +277,16 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			   .backgroundColor = theme()->surface,
 		 }) {
 
+		const float font_size_biggest =
+			  sizes()->font.title_lg +
+			  (sizes()->font.display - sizes()->font.title_lg) * 0.5f;
 		const float source_font_size =
 			  is_phrase ? get_font_size_based_on_str_size(
-								ctx->window_width, ctx->scale,
-								diff.source.utf8_length(), 15.f, 20.f)
+								ctx->window_width, diff.source.utf8_length(),
+								sizes()->font.body_sm, sizes()->font.title_lg)
 						: get_font_size_based_on_str_size(
-								ctx->window_width, ctx->scale,
-								diff.source.utf8_length(), 20.f, 30.f);
+								ctx->window_width, diff.source.utf8_length(),
+								sizes()->font.title_md, font_size_biggest);
 		const auto font_id = translation_font_id(ctx);
 
 		CLAY(CLAY_ID("ReviewTaskArea"),
