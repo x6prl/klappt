@@ -85,3 +85,11 @@ ru:  повт.
 @mastered_max_level
 en: Mastered (Max level)
 ru: Освоено (макс. уровень)
+
+@notification_word_not_found
+en: The word is not found in dictionary
+ru: Слово не найдено в словаре
+
+@notification_word_view_stack_cap
+en: Word view stack capacity reached!
+ru: Достигнут предел переходов по словам!

@@ -1,16 +1,16 @@
-#include "app/worker.h"
-#include "domain/word_id.h"
 #include "screen_helpers.h"
 
 #include <simdjson/simdjson.h>
 
 #include "app/app_context.h"
+#include "app/worker.h"
 #include "base/pair.h"
 #include "base/profiler.h"
 #include "base/str_builder.h"
 #include "base/str_view.h"
 #include "domain/grammar.h"
 #include "domain/word.h"
+#include "domain/word_id.h"
 #include "domain/word_payload.h"
 #include "platform/neuro.h"
 
@@ -92,7 +92,12 @@ bool find_and_push_word_if_exist(AppContext *ctx, StrView word,
 	if (ctx->word_store.find_word(ctx->arena_frame, word, is_phrase, word_id))
 		  [[likely]] {
 		if (!push_and_fill_state(ctx, word_id)) {
-			ctx->app_status.push_error("Word view stack cap reached"_v);
+			ctx->app_status.push_notification(
+				  {.title =
+			             tr()->screen_word_view_notification_word_view_stack_cap,
+			       .body = {},
+			       .deadline =
+			             ctx->ticks + AppStatus::Notification::DEFAULT_TTL_MS});
 		} else {
 			Worker::send_haptic_feedback(ctx);
 		}
@@ -934,11 +939,18 @@ static void draw_word_card(AppContext *ctx, Clay_ElementId element_id,
 								          sizes()->font.label_sm);
 							}
 
-							if (is_hovered && ctx->tslt.is_tap()) {
+							if (is_hovered && ctx->tslt.consume_tap()) {
 								if (!find_and_push_word_if_exist(ctx, word_text,
 								                                 false)) {
-									ctx->app_status.push_error(
-										  "The word is not found in dictionary"_v);
+									ctx->app_status.push_notification(
+										  {.title =
+									             tr()->screen_word_view_notification_word_not_found,
+									       .body = {}, // TODO: offer to search
+									                   // in dictionary instead
+									       .deadline = ctx->ticks +
+									                   AppStatus::Notification::
+									                         DEFAULT_TTL_MS,
+									       .on_click_cb = nullptr});
 								}
 							}
 						}

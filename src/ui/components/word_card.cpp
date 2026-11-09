@@ -140,7 +140,7 @@ void word_second_col(Arena &a, Clay_ElementId id, StrView translations_plain,
 } // namespace
 
 TapScrollLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
-                                            const Word &w) {
+                                             const Word &w) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_for_words_list");
 	TapScrollLongTap::State ret{TapScrollLongTap::State::FingerUp};
 	auto is_usual_card = !w.in_learning_list;
@@ -181,10 +181,12 @@ TapScrollLongTap::State word_card_dictionary(AppContext *ctx, Clay_ElementId id,
 		                tr_plain, col, sizes()->font.body_sm,
 		                translation_font_id(ctx));
 
-		bool is_tap_or_longtap = (ctx->tslt.state == TapScrollLongTap::Tap ||
-		                          ctx->tslt.state == TapScrollLongTap::LongTap);
-		if (Clay_Hovered() && is_tap_or_longtap) {
-			ret = ctx->tslt.state;
+		if (ctx->tslt.is_tap_or_longtap()) {
+			auto el_data = Clay_GetElementData(id);
+			ret = el_data.found && ctx->tslt.is_started_and_ended_inside(
+										 el_data.boundingBox)
+			            ? ctx->tslt.state
+			            : ret;
 		}
 	}
 	return ret;
@@ -228,8 +230,10 @@ bool word_card_suggestions(AppContext *ctx, Clay_ElementId id, const Word &w) {
 		                trs_plain, col, sizes()->font.body_sm,
 		                translation_font_id(ctx));
 
-		if (ctx->tslt.is_tap() && Clay_Hovered()) {
-			ret = true;
+		if (ctx->tslt.is_tap()) {
+			auto el_data = Clay_GetElementData(id);
+			ret = el_data.found &&
+			      ctx->tslt.is_started_and_ended_inside(el_data.boundingBox);
 		}
 	}
 	return ret;
@@ -237,8 +241,8 @@ bool word_card_suggestions(AppContext *ctx, Clay_ElementId id, const Word &w) {
 
 // tapped, longtapped
 TapScrollLongTap::State word_card_learning_list(AppContext *ctx,
-                                               Clay_ElementId id, const Word &w,
-                                               int due_mark) {
+                                                Clay_ElementId id,
+                                                const Word &w, int due_mark) {
 	KLAPPT_PROFILE_SCOPE_N("word_card_with_due");
 	TapScrollLongTap::State ret{TapScrollLongTap::State::FingerUp};
 
@@ -339,10 +343,12 @@ TapScrollLongTap::State word_card_learning_list(AppContext *ctx,
 					  }));
 		}
 
-		bool is_tap_or_longtap = (ctx->tslt.state == TapScrollLongTap::Tap ||
-		                          ctx->tslt.state == TapScrollLongTap::LongTap);
-		if (Clay_Hovered() && is_tap_or_longtap) {
-			ret = ctx->tslt.state;
+		if (ctx->tslt.is_tap_or_longtap()) {
+			auto el_data = Clay_GetElementData(id);
+			ret = el_data.found && ctx->tslt.is_started_and_ended_inside(
+										 el_data.boundingBox)
+			            ? ctx->tslt.state
+			            : ret;
 		}
 	}
 	return ret;
