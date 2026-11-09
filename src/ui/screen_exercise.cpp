@@ -358,6 +358,15 @@ void screen_exercise_draw(AppContext *ctx) {
 			} else {
 				list_island(ctx, CLAY_ID("ListIsland"), ss.opts.data,
 				            ss.opts.size, style, submit_tap);
+				CLAY(CLAY_ID_LOCAL("ListIslandSpacer"),
+				     {
+						   .layout =
+								 {
+									   .sizing = {CLAY_SIZING_FIXED(0),
+				                                  CLAY_SIZING_PERCENT(.1f)},
+								 },
+						   .backgroundColor = theme()->secondary,
+					 }) {}
 			}
 		}
 	}
