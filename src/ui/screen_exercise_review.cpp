@@ -529,8 +529,19 @@ void screen_exercise_review_draw(AppContext *ctx) {
 			if (is_correct) {
 				auto promote_btn = mobile_icon_button<false>(
 					  ctx, CLAY_ID("PromoteModeButton"), Icons::CHEVRON_UP);
-				if (promote_btn.activated()) {
-					promote_current_review_word_mode(ctx);
+				if (promote_btn.activated() &&
+				    promote_current_review_word_mode(ctx)) {
+
+					StrView title =
+						  ctx->exercises.current_result_review().actual;
+					ctx->app_status.push_notification(
+						  {.title = title,
+					       .body =
+					             tr()->screen_exercise_review_notification_promotion_success_sub,
+					       .deadline =
+					             ctx->ticks +
+					             AppStatus::Notification::DEFAULT_TTL_MS});
+					ctx->exercises.next_result();
 				}
 			}
 		}

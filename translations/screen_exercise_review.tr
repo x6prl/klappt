@@ -18,6 +18,10 @@ ru: Ваш ответ
 en: click anywhere to review next
 ru: нажмите в любом месте, чтобы продолжить
 
+@notification_promotion_success_sub
+en: Dificulty increased!
+ru: Сложность повышена!
+
 @err_word_state
 en: Word learning state error
 ru: Ошибка состояния изучения слова
