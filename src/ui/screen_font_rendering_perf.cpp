@@ -112,6 +112,7 @@ static void draw_phase_cold_cache(AppContext *ctx, uint32_t frame_idx) {
 }
 
 static void draw_phase_hot_cache(AppContext *ctx) {
+	(void)ctx;
 	KLAPPT_PROFILE_SCOPE_N("FontPerf::HotCache");
 
 	struct DictItem {
@@ -193,6 +194,7 @@ static void draw_phase_hot_cache(AppContext *ctx) {
 }
 
 static void draw_phase_wrapping(AppContext *ctx, uint32_t frame_idx) {
+	(void)ctx;
 	KLAPPT_PROFILE_SCOPE_N("FontPerf::WrappingStress");
 
 	constexpr Arr<StrView, 4> EXAMPLES_DE = {
@@ -265,6 +267,7 @@ static void draw_phase_wrapping(AppContext *ctx, uint32_t frame_idx) {
 }
 
 static void draw_phase_mixed_fonts(AppContext *ctx) {
+	(void)ctx;
 	KLAPPT_PROFILE_SCOPE_N("FontPerf::MixedFonts");
 
 	CLAY(CLAY_ID("MixedFontsContainer"),
