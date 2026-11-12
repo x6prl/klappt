@@ -10,16 +10,9 @@ ru: Добавить слова в список для изучения
 en: also:
 ru: также:
 
-@cannot_go_back_notification_title
-en: You are already at the start
-ru: Вы уже в начале упражнения
-@cannot_go_back_notification_body
-en: In order to exit press back button in the top panel
-ru: Для выхода из тренажера нажмите кнопку назад в верхней панели
-
-@exit_trainer_notification_title
+@notification_exit_trainer_tile
 en: Are you sure you want to exit?
 ru: Вы действительно хотите покинуть тренажер?
-@exit_trainer_notification_body
+@notification_exit_trainer_body
 en: Click here to exit
 ru: Нажмите сюда для выхода

@@ -84,8 +84,8 @@ inline void on_back_button_pressed(AppContext *ctx) {
 		} else {
 			// NOTE: it was
 			ctx->app_status.push_notification(
-				  {tr()->screen_exercise_cannot_go_back_notification_title,
-			       tr()->screen_exercise_cannot_go_back_notification_body,
+				  {tr()->screen_helpers_notification_cannot_go_back_title,
+			       tr()->screen_helpers_notification_cannot_go_back_body,
 			       ctx->ticks + AppStatus::Notification::DEFAULT_TTL_MS});
 			return;
 		}
@@ -165,20 +165,29 @@ inline void add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,
 			word_store->save(tmparena, *word);
 		};
 		Engine::State state{};
-		auto [success, was_found] = states->get(word->word_id, state);
-		if (!success) {
+		auto [is_success, was_found] = states->get(word->word_id, state);
+		if (!is_success) {
 			rollback_added_word();
-			app_status->push_error("Cannot read word learning state"_v);
+			app_status->push_error(
+				  tr()->screen_helpers_error_cannot_read_word_state);
 			return;
 		}
 		if (!was_found) {
+			// NOTE: then we create new
 			if (!states->set(word->word_id, state)) {
 				rollback_added_word();
-				app_status->push_error("Cannot create word learning state"_v);
+				app_status->push_error(
+					  tr()->screen_helpers_error_cannot_create_word_state);
 			}
 		}
 	} else {
-		app_status->push_error("Cannot add to the learning list"_v);
+		app_status->push_notification(
+			  {.title =
+		             tr()->screen_helpers_notification_cannot_add_word_to_learning_list_title,
+		       .body = {},
+		       .deadline = tctx()->app_ctx->ticks +
+		                   AppStatus::Notification::DEFAULT_TTL_MS,
+		       .on_click_cb = nullptr});
 	}
 }
 

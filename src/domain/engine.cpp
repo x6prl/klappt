@@ -481,7 +481,7 @@ void States::close() {
 	due_dbi = 0;
 }
 
-// returns [success, was_found]
+// returns [is_success, was_found]
 Pair<bool, bool> States::get(WordId word_id, State &dst) const {
 	KLAPPT_PROFILE_SCOPE_N("Engine::States::get");
 	MDB_txn *txn;
