@@ -6,7 +6,7 @@
 #include "app/app_status.h"
 #include "app/sizes.h"
 #include "app/textcache.h"
-#include "app/themes.h"
+#include "app/themes.h" // IWYU pragma: keep
 #include "app/words_init.h"
 #include "base/arena.h"
 #include "base/shuffle.h"
