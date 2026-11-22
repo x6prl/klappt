@@ -15,6 +15,52 @@
 #include "platform/web_persist.h"
 #include "ui/translations/langs.h"
 
+// #define DEBUG_FILL_WORDS
+#ifdef DEBUG_FILL_WORDS
+#include "base/dyn_arr.h"
+inline void debug_helper_add_word_to_learning_list(Arena &tmparena, Word *word, Words *words,
+                                      WordStore *word_store,
+                                      Engine::States *states,
+                                      AppStatus *app_status) {
+	word->in_learning_list = true;
+
+	auto word_ref = words->add();
+	if (word_ref != Words::null_index()) {
+		(*words)[word_ref] = *word;
+		word_store->save(tmparena, *word);
+		auto rollback_added_word = [&] {
+			word->in_learning_list = false;
+			words->remove_by_ref(word_ref);
+			word_store->save(tmparena, *word);
+		};
+		Engine::State state{};
+		auto [is_success, was_found] = states->get(word->word_id, state);
+		if (!is_success) {
+			rollback_added_word();
+			app_status->push_error(
+				  "tr()->screen_helpers_error_cannot_read_word_state"_v);
+			return;
+		}
+		if (!was_found) {
+			// NOTE: then we create new
+			if (!states->set(word->word_id, state)) {
+				rollback_added_word();
+				app_status->push_error(
+					  "tr()->screen_helpers_error_cannot_create_word_state"_v);
+			}
+		}
+	} else {
+		app_status->push_notification(
+			  {.title =
+		             "tr()->screen_helpers_notification_cannot_add_word_to_learning_list_title"_v,
+		       .body = {},
+		       .deadline = tctx()->app_ctx->ticks +
+		                   AppStatus::Notification::DEFAULT_TTL_MS,
+		       .on_click_cb = nullptr});
+	}
+}
+#endif // DEBUG_FILL_WORDS
+
 inline StrView str_view(const std::string &value) {
 	return {value.data(), static_cast<Size>(value.size())};
 }
@@ -110,29 +156,29 @@ inline bool learning_list_seed_matches(const Word &word,
 	return false;
 }
 
-inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
-                                             Words &words,
-                                             WordStore &word_store,
-                                             Engine::States &states) {
-	word.in_learning_list = true;
-	auto word_ref = words.add();
-	if (word_ref != Words::null_index()) {
-		words[word_ref] = word;
-		word_store.save(tmparena, word);
-		Engine::State state{};
-		auto [success, was_found] = states.get(word.word_id, state);
-		if (!success) {
-			return false;
-		}
-		if (!was_found) {
-			if (!states.set(word.word_id, state)) {
-				return false;
-			}
-		}
-		return true;
-	}
-	return false;
-}
+// inline bool add_word_to_learning_list_seeded(Arena &tmparena, Word &word,
+//                                              Words &words,
+//                                              WordStore &word_store,
+//                                              Engine::States &states) {
+// 	word.in_learning_list = true;
+// 	auto word_ref = words.add();
+// 	if (word_ref != Words::null_index()) {
+// 		words[word_ref] = word;
+// 		word_store.save(tmparena, word);
+// 		Engine::State state{};
+// 		auto [success, was_found] = states.get(word.word_id, state);
+// 		if (!success) {
+// 			return false;
+// 		}
+// 		if (!was_found) {
+// 			if (!states.set(word.word_id, state)) {
+// 				return false;
+// 			}
+// 		}
+// 		return true;
+// 	}
+// 	return false;
+// }
 
 inline bool seed_default_learning_list(AppContext &ctx) {
 	(void)ctx;
@@ -140,6 +186,10 @@ inline bool seed_default_learning_list(AppContext &ctx) {
 }
 
 inline bool init_runtime_data(AppContext &ctx) {
+	SDL_Log("==================");
+	SDL_Log("main arena usage before runtime data init: %" PRSize " / %" PRSize
+	        " bytes",
+	        ctx.arena.offset, ctx.arena.capacity);
 	KLAPPT_PROFILE_SCOPE_N("init_runtime_data");
 
 #if NEURO
@@ -177,7 +227,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 	const auto lcode = lang_code(lang);
 	SDL_Log("Active translation language: " StrView_Fmt, StrView_Arg(lcode));
 
-	{ 
+	{
 		ctx.word_store.close();
 		ctx.states.close();
 
@@ -196,10 +246,10 @@ inline bool init_runtime_data(AppContext &ctx) {
 		m.lap().printus("xapian opened");
 
 		if (ctx.words) {
-			delete ctx.words;
+			delete ctx.words; // TODO: rethink
 			ctx.words = nullptr;
 		}
-		ctx.words = new Words;
+		ctx.words = new Words; // TODO: rethink
 
 		FileLoader fl{};
 		if (fl.load_from_writable(scratch, words_leaf)) {
@@ -223,6 +273,22 @@ inline bool init_runtime_data(AppContext &ctx) {
 				SDL_Log("main arena usage after decode: %" PRSize " / %" PRSize
 				        " bytes",
 				        ctx.arena.offset, ctx.arena.capacity);
+#ifdef DEBUG_FILL_WORDS
+				if (false && ctx.words->size < Words::WORDS_CAPACITY - 1) {
+					uint64_t rng_state = ctx.ticks;
+					for (; ctx.words->size < Words::WORDS_CAPACITY - 2;) {
+						auto g = ctx.arena_frame.guard();
+						DynArr<Word> out = {};
+						ctx.word_store.get_smart_suggestions(ctx.arena_frame,
+						                                     ctx.arena, 1,
+						                                     out, &rng_state);
+						debug_helper_add_word_to_learning_list(ctx.arena_frame, &out.first(),
+						                          ctx.words, &ctx.word_store,
+						                          &ctx.states, &ctx.app_status);
+						SDL_Log("added ");
+					}
+				}
+#endif // DEBUG_FILL_WORDS
 			}
 		} else {
 			SDL_Log(StrView_Fmt
@@ -255,7 +321,7 @@ inline bool init_runtime_data(AppContext &ctx) {
 		m.lap().printus("save remapped snapshot");
 	}
 
-	SDL_Log("main arena usage after startup load: %" PRSize " / %" PRSize
+	SDL_Log("main arena usage after runtime data init: %" PRSize " / %" PRSize
 	        " bytes",
 	        ctx.arena.offset, ctx.arena.capacity);
 	SDL_Log("==================");
