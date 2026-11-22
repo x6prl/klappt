@@ -201,7 +201,8 @@ struct AppContext {
 		if (focused_input) {
 			focused_input = nullptr;
 			focused_input_id = 0;
-			if (window && SDL_TextInputActive(window)) {
+			if (SDL_TextInputActive(window)) {
+				SDL_Log("Changing screens and have an active input -> unfocusing and do SDL_StopTextInput()");
 				SDL_StopTextInput(window);
 			}
 		}
