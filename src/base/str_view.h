@@ -49,6 +49,11 @@ struct StrView {
 	StrView utf8_remove_punctuation(Arena &a) const;
 	[[nodiscard]]
 	StrView utf8_trim_punctuation(Arena &a) const;
+	// will not capitalize ẞ!
+	// will copy anyway
+	[[nodiscard]]
+	StrView utf8_capitalize_first_letter(Arena &a) const;
+
 
 	[[nodiscard]]
 	StrView copy(Arena &a) const;
@@ -112,11 +117,15 @@ struct StrView {
 	bool is_contains_punctuation_unicode() const;
 	// excluding 'y' and 'Y'
 	bool is_contains_vowels_german() const;
+
 	bool is_starts_with(char ch) const;
 	bool is_starts_with(StrView pref) const;
 	bool is_starts_with_digit() const;
+	bool utf8_is_starts_with_capital_letter() const;
+
 	bool is_ends_with(char ch) const;
 	bool is_ends_with(StrView suff) const;
+
 	// returns nullptr if notfound
 	const char *find(char ch) const;
 
@@ -157,8 +166,7 @@ constexpr StrView operator""_v(const char *str, std::size_t size) noexcept {
  * UTF32 basics *
  ****************/
 namespace UTF32 {
-Size decode_one_from_utf8(const char *str, Size size,
-                                 UTF32Codepoint &cp);
+Size decode_one_from_utf8(const char *str, Size size, UTF32Codepoint &cp);
 int encode_to_utf8(UTF32Codepoint cp, char buf[]);
 Pair<UTF32Codepoint *, Size> decode_from_utf8(Arena &a, StrView from);
 } // namespace UTF32

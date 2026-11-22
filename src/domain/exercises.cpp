@@ -343,6 +343,7 @@ void append_common_stage_entire(Arena &a, Arena &scratch,
                                 const StrView correct_str_raw,
                                 const DynArr<StrView> all_strs,
                                 FormType form_type, StrView source,
+                                bool is_capitalize_all_options,
                                 ExerciseState *exercise) {
 	constexpr Size OPTIONS_MAX = 5;
 	const StrView correct_str = correct_str_raw.trim();
@@ -367,8 +368,14 @@ void append_common_stage_entire(Arena &a, Arena &scratch,
 	Size distractor_count = std::min<Size>(candidates.size, OPTIONS_MAX - 1);
 	DynArr<StrView> opts =
 		  DynArr<StrView>::with<OPTIONS_MAX>(a, correct_str.copy(a));
-	for (Size i = 0; i < distractor_count; ++i) {
-		opts.push(a, candidates[i].copy(a));
+	if (is_capitalize_all_options) {
+		for (Size i = 0; i < distractor_count; ++i) {
+			opts.push(a, candidates[i].utf8_capitalize_first_letter(a));
+		}
+	} else {
+		for (Size i = 0; i < distractor_count; ++i) {
+			opts.push(a, candidates[i].copy(a));
+		}
 	}
 
 	// 4. shuffle options
@@ -416,7 +423,7 @@ void append_stages_aux_and_past_participle(
 		case Engine::Mode::Entire:
 			append_common_stage_entire(
 				  a, scratch, past_participle, past_participle_list,
-				  FormType::Partizip2, source_pp, exercise);
+				  FormType::Partizip2, source_pp, false, exercise);
 			break;
 		case Engine::Mode::Gaps:
 			append_common_stage_gaps(a, past_participle, Tokenizer::Kind::Verb,
@@ -781,11 +788,13 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 										 StrView str, Tokenizer::Kind kind,
 										 DynArr<StrView> spare_list,
 										 StrView source,
+										 bool is_capitalize_all_options,
 										 FormType form_type = FormType::None) {
 			switch (mode) {
 			case Engine::Mode::Entire:
 				append_common_stage_entire(a, scratch, str, spare_list,
-				                           form_type, source, e);
+				                           form_type, source,
+				                           is_capitalize_all_options, e);
 				break;
 			case Engine::Mode::Gaps:
 				append_common_stage_gaps(a, str, kind, form_type, source, e);
@@ -806,7 +815,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 				  extract_exercise_prompts(a, scratch, word, &exercise, parser);
 			append_article_stage(a, word, source, &exercise);
 			append_common_stage(word.n.lemma, Tokenizer::Kind::Noun,
-			                    noun_lemma_list, source);
+			                    noun_lemma_list, source, false);
 			append_plural_stage(a, scratch, word, source, &exercise);
 		} else if (word.type == WordType::Verb) {
 			auto source_clean =
@@ -814,19 +823,19 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 
 			{
 				append_common_stage(word.v.infinitive, Tokenizer::Kind::Verb,
-				                    verb_infinitive_list, source_clean,
+				                    verb_infinitive_list, source_clean, false,
 				                    FormType::Infinitive);
 				if (word.v.third_person) {
 					append_common_stage(
 						  grammar::verb_third_person(scratch, word.v),
 						  Tokenizer::Kind::Verb, verb_third_person_list,
-						  source_clean, FormType::ThirdPerson);
+						  source_clean, false, FormType::ThirdPerson);
 				}
 				if (word.v.praeteritum) {
 					append_common_stage(
 						  grammar::verb_praeteritum(scratch, word.v),
 						  Tokenizer::Kind::Verb, verb_praeteritum_list,
-						  source_clean, FormType::Praeteritum);
+						  source_clean, false, FormType::Praeteritum);
 				}
 				if (word.v.auxv_and_past_participle) {
 					append_stages_aux_and_past_participle(
@@ -840,19 +849,19 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 
 			{
 				append_common_stage(word.a.lemma, Tokenizer::Kind::Adjective,
-				                    adjective_lemma_list, source_clean);
+				                    adjective_lemma_list, source_clean, false);
 				if (!word.a.is_indeclinable) {
 					if (word.a.comparative) {
 						append_common_stage(word.a.comparative,
 						                    Tokenizer::Kind::Adjective,
 						                    adjective_cmp_list, source_clean,
-						                    FormType::Comparative);
+						                    false, FormType::Comparative);
 					}
 					if (word.a.superlative) {
 						append_common_stage(word.a.superlative,
 						                    Tokenizer::Kind::Adjective,
 						                    adjective_sup_list, source_clean,
-						                    FormType::Superlative);
+						                    false, FormType::Superlative);
 					}
 				}
 			}
@@ -862,9 +871,13 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 			                       : extract_exercise_prompts(
 										   a, scratch, word, &exercise, parser);
 			auto text = word.p.text;
+
+			bool is_first_word = true;
 			for (auto w = text.mut_split(); w; w = text.mut_split()) {
-				auto trimmed_w = !(w.is_starts_with_digit() && w.size <= 3 &&
-				                   w.is_ends_with('.')) &&
+				bool can_be_an_ordinal_number = w.is_starts_with_digit() &&
+				                                w.size <= 3 &&
+				                                w.is_ends_with('.');
+				auto trimmed_w = !(can_be_an_ordinal_number) &&
 				                             w.is_contains_punctuation_unicode()
 				                       ? w.utf8_trim_punctuation(scratch)
 				                       : w;
@@ -878,7 +891,13 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 					  : kind == Tokenizer::Kind::Adjective
 							? phrase_words_list_and_adjectives
 							: phrase_words_list_and_verbs;
-				append_common_stage(trimmed_w, kind, spare_words_list, source);
+
+				bool is_capitalize_all_options =
+					  is_first_word &&
+					  trimmed_w.utf8_is_starts_with_capital_letter();
+				append_common_stage(trimmed_w, kind, spare_words_list, source,
+				                    is_capitalize_all_options);
+				is_first_word = false;
 			}
 		}
 		// Size i{0};

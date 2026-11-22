@@ -367,6 +367,46 @@ StrView StrView::utf8_trim_punctuation(Arena &a) const {
 	return {utf8_buf, static_cast<Size>(ptr - utf8_buf)};
 }
 
+StrView StrView::utf8_capitalize_first_letter(Arena &a) const {
+	if (!size) {
+		return {};
+	}
+
+	auto copy = a.pushN<char>(size);
+	memcpy(copy, data, size);
+
+	auto b0 = static_cast<uint8_t>(data[0]);
+
+	// ASCII: a-z -> A-Z
+	if (b0 >= 'a' && b0 <= 'z') {
+		copy[0] -= 0x20;
+		return {copy, size};
+	}
+
+	if (size < 2 || b0 != 0xC3) {
+		return {copy, size};
+	}
+
+	auto b1 = static_cast<uint8_t>(data[1]);
+
+	switch (b1) {
+	case 0xA4: // ä -> Ä
+	case 0xB6: // ö -> Ö
+	case 0xBC: // ü -> Ü
+		copy[1] -= 0x20;
+		break;
+
+	case 0x9F: // ß is not changed to ẞ
+			   // NOTE: we do not capitalize ẞ
+			   // and do not replace it with SS
+		break;
+
+	default:
+		break;
+	}
+	return {copy, size};
+}
+
 StrView StrView::copy(Arena &a) const {
 	if (!size) {
 		return {};
@@ -489,6 +529,35 @@ bool StrView::is_starts_with_digit() const {
 	}
 	auto ch = first();
 	return ch >= '0' && ch <= '9';
+}
+
+bool StrView::utf8_is_starts_with_capital_letter() const {
+	if (!size) [[unlikely]] {
+		return false;
+	}
+
+	const auto b0 = static_cast<uint8_t>(data[0]);
+
+	if (b0 >= 'A' && b0 <= 'Z') {
+		return true;
+	}
+
+	// Ä, Ö, Ü
+	if (size >= 2 && b0 == 0xC3) {
+		const auto b1 = static_cast<uint8_t>(data[1]);
+
+		if (b1 == 0x84 || b1 == 0x96 || b1 == 0x9C) {
+			return true;
+		}
+	}
+
+	// capital sharp S: ẞ
+	if (size >= 3 && b0 == 0xE1 && static_cast<uint8_t>(data[1]) == 0xBA &&
+	    static_cast<uint8_t>(data[2]) == 0x9E) {
+		return true;
+	}
+
+	return false;
 }
 
 bool StrView::is_ends_with(char ch) const { return size > 0 && last() == ch; }
