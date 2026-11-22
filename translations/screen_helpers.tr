@@ -1,0 +1,18 @@
+@notification_cannot_go_back_title
+en: You are already at the start
+ru: Вы уже в начале упражнения
+@notification_cannot_go_back_body
+en: In order to exit press back button in the top panel
+ru: Для выхода из тренажера нажмите кнопку назад в верхней панели
+
+@notification_cannot_add_word_to_learning_list_title
+en: Cannot add more words to the learning list
+ru: Не могу добавить больше слов в список для изучения
+
+@error_cannot_read_word_state
+en: Cannot read the word learning state
+ru: Не могу прочесть состояние слова
+
+@error_cannot_create_word_state
+en: Cannot create a word learning state
+ru: Не могу создать состояние слова
