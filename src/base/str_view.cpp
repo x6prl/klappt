@@ -483,6 +483,14 @@ bool StrView::is_starts_with(StrView pref) const {
 	return 0 == memcmp(data, pref.data, pref.size);
 }
 
+bool StrView::is_starts_with_digit() const {
+	if (!size) [[unlikely]] {
+		return false;
+	}
+	auto ch = first();
+	return ch >= '0' && ch <= '9';
+}
+
 bool StrView::is_ends_with(char ch) const { return size > 0 && last() == ch; }
 bool StrView::is_ends_with(StrView suff) const {
 	if (!suff) [[unlikely]] {

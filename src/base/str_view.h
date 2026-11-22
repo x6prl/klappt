@@ -114,6 +114,7 @@ struct StrView {
 	bool is_contains_vowels_german() const;
 	bool is_starts_with(char ch) const;
 	bool is_starts_with(StrView pref) const;
+	bool is_starts_with_digit() const;
 	bool is_ends_with(char ch) const;
 	bool is_ends_with(StrView suff) const;
 	// returns nullptr if notfound
