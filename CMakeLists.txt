@@ -58,7 +58,7 @@ endif()
 
 add_compile_options(
     $<$<CONFIG:Debug>:-Og>
-    $<$<CONFIG:Debug>:-ggdb>
+    $<$<CONFIG:Debug>:-g>
 
     $<$<CONFIG:Release>:-O2>
     $<$<CONFIG:Release>:-ffunction-sections>
