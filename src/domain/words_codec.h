@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base/arena.h"
+#include "base/profiler.h"
 #include "base/str_view.h"
 #include "domain/word.h"
 #include "domain/words.h"
@@ -245,6 +246,7 @@ inline bool decode_entry_payload(const unsigned char *&cursor,
 inline StrView word_encode(Arena &a, const Word &word) {
 	if (word.type == WordType::Nil)
 		return {};
+	KLAPPT_PROFILE_SCOPE_N("word_encode");
 
 	uint64_t max_size = 2 + 10 + 10; // header + id + timestamp
 	const bool valid = codec_detail::for_each_str(word, [&](StrView v) {
@@ -274,6 +276,7 @@ inline StrView word_encode(Arena &a, const Word &word) {
 inline bool word_decode(Arena &a, const void *data, Size size, Word &word) {
 	if (!data || size < 3 || size > MAX_ENCODED_BLOB_SIZE)
 		return false;
+	KLAPPT_PROFILE_SCOPE_N("word_decode");
 
 	const auto offset_before = a.offset;
 	auto *blob = static_cast<unsigned char *>(a.push(size, 1));
@@ -291,6 +294,7 @@ inline bool word_decode(Arena &a, const void *data, Size size, Word &word) {
 }
 
 inline StrView words_encode(Arena &a, const Words &words) {
+	KLAPPT_PROFILE_SCOPE_N("words_encode");
 	uint64_t max_size = 1 + 5 + 5; // version + entry_count + next_free
 	Size count = 0;
 
@@ -342,6 +346,7 @@ inline StrView words_encode(Arena &a, const Words &words) {
 inline bool words_decode(Arena &a, const void *data, Size size, Words &words) {
 	if (!data || size < 3 || size > MAX_ENCODED_BLOB_SIZE)
 		return false;
+	KLAPPT_PROFILE_SCOPE_N("words_decode");
 
 	const auto offset_before = a.offset;
 	auto *blob = static_cast<unsigned char *>(a.push(size, 1));

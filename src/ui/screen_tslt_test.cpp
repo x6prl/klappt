@@ -75,8 +75,7 @@ static StrView state_to_str(TapScrollLongTap::State s) {
 	}
 }
 
-static Clay_Color state_to_bg_color(AppContext *ctx,
-                                    TapScrollLongTap::State s) {
+static Clay_Color state_to_bg_color(TapScrollLongTap::State s) {
 	switch (s) {
 	case TapScrollLongTap::FingerUp:
 		return theme()->surfaceContainerHigh;
@@ -93,8 +92,7 @@ static Clay_Color state_to_bg_color(AppContext *ctx,
 	}
 }
 
-static Clay_Color state_to_fg_color(AppContext *ctx,
-                                    TapScrollLongTap::State s) {
+static Clay_Color state_to_fg_color(TapScrollLongTap::State s) {
 	switch (s) {
 	case TapScrollLongTap::FingerUp:
 		return theme()->onSurfaceContainerHigh;
@@ -180,12 +178,11 @@ void screen_tslt_test_draw(AppContext *ctx) {
 				CLAY(CLAY_ID("StateBadge"),
 				     {
 						   .layout = {.padding = sizes()->pad.badge_compact},
-						   .backgroundColor =
-								 state_to_bg_color(ctx, tslt.state),
+						   .backgroundColor = state_to_bg_color(tslt.state),
 						   .cornerRadius = sizes()->radius.xs,
 					 }) {
 					draw_text(state_to_str(tslt.state),
-					          state_to_fg_color(ctx, tslt.state),
+					          state_to_fg_color(tslt.state),
 					          sizes()->font.label_sm);
 				}
 
@@ -198,9 +195,9 @@ void screen_tslt_test_draw(AppContext *ctx) {
 							   .cornerRadius = sizes()->radius.xs,
 						 }) {
 						draw_text(
-							  StrBuilder::concat(
-									frame, "Streak: "_v,
-									StrView::from_number(frame, tslt.tap_count)),
+							  StrBuilder::concat(frame, "Streak: "_v,
+						                         StrView::from_number(
+													   frame, tslt.tap_count)),
 							  theme()->onSurface, sizes()->font.label_sm);
 					}
 				}
@@ -270,31 +267,28 @@ void screen_tslt_test_draw(AppContext *ctx) {
 			if (tslt.is_triple_tap_started_and_ended_inside(tap_rect)) {
 				s_test.triple_tap_count++;
 				s_test.add_log(
-					  StrBuilder::concat(
-							frame, "TRIPLE-TAP #"_v,
-							StrView::from_number(frame,
-				                                 s_test.triple_tap_count),
-							" inside!"_v),
+					  StrBuilder::concat(frame, "TRIPLE-TAP #"_v,
+				                         StrView::from_number(
+											   frame, s_test.triple_tap_count),
+				                         " inside!"_v),
 					  theme()->primary);
 				(void)tslt.consume_triple_tap();
 			} else if (tslt.is_double_tap_started_and_ended_inside(tap_rect)) {
 				s_test.double_tap_count++;
 				s_test.add_log(
-					  StrBuilder::concat(
-							frame, "DOUBLE-TAP #"_v,
-							StrView::from_number(frame,
-				                                 s_test.double_tap_count),
-							" inside"_v),
+					  StrBuilder::concat(frame, "DOUBLE-TAP #"_v,
+				                         StrView::from_number(
+											   frame, s_test.double_tap_count),
+				                         " inside"_v),
 					  theme()->secondary);
 				(void)tslt.consume_double_tap();
 			} else if (tslt.is_single_tap_started_and_ended_inside(tap_rect)) {
 				s_test.single_tap_count++;
 				s_test.add_log(
-					  StrBuilder::concat(
-							frame, "Single Tap #"_v,
-							StrView::from_number(frame,
-				                                 s_test.single_tap_count),
-							" inside"_v),
+					  StrBuilder::concat(frame, "Single Tap #"_v,
+				                         StrView::from_number(
+											   frame, s_test.single_tap_count),
+				                         " inside"_v),
 					  theme()->onSurface);
 				(void)tslt.consume_single_tap();
 			}
@@ -352,13 +346,12 @@ void screen_tslt_test_draw(AppContext *ctx) {
 											   : theme()->surfaceContainerHigh,
 								   .cornerRadius = sizes()->radius.xs,
 							 }) {
-							draw_text(
-								  StrBuilder::concat(
-										frame, label, ": "_v,
-										StrView::from_number(frame, count)),
-								  is_active ? theme()->surface
-											: theme()->onSurfaceContainer,
-								  sizes()->font.label_sm);
+							draw_text(StrBuilder::concat(
+											frame, label, ": "_v,
+											StrView::from_number(frame, count)),
+							          is_active ? theme()->surface
+							                    : theme()->onSurfaceContainer,
+							          sizes()->font.label_sm);
 						}
 					};
 
@@ -550,7 +543,8 @@ void screen_tslt_test_draw(AppContext *ctx) {
 					const float local_start_x = tslt.x - swipe_rect.x;
 					const float local_start_y = tslt.y - swipe_rect.y;
 
-					// 1. Scroll boundary ring (circle of radius scroll_threshold_px)
+					// 1. Scroll boundary ring (circle of radius
+					// scroll_threshold_px)
 					CLAY(CLAY_ID("ScrollDeadZoneCircle"),
 					     {
 							   .layout =

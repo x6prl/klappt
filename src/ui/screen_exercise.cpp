@@ -82,8 +82,8 @@ void screen_exercise_go(AppContext *ctx, bool reset_stack) {
 	ctx->on_app_bar_back_button_cb = [](AppContext *ctx) {
 		SDL_Log("ON APP BACK BTN");
 		ctx->app_status.push_notification(
-			  {tr()->screen_exercise_exit_trainer_notification_title,
-		       tr()->screen_exercise_exit_trainer_notification_body,
+			  {tr()->screen_exercise_notification_exit_trainer_tile,
+		       tr()->screen_exercise_notification_exit_trainer_body,
 		       ctx->ticks + AppStatus::Notification::DEFAULT_TTL_MS,
 		       [](AppContext *ctx) {
 				   SDL_Log("ON NOT CLICked");

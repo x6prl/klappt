@@ -115,8 +115,6 @@ void screen_dictionary_draw(AppContext *ctx) {
 		// NOTE: at least 2 chars to start searching
 		if (query.size >= 2) {
 			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
-
-			KLAPPT_PROFILE_SCOPE_N("screen_words_list_draw::word_search");
 			const auto mode = ctx->is_dictionary_search_translations_only
 			                        ? SearchMode::TranslationsOnly
 			                        : SearchMode::All;
