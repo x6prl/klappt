@@ -24,9 +24,9 @@ struct WordRef {
 };
 
 struct Words {
-	static constexpr Size MAX_WORDS = 1 << 11;
-	bool used[MAX_WORDS]{};
-	Word words[MAX_WORDS]{};
+	static constexpr Size WORDS_CAPACITY = 1 << 12;
+	bool used[WORDS_CAPACITY]{};
+	Word words[WORDS_CAPACITY]{};
 	Size next_free = 1;
 	Size size = 0;
 
@@ -47,7 +47,7 @@ struct Words {
 				return {(int32_t)ref};
 			}
 		}
-		if (next_free < MAX_WORDS) {
+		if (next_free < WORDS_CAPACITY) {
 			used[next_free] = true;
 			++size;
 			++next_free;

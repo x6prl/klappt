@@ -364,7 +364,7 @@ inline bool words_decode(Arena &a, const void *data, Size size, Words &words) {
 		return false;
 	}
 
-	if (entry_count > Words::MAX_WORDS || next_free > Words::MAX_WORDS) {
+	if (entry_count > Words::WORDS_CAPACITY || next_free > Words::WORDS_CAPACITY) {
 		a.offset = offset_before;
 		return false;
 	}
@@ -379,7 +379,7 @@ inline bool words_decode(Arena &a, const void *data, Size size, Words &words) {
 			return false;
 		}
 
-		if (ref_val == 0 || ref_val >= Words::MAX_WORDS ||
+		if (ref_val == 0 || ref_val >= Words::WORDS_CAPACITY ||
 		    words.used[ref_val]) {
 			a.offset = offset_before;
 			return false;
