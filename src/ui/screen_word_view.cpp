@@ -208,27 +208,22 @@ static StrView phrase_word_class_to_badge(StrView cls) {
 
 static StrView format_due_delta(Arena &a, Engine::Timestamp now,
                                 Engine::Timestamp due) {
-	const auto delta = static_cast<long long>(due - now);
-	if (delta <= 0) {
-		const auto overdue = -delta;
-		const int hours = overdue / (60 * 60);
-		const int mins = (overdue / 60) % 60;
-		auto ret = StrBuilder::concat(
-			  a, tr()->screen_word_view_due_overdue, " "_v,
-			  StrView::from_number(a, hours), tr()->ui_hour_1c, " "_v,
-			  StrView::from_number(a, mins), tr()->ui_minute_1c);
-		return ret;
-	}
+	const auto delta = static_cast<int64_t>(due) - static_cast<int64_t>(now);
 
-	const int days = delta / (60 * 60 * 24);
-	const int hours = (delta / (60 * 60)) % 24;
-	const int mins = (delta / 60) % 60;
-	auto ret = StrBuilder::concat(
-		  a, tr()->screen_word_view_due_in, " "_v,
-		  StrView::from_number(a, days), tr()->ui_day_1c, " "_v,
+	const bool overdue = delta <= 0;
+	const auto abs_delta = overdue ? -delta : delta;
+
+	const int64_t days = abs_delta / 86400;
+	const int64_t hours = (abs_delta / 3600) % 24;
+	const int64_t mins = (abs_delta / 60) % 60;
+
+	return StrBuilder::concat(
+		  a,
+		  overdue ? tr()->screen_word_view_due_overdue
+				  : tr()->screen_word_view_due_in,
+		  " "_v, StrView::from_number(a, days), tr()->ui_day_1c, " "_v,
 		  StrView::from_number(a, hours), tr()->ui_hour_1c, " "_v,
 		  StrView::from_number(a, mins), tr()->ui_minute_1c);
-	return ret;
 }
 
 static StrView mode_name(Engine::Mode mode) {
