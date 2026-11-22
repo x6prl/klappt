@@ -179,7 +179,7 @@ static StrView phrase_word_class_to_badge(StrView cls) {
 	}
 
 	if (cls == "phrase"_v) {
-		return "Redewendung"_v;
+		return "Satz"_v;
 	}
 	if (cls == "abbrev"_v) {
 		return "Abkürzung"_v;
