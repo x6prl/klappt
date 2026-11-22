@@ -864,7 +864,7 @@ Size Exercises::generate_new_exercises(AppContext *ctx, Size n) {
 			auto text = word.p.text;
 			for (auto w = text.mut_split(); w; w = text.mut_split()) {
 				auto trimmed_w = w.is_contains_punctuation_unicode()
-				                       ? w.utf8_remove_punctuation(scratch)
+				                       ? w.utf8_trim_punctuation(scratch)
 				                       : w;
 				if (!trimmed_w) {
 					continue;

@@ -335,6 +335,38 @@ StrView StrView::utf8_remove_punctuation(Arena &a) const {
 	return {out, out_size};
 }
 
+StrView StrView::utf8_trim_punctuation(Arena &a) const {
+	if (!size) {
+		return {};
+	}
+
+	char *utf8_buf = a.pushN<char>(size);
+
+	auto g = a.guard();
+	auto [utf32_ptr, utf32_size] = UTF32::decode_from_utf8(a, *this);
+
+	Size begin_idx = 0;
+	Size end_idx = utf32_size;
+
+	for (; begin_idx < end_idx && //
+	       is_unicode_punctuation(utf32_ptr[begin_idx]);
+	     ++begin_idx) {
+	}
+
+	for (; begin_idx < end_idx && //
+	       is_unicode_punctuation(utf32_ptr[end_idx - 1]);
+	     --end_idx) {
+	}
+
+	char *ptr = utf8_buf;
+
+	for (Size i = begin_idx; i < end_idx; ++i) {
+		ptr += UTF32::encode_to_utf8(utf32_ptr[i], ptr);
+	}
+
+	return {utf8_buf, static_cast<Size>(ptr - utf8_buf)};
+}
+
 StrView StrView::copy(Arena &a) const {
 	if (!size) {
 		return {};
@@ -720,7 +752,7 @@ StrView StrView::from_utf32(Arena &a, UTF32Codepoint *str, Size size) {
 int8_t StrView::utf8_codepoint_size(uint8_t b) { return bytes_for_utf8[b]; }
 
 Size UTF32::decode_one_from_utf8(const char *str, Size size,
-                                       UTF32Codepoint &cp) {
+                                 UTF32Codepoint &cp) {
 	Size cp_size{};
 	cp = decode_utf8_at(str, size, 0, cp_size);
 	return cp_size;
