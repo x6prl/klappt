@@ -10,8 +10,25 @@
 
 namespace {
 
-static constexpr Arr<StrView, 8> inseparable_prefixes = {
-	  "be"_v, "emp"_v, "ent"_v, "er"_v, "ge"_v, "miss"_v, "ver"_v, "zer"_v};
+static constexpr Arr<StrView, 16> inseparable_and_variable_prefixes = {
+	  "be"_v,
+	  "emp"_v,
+	  "ent"_v,
+	  "er"_v,
+	  "ge"_v,
+	  "miss"_v,
+	  "ver"_v,
+	  "zer"_v,
+	  // variable prefixes: only some verbs are inseparable.
+	  "durch"_v,
+	  "hinter"_v,
+	  "über"_v,
+	  "um"_v,
+	  "unter"_v,
+	  "wieder"_v,
+	  "wider"_v,
+	  "voll"_v,
+};
 static constexpr Arr<StrView, 2> no_ge_suffixes = {"ieren"_v, "eien"_v};
 static constexpr Arr<StrView, 8> stem_parts_exceptions = {
 	  "icht"_v, "ister"_v, "ter"_v,  "ier"_v,
@@ -45,7 +62,7 @@ bool stem_starts_with_one_of_and_stem_looks_valid(StrView stem,
 				    without_pref.is_contains_vowels_german()) [[unlikely]] {
 					if (stem_parts_exceptions.is_contains(without_pref))
 						  [[unlikely]] {
-						return false;
+						return false; // no more matches possible in our list
 					}
 					// SDL_Log(StrView_Fmt " | >>%" PRSize " vs size: %" PRSize,
 					//         StrView_Arg(without_pref),
@@ -121,7 +138,7 @@ StrView verb_form_pp(Arena &scratch, const Verb &v) {
 	bool do_not_add_ge = infinitiv_ends_with_one_of_and_infinitiv_looks_valid(
 							   inf_without_pref, no_ge_suffixes) ||
 	                     (stem_starts_with_one_of_and_stem_looks_valid(
-							   stem, inseparable_prefixes));
+							   stem, inseparable_and_variable_prefixes));
 	if (!do_not_add_ge) {
 		builder.push(scratch, "ge"_v);
 	}

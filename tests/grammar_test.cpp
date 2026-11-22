@@ -317,10 +317,8 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "gemacht"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "hat gemacht"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v),
-		                  "machte"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
-		                  "macht"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v), "machte"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v), "macht"_v);
 	}
 	{
 		Verb v{.infinitive = "betteln"_v,
@@ -621,10 +619,8 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "gedruckt"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "hat gedruckt"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v),
-		                  "druckte"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
-		                  "druckt"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v), "druckte"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v), "druckt"_v);
 	}
 
 	// Strong verbs with auxiliary "sein"
@@ -640,8 +636,7 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "ist gegangen"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v), "ging"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
-		                  "geht"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v), "geht"_v);
 	}
 
 	// Separable verbs
@@ -658,11 +653,67 @@ static void test_verb_tenses_and_forms(Arena &scratch) {
 		                  "aufgestanden"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_perfect_full(scratch, v),
 		                  "ist aufgestanden"_v);
-		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v),
-		                  "stand auf"_v);
+		TEST_CHECK_STR_EQ(grammar::verb_praeteritum(scratch, v), "stand auf"_v);
 		TEST_CHECK_STR_EQ(grammar::verb_third_person(scratch, v),
 		                  "steht auf"_v);
 	}
+}
+
+static void test_verb_past_participle_prefixes(Arena &scratch) {
+	auto check = [&](StrView infinitive, uint8_t separable_prefix_size,
+	                 StrView expected) {
+		Verb v{
+			  .infinitive = infinitive,
+			  .third_person = ""_v,
+			  .praeteritum = ""_v,
+			  .auxv_and_past_participle = "hat"_v,
+			  .separable_prefix_size = separable_prefix_size,
+		};
+
+		TEST_CHECK_STR_EQ(grammar::verb_past_participle(scratch, v), expected);
+	};
+
+	// ---------------------------------------------------------------------
+	// Inseparable prefixes
+	// ---------------------------------------------------------------------
+
+	check("durchschauen"_v, 0, "durchschaut"_v);
+
+	check("hinterfragen"_v, 0, "hinterfragt"_v);
+	check("hinterlegen"_v, 0, "hinterlegt"_v);
+
+	check("überzeugen"_v, 0, "überzeugt"_v);
+	check("übersetzen"_v, 0, "übersetzt"_v);
+
+	check("umarmen"_v, 0, "umarmt"_v);
+	check("umstellen"_v, 0, "umstellt"_v);
+
+	check("unterrichten"_v, 0, "unterrichtet"_v);
+
+	check("wiederholen"_v, 0, "wiederholt"_v);
+
+	check("widerlegen"_v, 0, "widerlegt"_v);
+
+	// ---------------------------------------------------------------------
+	// Separable prefixes
+	// NOTE: separable_prefix_size is measured in UTF-8 bytes.
+	// ---------------------------------------------------------------------
+
+	check("durchatmen"_v, 5, "durchgeatmet"_v);
+
+	check("überkochen"_v, 5, "übergekocht"_v);
+
+	// Same infinitive, different meaning.
+	check("übersetzen"_v, 5, "übergesetzt"_v);
+
+	check("umstellen"_v, 2, "umgestellt"_v);
+
+	check("untertauchen"_v, 5, "untergetaucht"_v);
+
+	// Same infinitive, different meaning.
+	check("wiederholen"_v, 6, "wiedergeholt"_v);
+
+	check("widerhallen"_v, 5, "widergehallt"_v);
 }
 
 // -----------------------------------------------------------------------------
@@ -702,6 +753,7 @@ int main() {
 	test_verb_auxiliary();
 	test_verb_regularity();
 	test_verb_tenses_and_forms(scratch);
+	test_verb_past_participle_prefixes(scratch);
 	test_arena_scratch_safety(scratch);
 
 	std::printf("======================================\n");
